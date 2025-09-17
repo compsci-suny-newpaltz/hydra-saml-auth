@@ -29,7 +29,11 @@ app.use(express.json());
 // Simple API key auth for all routes
 app.use((req, res, next) => {
   const provided = req.get('x-api-key') || '';
-  if (provided && crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(API_KEY))) {
+  const providedBuf = Buffer.from(provided);
+  const apiKeyBuf = Buffer.from(API_KEY);
+
+  if (provided && providedBuf.length === apiKeyBuf.length &&
+      crypto.timingSafeEqual(providedBuf, apiKeyBuf)) {
     return next();
   }
   return res.status(401).json({ success: false, message: 'Unauthorized' });
