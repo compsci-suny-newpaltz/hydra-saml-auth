@@ -208,7 +208,7 @@
     // Function to check if user exists in OpenWebUI
     function checkUserExists(email, name) {
       // This would be an AJAX call to your backend
-      fetch('/api/webui/check-user', {
+  fetch('/dashboard/api/webui/check-user', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -249,7 +249,7 @@
       }
       
       // This would be an AJAX call to your backend
-      fetch('/api/webui/create-account', {
+  fetch('/dashboard/api/webui/create-account', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -291,7 +291,7 @@
       }
       
       // This would be an AJAX call to your backend
-      fetch('/api/webui/change-password', {
+  fetch('/dashboard/api/webui/change-password', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

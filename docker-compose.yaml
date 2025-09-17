@@ -47,8 +47,12 @@ services:
     container_name: hydra-saml-auth
     volumes:
       - open-webui:/app/data:rw
+    env_file:
+      - .env
+    environment:
+      - OPENWEBUI_API_PORT=7070
     ports:
-      - "6969:6969"
+      - "7070:7070"
     restart: unless-stopped
     depends_on:
       - open-webui

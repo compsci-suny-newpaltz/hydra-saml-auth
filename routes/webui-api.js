@@ -1,9 +1,11 @@
-// routes/webui-api.js with direct SQLite access
+// routes/webui-api.js now proxies to remote OpenWebUI DB API server
 const express = require('express');
 const router = express.Router();
-const crypto = require('crypto');
-const bcrypt = require('bcrypt');
-const { getDb } = require('../db');
+const axios = require('axios');
+
+// Config: target backend and API key loaded from env
+const OPENWEBUI_API_BASE = process.env.OPENWEBUI_API_BASE || 'http://chimera:7070/openwebui/api';
+const OPENWEBUI_API_KEY = process.env.OPENWEBUI_API_KEY || process.env.WEBUI_API_KEY || process.env.API_KEY;
 
 // Middleware to ensure user is authenticated
 function ensureAuthenticated(req, res, next) {
@@ -13,157 +15,53 @@ function ensureAuthenticated(req, res, next) {
   res.status(401).json({ success: false, message: 'Not authenticated' });
 }
 
-// Helper function to hash passwords properly with bcrypt
-async function hashPassword(password) {
-  const saltRounds = 12;
-  const hash = await bcrypt.hash(password, saltRounds);
-  console.log("Generated bcrypt hash:", hash);
-  return hash;
+// Validate config at load time
+if (!OPENWEBUI_API_KEY) {
+  console.warn('[webui-api] Missing OPENWEBUI_API_KEY. Requests will fail with 500.');
 }
 
 // Check if user exists in OpenWebUI
 router.post('/check-user', ensureAuthenticated, async (req, res) => {
-  const db = await getDb();
   try {
-    const { email } = req.body;
-    
-    // Use prepared statements for security
-    const user = await db.get('SELECT id, name, email, role FROM user WHERE email = ?', [email]);
-    
-    if (user) {
-      res.json({
-        exists: true,
-        id: user.id,
-        username: user.name,
-        email: user.email,
-        role: user.role
-      });
-    } else {
-      res.json({ exists: false });
-    }
-  } catch (error) {
-    console.error('Error checking user:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Error checking user status' 
+    const { data } = await axios.post(`${OPENWEBUI_API_BASE}/check-user`, req.body, {
+      headers: { 'x-api-key': OPENWEBUI_API_KEY }
     });
-  } finally {
-    // Close the database connection
-    await db.close();
+    res.json(data);
+  } catch (error) {
+    const status = error.response?.status || 500;
+    const data = error.response?.data || { success: false, message: 'Error checking user status' };
+    console.error('[webui-api] check-user proxy error:', error.message);
+    res.status(status).json(data);
   }
 });
 
 // Create a new OpenWebUI account
 router.post('/create-account', ensureAuthenticated, async (req, res) => {
-  const db = await getDb();
   try {
-    const { email, name, password } = req.body;
-    
-    // Start a transaction
-    await db.run('BEGIN TRANSACTION');
-    
-    // Check if user already exists
-    const existingUser = await db.get('SELECT id FROM user WHERE email = ?', [email]);
-    
-    if (existingUser) {
-      await db.run('ROLLBACK');
-      return res.status(400).json({
-        success: false,
-        message: 'User with this email already exists'
-      });
-    }
-    
-    // Generate a unique ID for the user
-    const userId = crypto.randomUUID();
-    
-    // Hash the password
-    const hashedPassword = await hashPassword(password);
-    
-    // Get current timestamp in seconds
-    const timestamp = Math.floor(Date.now() / 1000);
-    
-    // Insert new user
-    await db.run(
-      `INSERT INTO user (
-        id, name, email, role, profile_image_url, created_at, updated_at, last_active_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        userId, 
-        name, 
-        email, 
-        'user', 
-        'https://hydra.newpaltz.edu/SUNYCAT.png', 
-        timestamp, 
-        timestamp, 
-        timestamp
-      ]
-    );
-    
-    // Insert auth record
-    await db.run(
-      `INSERT INTO auth (id, email, password, active) VALUES (?, ?, ?, ?)`,
-      [userId, email, hashedPassword, 1]
-    );
-    
-    // Commit the transaction
-    await db.run('COMMIT');
-    
-    res.json({
-      success: true,
-      message: 'Account created successfully'
+    const { data } = await axios.post(`${OPENWEBUI_API_BASE}/create-account`, req.body, {
+      headers: { 'x-api-key': OPENWEBUI_API_KEY }
     });
+    res.json(data);
   } catch (error) {
-    // Rollback on error
-    await db.run('ROLLBACK');
-    console.error('Error creating account:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error creating account'
-    });
-  } finally {
-    // Close the database connection
-    await db.close();
+    const status = error.response?.status || 500;
+    const data = error.response?.data || { success: false, message: 'Error creating account' };
+    console.error('[webui-api] create-account proxy error:', error.message);
+    res.status(status).json(data);
   }
 });
 
 // Change password for an existing account
 router.post('/change-password', ensureAuthenticated, async (req, res) => {
-  const db = await getDb();
   try {
-    const { email, password } = req.body;
-    
-    // Check if user exists
-    const user = await db.get('SELECT id FROM user WHERE email = ?', [email]);
-    
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
-    }
-    
-    // Hash the new password
-    const hashedPassword = await hashPassword(password);
-    
-    // Update password
-    await db.run(
-      'UPDATE auth SET password = ? WHERE email = ?',
-      [hashedPassword, email]
-    );
-    
-    res.json({
-      success: true,
-      message: 'Password updated successfully'
+    const { data } = await axios.post(`${OPENWEBUI_API_BASE}/change-password`, req.body, {
+      headers: { 'x-api-key': OPENWEBUI_API_KEY }
     });
+    res.json(data);
   } catch (error) {
-    console.error('Error changing password:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error updating password'
-    });
-  } finally {
-    // Close the database connection
-    await db.close();
+    const status = error.response?.status || 500;
+    const data = error.response?.data || { success: false, message: 'Error updating password' };
+    console.error('[webui-api] change-password proxy error:', error.message);
+    res.status(status).json(data);
   }
 });
 

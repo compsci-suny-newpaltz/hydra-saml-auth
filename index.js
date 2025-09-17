@@ -12,7 +12,6 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const fs = require('fs');
 
-
 const app = express();
 const PORT = process.env.PORT || 6969;
 
@@ -54,6 +53,18 @@ function sanitizeReturnTo(input) {
   return '/';
 }
 
+/**
+ * Loads Identity Provider (IdP) SAML metadata from a given URL and extracts key information.
+ *
+ * @async
+ * @param {string} url - The URL to fetch the IdP metadata XML from.
+ * @returns {Promise<{ entryPoint: string, certificate: string, logoutUrl: string | null }>} 
+ *   Resolves with an object containing:
+ *   - entryPoint: The SSO endpoint URL (preferably HTTP-Redirect binding).
+ *   - certificate: The IdP's signing X.509 certificate (base64, no whitespace).
+ *   - logoutUrl: The SLO endpoint URL, or null if not present.
+ * @throws {Error} If the metadata cannot be fetched, parsed, or required fields are missing.
+ */
 async function loadIdPFromMetadata(url) {
   const resp = await fetch(url);
   if (!resp.ok) throw new Error(`Metadata fetch failed: ${resp.status}`);
@@ -108,6 +119,25 @@ const URI = {
 const toArray = v => (!v ? [] : Array.isArray(v) ? v : [v]);
 const getClaim = (p, k, fb) => p[k] ?? (fb ? p[fb] : undefined);
 
+/**
+ * Extracts and normalizes user information from a SAML profile object.
+ *
+ * @param {Object} profile - The SAML profile object containing user claims.
+ * @returns {Object} An object containing normalized user attributes:
+ *   @property {string} sub - Subject identifier (nameID, oid, email, or name).
+ *   @property {string} email - User's email address.
+ *   @property {string} name - User's name (UPN or email).
+ *   @property {string} given_name - User's given name.
+ *   @property {string} family_name - User's family name.
+ *   @property {string} display_name - User's display name.
+ *   @property {string} tenant_id - Tenant identifier.
+ *   @property {string} oid - Object identifier.
+ *   @property {string} idp - Identity provider identifier.
+ *   @property {Array<string>} groups - Array of group names.
+ *   @property {string} affiliation - User's affiliation (e.g., 'student', 'faculty').
+ *   @property {Array<string>} roles - Array of user roles, including affiliation and domain-specific roles.
+ *   @property {Array<string>} amr - Array of authentication methods.
+ */
 function collectUserFromSaml(profile) {
   const email = getClaim(profile, URI.email) || profile.email || getClaim(profile, 'mail') || getClaim(profile, URI.upn);
   const given_name = getClaim(profile, URI.given) || profile.givenName || '';
@@ -139,6 +169,15 @@ let privateKeyPem = JWT_PRIVATE_KEY_PEM;
 let publicKeyPem = JWT_PUBLIC_KEY_PEM;
 let jwk = null;
 
+/**
+ * Ensures that RSA key pairs and their corresponding JWK are available.
+ * If PEM-encoded private and public keys are provided, builds a JWK from the public key.
+ * Otherwise, generates an ephemeral RSA key pair and exports them in PEM and JWK formats.
+ * Sets the global variables `privateKeyPem`, `publicKeyPem`, and `jwk`.
+ * Warns if ephemeral keys are used (not suitable for production).
+ *
+ * @throws {Error} If key generation or export fails.
+ */
 function ensureKeys() {
   if (privateKeyPem && publicKeyPem) {
     // build JWK from provided public key
@@ -167,17 +206,36 @@ function ensureKeys() {
 }
 ensureKeys();
 
+/**
+ * Signs and generates a JWT access token using the provided user claims.
+ *
+ * @param {Object} claims - The user claims to include in the JWT payload.
+ * @param {string} claims.email - The user's email address.
+ * @param {string} claims.name - The user's principal name (UPN), typically same as email.
+ * @param {string} claims.given_name - The user's given (first) name.
+ * @param {string} claims.family_name - The user's family (last) name.
+ * @param {string} claims.display_name - The user's full display name.
+ * @param {string} claims.tenant_id - The Azure AD tenant ID (school identifier).
+ * @param {string} claims.oid - The user's unique object ID in Azure AD.
+ * @param {string} claims.idp - The identity provider URL.
+ * @param {Array<string>} claims.groups - The groups the user belongs to.
+ * @param {string|Array<string>} claims.affiliation - The user's affiliation(s).
+ * @param {Array<string>} claims.roles - The user's roles.
+ * @param {Array<string>} claims.amr - The authentication methods references.
+ * @param {string} claims.sub - The subject identifier for the JWT.
+ * @returns {string} The signed JWT access token.
+ */
 function signAccessToken(claims) {
   // Payload kept reasonably small; students can also call /check for details
   const payload = {
     email: claims.email,
-    name: claims.name,
+    name: claims.name, // the UPN (User Principal Name), This is the same as email for us. Ignoring.
     given_name: claims.given_name,
     family_name: claims.family_name,
-    display_name: claims.display_name,
-    tid: claims.tenant_id,
-    oid: claims.oid,
-    idp: claims.idp,
+    display_name: claims.display_name, // Full name
+    school_id: claims.tenant_id, // This is the Azure AD tenant ID which means "New Paltz"
+    id: claims.oid, // This is the user's unique object ID in Azure AD (unlikely to be phished/spoofed)
+    idp: claims.idp, // Identity Provider (e.g. "https://sts.windows.net/..."). 
     groups: claims.groups,
     affiliation: claims.affiliation,
     roles: claims.roles,
@@ -194,6 +252,13 @@ function signAccessToken(claims) {
   });
 }
 
+/**
+ * Verifies a JWT access token using the provided public key and validation options.
+ *
+ * @param {string} token - The JWT access token to verify.
+ * @returns {object} The decoded token payload if verification is successful.
+ * @throws {Error} If the token is invalid or verification fails.
+ */
 function verifyAccessToken(token) {
   return jwt.verify(token, publicKeyPem, {
     algorithms: ['RS256'],
@@ -202,6 +267,12 @@ function verifyAccessToken(token) {
   });
 }
 
+/**
+ * Sets the 'np_access' cookie on the response with the provided token and options.
+ *
+ * @param {import('express').Response} res - The Express response object.
+ * @param {string} token - The JWT token to set as the cookie value.
+ */
 function setNpCookie(res, token) {
   res.cookie('np_access', token, {
     httpOnly: true,
@@ -215,6 +286,7 @@ function setNpCookie(res, token) {
 
 // ---------- App + middleware ----------
 app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
@@ -378,6 +450,14 @@ const ensureAuthenticated = (req, res, next) =>
       res.json({ keys: [jwk] });
     });
 
+    // Mount API routes for OpenWebUI account management
+    try {
+      const webuiApiRouter = require('./routes/webui-api');
+      app.use('/dashboard/api/webui', webuiApiRouter);
+    } catch (e) {
+      console.warn('[Init] webui-api routes not mounted:', e?.message || e);
+    }
+
     // Basic pages
     app.get('/', (req, res) => {
       res.redirect(req.isAuthenticated() ? '/dashboard' : '/login');
@@ -385,7 +465,13 @@ const ensureAuthenticated = (req, res, next) =>
 
     app.get('/dashboard', (req, res) => {
       if (!req.isAuthenticated()) return res.redirect('/login');
-      res.send(`<pre>Welcome ${req.user.display_name || req.user.email}\n\n${JSON.stringify(req.user, null, 2)}</pre>`);
+      const viewUser = {
+        firstName: req.user.given_name || '',
+        lastName: req.user.family_name || '',
+        email: req.user.email || '',
+        displayName: req.user.display_name || req.user.name || req.user.email || ''
+      };
+      res.render('dashboard', { user: viewUser });
     });
 
     app.get('/logout', (req, res, next) => {

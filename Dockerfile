@@ -21,10 +21,10 @@ USER root
 COPY --from=build /app/node_modules /app/node_modules
 COPY . .
 
-ENV PORT=6969 \
+ENV OPENWEBUI_API_PORT=7070 \
     DB_PATH=/app/data/webui.db
 
-EXPOSE 6969
+EXPOSE 7070
 
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["node", "index.js"]
+CMD ["npm", "run", "openwebui:server"]
