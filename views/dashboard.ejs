@@ -178,6 +178,33 @@
           </div>
         </div>
       </div>
+
+      <!-- n8n Account Management Section -->
+      <div class="webui-section">
+        <h3>n8n Account Management</h3>
+        <p>Manage your n8n automation account.</p>
+
+        <div id="n8n-status-loading"><p>Checking your n8n account status...</p></div>
+        <div id="n8n-account-exists" class="hidden">
+          <p><strong>Status:</strong> Found</p>
+          <p><strong>Role:</strong> <span id="n8n-role"></span></p>
+        </div>
+        <div id="n8n-create-account" class="hidden">
+          <p>No n8n account found. You can request an invite:</p>
+          <form id="n8n-create-form">
+            <div class="form-group">
+              <label for="n8n-email">Email</label>
+              <input type="email" id="n8n-email" required value="<%= user.email %>">
+            </div>
+            <button type="submit" class="btn btn-primary">Request n8n Invite</button>
+          </form>
+          <div id="n8n-create-message"></div>
+        </div>
+        <div id="n8n-invite" class="hidden">
+          <p>Invite created. Use this link to complete setup:</p>
+          <p><a id="n8n-invite-link" href="#" target="_blank"></a></p>
+        </div>
+      </div>
       
       <div class="actions" style="margin-top: 30px;">
         <a href="/logout" class="btn">Logout</a>
@@ -189,6 +216,7 @@
     document.addEventListener('DOMContentLoaded', function() {
       const email = "<%= user.email %>";
       const name = "<%= user.firstName %> <%= user.lastName %>";
+        const oid = "<%= user.oid %>";
       
       // Check if user exists in OpenWebUI
       checkUserExists(email, name);
@@ -202,6 +230,13 @@
       document.getElementById('change-password-form').addEventListener('submit', function(e) {
         e.preventDefault();
         changePassword(email);
+      });
+
+      // n8n: status + create flow
+  checkN8nStatus();
+      document.getElementById('n8n-create-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        createN8nAccount();
       });
     });
     
@@ -233,6 +268,54 @@
         console.error('Error checking user:', error);
         document.getElementById('webui-status-loading').innerHTML = 
           '<p class="error">Error checking account status. Please try again later.</p>';
+      });
+    }
+
+    // n8n helpers
+    function checkN8nStatus() {
+      fetch('/dashboard/api/n8n/status', { method: 'POST' })
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById('n8n-status-loading').classList.add('hidden');
+        if (data && data.exists === false) {
+          document.getElementById('n8n-create-account').classList.remove('hidden');
+        } else {
+          document.getElementById('n8n-account-exists').classList.remove('hidden');
+          if (data.role) document.getElementById('n8n-role').textContent = data.role;
+        }
+      })
+      .catch(err => {
+        console.error('Error checking n8n status:', err);
+        document.getElementById('n8n-status-loading').innerHTML = '<p class="message error">Error checking n8n status.</p>';
+      });
+    }
+
+    function createN8nAccount() {
+      // Email is taken from server-side auth; body is not required
+      const msg = document.getElementById('n8n-create-message');
+      fetch('/dashboard/api/n8n/create-user', { method: 'POST' })
+      .then(res => res.json())
+      .then(data => {
+        // If array [] -> already has account, no invite
+        if (Array.isArray(data)) {
+          msg.innerHTML = '<p class="message success">Account already active. No invite needed.</p>';
+          return;
+        }
+        if (data && data.user && data.user.inviteAcceptUrl) {
+          const link = data.user.inviteAcceptUrl;
+          document.getElementById('n8n-invite-link').textContent = link;
+          document.getElementById('n8n-invite-link').href = link;
+          document.getElementById('n8n-invite').classList.remove('hidden');
+          msg.innerHTML = '<p class="message success">Invite created successfully.</p>';
+        } else if (data && data.error) {
+          msg.innerHTML = `<p class="message error">${data.error}</p>`;
+        } else {
+          msg.innerHTML = '<p class="message error">Unexpected response.</p>';
+        }
+      })
+      .catch(err => {
+        console.error('Error creating n8n account:', err);
+        msg.innerHTML = '<p class="message error">Failed to create n8n account.</p>';
       });
     }
     

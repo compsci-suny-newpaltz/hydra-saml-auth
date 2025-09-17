@@ -458,6 +458,14 @@ const ensureAuthenticated = (req, res, next) =>
       console.warn('[Init] webui-api routes not mounted:', e?.message || e);
     }
 
+    // Mount API routes for n8n management
+    try {
+      const n8nApiRouter = require('./routes/n8n-api');
+      app.use('/dashboard/api/n8n', n8nApiRouter);
+    } catch (e) {
+      console.warn('[Init] n8n-api routes not mounted:', e?.message || e);
+    }
+
     // Basic pages
     app.get('/', (req, res) => {
       res.redirect(req.isAuthenticated() ? '/dashboard' : '/login');
@@ -469,7 +477,8 @@ const ensureAuthenticated = (req, res, next) =>
         firstName: req.user.given_name || '',
         lastName: req.user.family_name || '',
         email: req.user.email || '',
-        displayName: req.user.display_name || req.user.name || req.user.email || ''
+        displayName: req.user.display_name || req.user.name || req.user.email || '',
+        oid: req.user.oid || req.user.id || ''
       };
       res.render('dashboard', { user: viewUser });
     });
