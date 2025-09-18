@@ -1,0 +1,61 @@
+services:
+  ollama:
+    volumes:
+      - ollama:/root/.ollama
+    container_name: ollama
+    pull_policy: always
+    tty: true
+    restart: unless-stopped
+    image: ollama/ollama:${OLLAMA_DOCKER_TAG-latest}
+    ports:
+      - "11434:11434"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 3
+              capabilities:
+                - gpu
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:${WEBUI_DOCKER_TAG-main}
+    container_name: open-webui
+    volumes:
+      - open-webui:/app/backend/data
+    depends_on:
+      - ollama
+    ports:
+      - ${OPEN_WEBUI_PORT-3000}:8080 
+    environment:
+      - 'OLLAMA_BASE_URL=http://ollama:11434'
+      - 'WEBUI_SECRET_KEY='
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    restart: unless-stopped
+
+  openwebui_middleman:
+    build:
+      context: ..
+      dockerfile: chimera_docker/Dockerfile.middleman
+    container_name: openwebui_middleman
+    command: ["node", "openwebui_middleman/index.js"]
+    env_file:
+      - ../.env # contains OPENWEBUI_API_KEY
+    environment:
+      - OPENWEBUI_API_PORT=7070
+    volumes:
+      - open-webui:/app/data:rw
+    ports:
+      - "7070:7070"
+    restart: unless-stopped
+    depends_on:
+      - open-webui
+
+volumes:
+  ollama:
+    external: true
+    name: comp_ollama
+  open-webui:
+    external: true
+    name: comp_open-webui
