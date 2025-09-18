@@ -277,7 +277,7 @@ function setNpCookie(res, token) {
   res.cookie('np_access', token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    sameSite: 'lax',      
     domain: COOKIE_DOMAIN,       // remove or change if developing on localhost
     path: '/',
     maxAge: JWT_TTL_SECONDS * 1000

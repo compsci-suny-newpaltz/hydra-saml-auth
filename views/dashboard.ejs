@@ -28,7 +28,7 @@
           <p><span class="font-semibold">Username:</span> <%= user.displayName %></p>
         </div>
         <div class="shrink-0">
-          <a href="/logout" class="inline-flex items-center px-4 py-2 rounded bg-red-600 text-white hover:bg-red-700">Logout</a>
+          <a href="/logout?returnTo=https://hydra.newpaltz.edu/dashboard" class="inline-flex items-center px-4 py-2 rounded bg-red-600 text-white hover:bg-red-700">Logout</a>
         </div>
       </div>
 
@@ -41,11 +41,35 @@
       <!-- Tabs -->
       <div>
         <div class="flex border-b mb-4" role="tablist">
-          <button id="tab-openwebui" class="px-4 py-2 -mb-px border-b-2 border-[#052049] text-[#052049] font-medium" data-target="#panel-openwebui">OpenWebUI</button>
+          <button id="tab-minecraft" class="px-4 py-2 -mb-px border-b-2 border-[#052049] text-[#052049] font-medium" data-target="#panel-minecraft">Minecraft</button>
+          <button id="tab-openwebui" class="px-4 py-2 text-gray-600 hover:text-gray-900" data-target="#panel-openwebui">OpenWebUI</button>
           <button id="tab-n8n" class="px-4 py-2 text-gray-600 hover:text-gray-900" data-target="#panel-n8n">n8n</button>
         </div>
 
-        <section id="panel-openwebui">
+        <section id="panel-minecraft">
+          <h3 class="text-xl font-semibold mb-2">Minecraft Server</h3>
+          <form id="minecraft-form" class="space-y-3 max-w-md">
+            <div>
+              <label for="minecraft-username" class="block text-sm font-medium">Minecraft Username</label>
+              <input type="text" id="minecraft-username" name="minecraft-username" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2" placeholder="e.g. Notch" />
+              <p id="minecraft-help" class="text-xs text-gray-500 mt-2 hidden">Enter your Minecraft username (e.g. <span class="font-mono">Notch</span>). This is <span class="font-bold">required</span> to join the server.</p>
+            </div>
+            <button type="submit" class="inline-flex items-center px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700">Save Username</button>
+            <div id="minecraft-message" class="mt-3"></div>
+          </form>
+          <div class="mb-3">
+            <label for="minecraft-server-url" class="block text-sm font-medium">Server Address (Copy to Minecraft)</label>
+            <div class="flex items-center gap-2 mt-1">
+              <input type="text" id="minecraft-server-url" class="block w-full rounded border border-gray-300 px-3 py-2 font-mono bg-gray-100" value="hydra.newpaltz.edu" readonly />
+              <button type="button" id="copy-server-url" class="px-3 py-2 rounded bg-blue-600 text-white hover:bg-blue-700" title="Copy">Copy</button>
+            </div>
+            <p class="text-xs text-gray-500 mt-2">Paste this address into Minecraft to join the server.</p>
+          </div>
+          <p class="text-gray-700 mb-2">More Minecraft configuration at the <a href="https://hydra.newpaltz.edu/minecraftdashboard/" target="_blank" class="text-blue-600 underline">configuration panel</a>.</p>
+          
+        </section>
+
+        <section id="panel-openwebui" class="hidden">
           <h3 class="text-xl font-semibold mb-2">OpenWebUI Account Management</h3>
           <p class="text-gray-700 mb-2">Welcome to the OpenWebUI account management portal. OpenWebUI provides a comprehensive interface for accessing AI models and managing your preferences in a secure environment.</p>
           <p class="text-gray-700 mb-4">Our institution hosts an OpenWebUI instance at <a href="https://gpt.hydra.newpaltz.edu" target="_blank" class="text-blue-600 underline">https://gpt.hydra.newpaltz.edu</a>. To utilize these services, you'll need to establish credentials through this portal.</p>
@@ -120,7 +144,7 @@
   </main>
 
   <script>
-    document.addEventListener('DOMContentLoaded', function() {
+  document.addEventListener('DOMContentLoaded', function() {
       const email = "<%= user.email %>";
       const name = "<%= user.firstName %> <%= user.lastName %>";
       const oid = "<%= user.oid %>";
@@ -141,6 +165,7 @@
 
       // Tabs
       const tabs = [
+        { btn: 'tab-minecraft', panel: 'panel-minecraft' },
         { btn: 'tab-openwebui', panel: 'panel-openwebui' },
         { btn: 'tab-n8n', panel: 'panel-n8n' }
       ];
@@ -155,6 +180,58 @@
           document.getElementById(t.btn).classList.remove('text-gray-600');
           document.getElementById(t.panel).classList.remove('hidden');
         });
+      });
+
+      // Minecraft username fetch/save
+      async function api(url, opts={}) {
+        const res = await fetch(url, opts);
+        if (!res.ok) throw new Error(await res.text());
+        return await res.json();
+      }
+      async function loadMinecraftUsername() {
+        try {
+          const res = await fetch('/minecraftdashboard/api/my-username');
+          if (res.status === 401) {
+            window.location.href = '/logout?returnTo=https://hydra.newpaltz.edu/dashboard';
+            return;
+          }
+          if (!res.ok) throw new Error(await res.text());
+          const { minecraft_username } = await res.json();
+          const input = document.getElementById('minecraft-username');
+          input.value = minecraft_username || '';
+          document.getElementById('minecraft-help').classList.toggle('hidden', !!minecraft_username);
+        } catch {
+          document.getElementById('minecraft-help').classList.remove('hidden');
+        }
+      }
+      document.getElementById('minecraft-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const input = document.getElementById('minecraft-username');
+        const username = input.value.trim();
+        const msg = document.getElementById('minecraft-message');
+        if (!username) {
+          msg.innerHTML = '<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2">Please enter a Minecraft username.</p>';
+          document.getElementById('minecraft-help').classList.remove('hidden');
+          return;
+        }
+        try {
+          await api('/minecraftdashboard/api/my-username', { method: 'POST', body: JSON.stringify({ minecraft_username: username }), headers: { 'Content-Type': 'application/json' } });
+          msg.innerHTML = '<p class="text-green-700 bg-green-100 border border-green-200 rounded p-2">Username saved!</p>';
+          document.getElementById('minecraft-help').classList.add('hidden');
+        } catch (err) {
+          msg.innerHTML = '<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2">Failed to save username.</p>';
+        }
+      });
+      loadMinecraftUsername();
+
+      // Copy Minecraft server URL to clipboard
+      document.getElementById('copy-server-url').addEventListener('click', function() {
+        const input = document.getElementById('minecraft-server-url');
+        input.select();
+        input.setSelectionRange(0, 99999); // For mobile
+        document.execCommand('copy');
+        this.textContent = 'Copied!';
+        setTimeout(() => { this.textContent = 'Copy'; }, 1500);
       });
 
       // n8n: status + create flow
@@ -202,7 +279,7 @@
       .then(res => res.json())
       .then(data => {
         document.getElementById('n8n-status-loading').classList.add('hidden');
-        if (data && data.exists === false) {
+        if (data && data.isPending === true) {
           document.getElementById('n8n-create-account').classList.remove('hidden');
         } else {
           document.getElementById('n8n-account-exists').classList.remove('hidden');
@@ -222,10 +299,11 @@
       .then(res => res.json())
       .then(data => {
         // If array [] -> already has account, no invite
-        if (Array.isArray(data)) {
+        if (data.length == 0) {
           msg.innerHTML = '<p class="text-green-700 bg-green-100 border border-green-200 rounded p-2">Account already active. No invite needed.</p>';
           return;
         }
+        data = data[0]; // Get first item
         if (data && data.user && data.user.inviteAcceptUrl) {
           const link = data.user.inviteAcceptUrl;
           document.getElementById('n8n-invite-link').textContent = link;
@@ -299,30 +377,30 @@
       }
       
       // This would be an AJAX call to your backend
-  fetch('/dashboard/api/webui/change-password', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          email: email,
-          password: newPassword 
-        })
-      })
-      .then(response => response.json())
-      .then(data => {
-        if (data.success) {
-          messageDiv.innerHTML = '<p class="text-green-700 bg-green-100 border border-green-200 rounded p-2">Password updated successfully!</p>';
-          // Clear the form
-          document.getElementById('change-password-form').reset();
-        } else {
-            messageDiv.innerHTML = `<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2">Error: ${data.message}</p>`;
-        }
-      })
-      .catch(error => {
-        console.error('Error changing password:', error);
-        messageDiv.innerHTML = '<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2">Error updating password. Please try again later.</p>';
-      });
+      fetch('/dashboard/api/webui/change-password', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 
+              email: email,
+              password: newPassword 
+            })
+          })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              messageDiv.innerHTML = '<p class="text-green-700 bg-green-100 border border-green-200 rounded p-2">Password updated successfully!</p>';
+              // Clear the form
+              document.getElementById('change-password-form').reset();
+            } else {
+                messageDiv.innerHTML = `<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2">Error: ${data.message}</p>`;
+            }
+          })
+          .catch(error => {
+            console.error('Error changing password:', error);
+            messageDiv.innerHTML = '<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2">Error updating password. Please try again later.</p>';
+          });
     }
   </script>
 </body>
