@@ -10,3 +10,30 @@ services:
     ports:
       - "6969:6969"
     restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - hydra_students_net
+
+  traefik:
+    image: traefik:v2.11
+    container_name: traefik
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:8082
+      - --entrypoints.web.forwardedHeaders.trustedIPs=127.0.0.1/32
+      - --api.dashboard=true
+    ports:
+      - "8082:8082"   # public entrypoint for student containers
+      - "8081:8080"   # optional: Traefik dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
+    networks:
+      - hydra_students_net
+
+networks:
+  hydra_students_net:
+    driver: bridge
+    name: hydra_students_net

@@ -466,6 +466,14 @@ const ensureAuthenticated = (req, res, next) =>
       console.warn('[Init] n8n-api routes not mounted:', e?.message || e);
     }
 
+    // Mount API routes for student containers (behind auth)
+    try {
+      const containersRouter = require('./routes/containers');
+      app.use('/dashboard/api/containers', ensureAuthenticated, containersRouter);
+    } catch (e) {
+      console.warn('[Init] containers routes not mounted:', e?.message || e);
+    }
+
     // Basic pages
     app.get('/', (req, res) => {
       res.redirect(req.isAuthenticated() ? '/dashboard' : '/login');
