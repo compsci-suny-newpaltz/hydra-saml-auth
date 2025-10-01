@@ -7,13 +7,12 @@ services:
     env_file:
       - .env
     command: ["npm", "start"]
-    ports:
-      - "6969:6969"
+    network_mode: host # required for access to chimera:7070 for openwebui password reset
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-    networks:
-      - hydra_students_net
+    # Note: ports are not needed with host network mode
+    # The app will bind directly to host port 6969
 
   traefik:
     image: traefik:v2.11
@@ -25,8 +24,8 @@ services:
       - --entrypoints.web.forwardedHeaders.trustedIPs=127.0.0.1/32
       - --api.dashboard=true
     ports:
-      - "8082:8082"   # public entrypoint for student containers
-      - "8081:8080"   # optional: Traefik dashboard
+      - "8082:8082"
+      - "8081:8080"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     restart: unless-stopped
