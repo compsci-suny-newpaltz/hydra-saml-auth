@@ -480,6 +480,25 @@
             
             const stateColor = c.state === 'running' ? 'text-green-600' : 'text-gray-500';
             
+            // Build repo info display if this is a repo container
+            let repoInfo = '';
+            if (c.repoUrl) {
+              const repoMatch = c.repoUrl.match(/github\.com\/([^\/]+\/[^\/\.]+)/);
+              const repoSlug = repoMatch ? repoMatch[1] : null;
+              const commitShort = c.repoCommit ? c.repoCommit.substring(0, 7) : 'unknown';
+              const commitLink = repoSlug && c.repoCommit 
+                ? `https://github.com/${repoSlug}/commit/${c.repoCommit}` 
+                : c.repoUrl;
+              
+              repoInfo = `
+                <div class="text-xs text-gray-600 mt-1">
+                  <i class="fab fa-github"></i> 
+                  <a href="${c.repoUrl}" target="_blank" class="underline">${repoSlug || c.repoUrl}</a>
+                  @ <a href="${commitLink}" target="_blank" class="font-mono underline">${commitShort}</a>
+                </div>
+              `;
+            }
+            
             row.innerHTML = `
               <div class="flex items-start justify-between mb-2">
                 <div class="flex-1">
@@ -487,11 +506,15 @@
                   <div class="text-xs text-gray-600">${c.image}</div>
                   <div class="text-xs ${stateColor}"><i class="fas fa-circle" style="font-size:6px;"></i> ${c.state} — ${c.status}</div>
                   ${c.url ? `<div class="mt-1"><a class="text-xs underline text-blue-600" target="_blank" href="${c.url}"><i class="fas fa-external-link-alt"></i> ${c.url}</a></div>` : ''}
+                  ${repoInfo}
                 </div>
               </div>
               <div class="flex gap-2 flex-wrap">
                 ${c.jupyterToken ? `<button onclick="showToken('${c.jupyterToken}')" class="px-2 py-1 text-xs rounded bg-purple-100 hover:bg-purple-200 border border-purple-300 text-purple-700">
                   <i class="fas fa-key"></i> Show Token
+                </button>` : ''}
+                ${c.repoUrl ? `<button onclick="gitPull('${c.name}')" class="px-2 py-1 text-xs rounded bg-green-100 hover:bg-green-200 border border-green-300 text-green-700">
+                  <i class="fas fa-sync-alt"></i> Pull Latest
                 </button>` : ''}
                 <button onclick="openLogs('${c.name}')" class="px-2 py-1 text-xs rounded bg-gray-200 hover:bg-gray-300 border">
                   <i class="fas fa-file-alt"></i> Logs
@@ -538,6 +561,22 @@
         }
       };
 
+      window.gitPull = async function(name) {
+        if (!confirm('Pull latest changes from the repository? This will update the code and restart the container.')) return;
+        try {
+          const res = await fetch(`/dashboard/api/containers/${encodeURIComponent(name)}/git-pull`, { method: 'POST' });
+          const data = await res.json();
+          if (!res.ok || !data.success) throw new Error(data.message || 'Failed');
+          const msg = data.commitHash 
+            ? `Successfully updated to commit ${data.commitHash.substring(0, 7)}!` 
+            : 'Successfully pulled latest changes!';
+          alert(msg);
+          loadMyContainers();
+        } catch (err) {
+          alert('Failed to pull latest changes: ' + err.message);
+        }
+      };
+
       window.openLogs = function(name) {
         const w = window.open('', '_blank', 'width=900,height=600');
         w.document.write('<!DOCTYPE html><html><head><title>Logs: ' + name + '</title>');
@@ -568,26 +607,52 @@
 
       window.openTerminal = function(name) {
         const w = window.open('', '_blank', 'width=1000,height=700');
-        w.document.write('<!DOCTYPE html><html><head><title>Terminal: ' + name + '</title>');
-        w.document.write('<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />');
-        w.document.write('<style>body { margin: 0; padding: 0; background: #000; } #terminal { height: 100vh; padding: 8px; }</style>');
-        w.document.write('</head><body><div id="terminal"></div>');
-        w.document.write('<sc' + 'ript src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></sc' + 'ript>');
-        w.document.write('<sc' + 'ript>');
-        w.document.write('window.addEventListener("load", function() {');
-        w.document.write('  const term = new Terminal({ convertEol: true, fontFamily: "monospace", fontSize: 14, cursorBlink: true, theme: { background: "#000000", foreground: "#ffffff" } });');
-        w.document.write('  term.open(document.getElementById("terminal"));');
-        w.document.write('  term.writeln("Connecting to container...");');
-        w.document.write('  const proto = location.protocol === "https:" ? "wss" : "ws";');
-        w.document.write('  const ws = new WebSocket(proto + "://" + location.host + "/dashboard/ws/containers/' + encodeURIComponent(name) + '/exec");');
-        w.document.write('  ws.binaryType = "arraybuffer";');
-        w.document.write('  ws.onopen = function() { term.clear(); term.writeln("Connected! Type commands below:"); term.write("$ "); };');
-        w.document.write('  ws.onmessage = function(ev) { term.write(new Uint8Array(ev.data)); };');
-        w.document.write('  ws.onclose = function() { term.writeln("\\r\\n[Connection closed]"); };');
-        w.document.write('  ws.onerror = function() { term.writeln("\\r\\n[Connection error]"); };');
-        w.document.write('  term.onData(function(data) { if (ws.readyState === WebSocket.OPEN) ws.send(data); });');
-        w.document.write('});');
-        w.document.write('</sc' + 'ript></body></html>');
+        const doc = w.document;
+        
+        doc.open();
+        doc.write('<!DOCTYPE html><html><head><title>Terminal: ' + name + '</title></head><body></body></html>');
+        doc.close();
+        
+        // Add stylesheet
+        const link = doc.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = 'https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css';
+        doc.head.appendChild(link);
+        
+        // Add styles
+        const style = doc.createElement('style');
+        style.textContent = 'body { margin: 0; padding: 0; background: #000; } #terminal { height: 100vh; padding: 8px; }';
+        doc.head.appendChild(style);
+        
+        // Add terminal div
+        const terminalDiv = doc.createElement('div');
+        terminalDiv.id = 'terminal';
+        doc.body.appendChild(terminalDiv);
+        
+        // Load xterm.js and initialize
+        const script = doc.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js';
+        script.onload = function() {
+          const term = new w.Terminal({ 
+            convertEol: true, 
+            fontFamily: "monospace", 
+            fontSize: 14, 
+            cursorBlink: true, 
+            theme: { background: "#000000", foreground: "#ffffff" } 
+          });
+          term.open(doc.getElementById("terminal"));
+          term.writeln("Connecting to container...");
+          
+          const proto = location.protocol === "https:" ? "wss" : "ws";
+          const ws = new WebSocket(proto + "://" + location.host + "/dashboard/ws/containers/" + encodeURIComponent(name) + "/exec");
+          ws.binaryType = "arraybuffer";
+          ws.onopen = function() { term.clear(); term.writeln("Connected! Type commands below:"); term.write("$ "); };
+          ws.onmessage = function(ev) { term.write(new Uint8Array(ev.data)); };
+          ws.onclose = function() { term.writeln("\r\n[Connection closed]"); };
+          ws.onerror = function() { term.writeln("\r\n[Connection error]"); };
+          term.onData(function(data) { if (ws.readyState === WebSocket.OPEN) ws.send(data); });
+        };
+        doc.head.appendChild(script);
       };
 
       document.getElementById('refresh-containers').addEventListener('click', loadMyContainers);

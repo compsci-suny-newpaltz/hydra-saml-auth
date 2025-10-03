@@ -161,6 +161,7 @@ router.post('/start', async (req, res) => {
             // 1) Pre-clone repo into the named volume using alpine/git
             const gitImg = 'alpine/git:latest';
             await pullImage(gitImg);
+            await pullImage('busybox:latest'); // Also pull busybox for reading commit hash
             
             const branchOpt = repo.branch ? `-b ${repo.branch}` : '';
             const gitCloneCmd = `
@@ -169,6 +170,8 @@ router.post('/start', async (req, res) => {
                 if [ ! -d /w/src/.git ]; then
                   GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=echo git clone --depth=1 ${branchOpt} ${repo.url} /w/src
                 fi
+                cd /w/src
+                git rev-parse HEAD > /w/commit_hash.txt
             `;
             
             const gitInit = await docker.createContainer({
@@ -192,7 +195,39 @@ router.post('/start', async (req, res) => {
                 return res.status(500).json({ success: false, message: 'Failed to clone repository' });
             }
             
+            // Get the commit hash
+            let commitHash = '';
+            try {
+                const hashReader = await docker.createContainer({
+                    Image: 'busybox:latest',
+                    Cmd: ['cat', '/w/commit_hash.txt'],
+                    HostConfig: { Mounts: [{ Type: 'volume', Source: volumeName, Target: '/w' }] }
+                });
+                await hashReader.start();
+                await hashReader.wait();
+                
+                // Get logs as buffer and manually parse Docker stream header
+                const logBuffer = await hashReader.logs({ stdout: true, stderr: false });
+                
+                // Docker stream format: [8 bytes header][payload]
+                // Header: [stream type: 1 byte][3 bytes padding][size: 4 bytes big-endian]
+                if (logBuffer.length > 8) {
+                    const payloadSize = logBuffer.readUInt32BE(4);
+                    const payload = logBuffer.slice(8, 8 + payloadSize);
+                    commitHash = payload.toString('utf8').trim();
+                }
+                
+                await hashReader.remove();
+            } catch (e) {
+                console.error('[containers] Failed to read commit hash:', e);
+            }
+            
             await gitInit.remove({ force: true });
+            
+            // Store commit hash in labels
+            if (commitHash) {
+                labels['hydra.repo_commit'] = commitHash;
+            }
 
             // 2) Choose runtime image + bootstrap
             if (runtime === 'node') {
@@ -356,7 +391,9 @@ router.get('/mine', async (req, res) => {
             project: c.Labels?.['hydra.project'] || '',
             url: c.Labels?.['hydra.public_url'] || '',
             preset: c.Labels?.['hydra.preset'] || '',
-            jupyterToken: c.Labels?.['hydra.jupyter_token'] || null
+            jupyterToken: c.Labels?.['hydra.jupyter_token'] || null,
+            repoUrl: c.Labels?.['hydra.repo_url'] || null,
+            repoCommit: c.Labels?.['hydra.repo_commit'] || null
         }));
         return res.json({ success: true, containers: items });
     } catch (err) {
@@ -445,13 +482,27 @@ router.get('/:name/logs/stream', async (req, res) => {
             follow: true, stdout: true, stderr: true, tail: 200
         });
 
-        function send(chunk) {
-            const lines = chunk.toString('utf8').split(/\r?\n/);
-            lines.forEach(line => {
-                if (line) res.write(`data: ${line}\n\n`);
-            });
-        }
-        logStream.on('data', send);
+        // Use demuxStream to properly handle Docker's multiplexed stream
+        const stdout = {
+            write: (chunk) => {
+                const lines = chunk.toString('utf8').split(/\r?\n/);
+                lines.forEach(line => {
+                    if (line) res.write(`data: ${line}\n\n`);
+                });
+            }
+        };
+        const stderr = {
+            write: (chunk) => {
+                const lines = chunk.toString('utf8').split(/\r?\n/);
+                lines.forEach(line => {
+                    if (line) res.write(`data: [stderr] ${line}\n\n`);
+                });
+            }
+        };
+
+        docker.modem.demuxStream(logStream, stdout, stderr);
+        
+        logStream.on('end', () => res.end());
         logStream.on('error', () => res.end());
         req.on('close', () => {
             try { logStream.destroy(); } catch {}
@@ -459,6 +510,144 @@ router.get('/:name/logs/stream', async (req, res) => {
     } catch (err) {
         console.error('[containers] logs stream error:', err);
         try { res.status(500).end(); } catch {}
+    }
+});
+
+// Pull latest changes from git repo
+router.post('/:name/git-pull', async (req, res) => {
+    try {
+        if (!req.isAuthenticated?.() || !req.user?.email) {
+            return res.status(401).json({ success: false, message: 'Not authenticated' });
+        }
+        const username = String(req.user.email).split('@')[0];
+        const nameParam = String(req.params.name || '').trim();
+        if (!nameParam) return res.status(400).json({ success: false, message: 'Missing container name' });
+
+        const container = docker.getContainer(nameParam);
+        const info = await container.inspect();
+        const labels = info?.Config?.Labels || {};
+        
+        if (labels['hydra.owner'] !== username || labels['hydra.managed_by'] !== 'hydra-saml-auth') {
+            return res.status(403).json({ success: false, message: 'Not allowed' });
+        }
+
+        // Only works for repo containers
+        if (labels['hydra.preset'] !== 'repo' || !labels['hydra.repo_url']) {
+            return res.status(400).json({ success: false, message: 'Not a repository container' });
+        }
+
+        const project = labels['hydra.project'];
+        const volumeName = `hydra-vol-${username}-${project}`.replace(/[^a-z0-9-]/g, '').slice(0, 60);
+
+        // Pull latest changes using alpine/git
+        const gitImg = 'alpine/git:latest';
+        await pullImage(gitImg);
+        await pullImage('busybox:latest'); // Also pull busybox for reading commit hash
+
+        const gitPullCmd = `
+            set -e
+            cd /w/src
+            git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"
+            GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=echo git fetch origin
+            GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=echo git reset --hard origin/HEAD
+            git rev-parse HEAD > /w/commit_hash.txt
+        `;
+
+        const gitPull = await docker.createContainer({
+            Image: gitImg,
+            Labels: { 'hydra.temp': 'true' },
+            Cmd: ['-c', gitPullCmd],
+            HostConfig: { Mounts: [{ Type: 'volume', Source: volumeName, Target: '/w' }] },
+            Entrypoint: ['sh']
+        });
+        
+        await gitPull.start();
+        const result = await gitPull.wait();
+
+        if (result.StatusCode !== 0) {
+            console.error(`[containers] Git pull failed with status ${result.StatusCode}`);
+            try {
+                const logs = await gitPull.logs({ stdout: true, stderr: true });
+                console.error('[containers] Git pull logs:', logs.toString());
+            } catch {}
+            await gitPull.remove({ force: true });
+            return res.status(500).json({ success: false, message: 'Failed to pull latest changes' });
+        }
+
+        // Get the new commit hash
+        let commitHash = '';
+        try {
+            const hashReader = await docker.createContainer({
+                Image: 'busybox:latest',
+                Cmd: ['cat', '/w/commit_hash.txt'],
+                HostConfig: { Mounts: [{ Type: 'volume', Source: volumeName, Target: '/w' }] }
+            });
+            await hashReader.start();
+            await hashReader.wait();
+            
+            // Get logs as buffer and manually parse Docker stream header
+            const logBuffer = await hashReader.logs({ stdout: true, stderr: false });
+            
+            // Docker stream format: [8 bytes header][payload]
+            // Header: [stream type: 1 byte][3 bytes padding][size: 4 bytes big-endian]
+            if (logBuffer.length > 8) {
+                const payloadSize = logBuffer.readUInt32BE(4);
+                const payload = logBuffer.slice(8, 8 + payloadSize);
+                commitHash = payload.toString('utf8').trim();
+            }
+            
+            await hashReader.remove();
+        } catch (e) {
+            console.error('[containers] Failed to read commit hash:', e);
+        }
+
+        await gitPull.remove({ force: true });
+
+        // Update the container labels with new commit hash (requires recreation)
+        if (commitHash) {
+            try {
+                const oldInfo = await container.inspect();
+                const oldConfig = oldInfo.Config;
+                const oldHostConfig = oldInfo.HostConfig;
+                
+                // Update labels
+                const updatedLabels = { ...oldConfig.Labels, 'hydra.repo_commit': commitHash };
+                
+                // Stop and remove old container
+                try { await container.stop({ t: 5 }); } catch {}
+                await container.remove({ force: true });
+                
+                // Recreate with updated labels
+                const newContainer = await docker.createContainer({
+                    name: nameParam,
+                    Image: oldConfig.Image,
+                    Labels: updatedLabels,
+                    Cmd: oldConfig.Cmd,
+                    Env: oldConfig.Env,
+                    HostConfig: oldHostConfig
+                });
+                
+                await newContainer.start();
+            } catch (e) {
+                console.error('[containers] Failed to update container labels:', e);
+                // If recreation failed, try to restart the old one
+                try {
+                    await container.restart();
+                } catch {}
+            }
+        } else {
+            // No commit hash, just restart
+            try {
+                await container.restart();
+            } catch (e) {
+                await container.start();
+            }
+        }
+
+        return res.json({ success: true, commitHash });
+    } catch (err) {
+        console.error('[containers] git-pull error:', err);
+        return res.status(500).json({ success: false, message: 'Failed to pull latest changes' });
     }
 });
 
