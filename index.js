@@ -2,6 +2,7 @@
 require('dotenv').config();
 
 const express = require('express');
+const expressWs = require('express-ws');
 const session = require('express-session');
 const passport = require('passport');
 const { Strategy: SamlStrategy } = require('passport-saml');
@@ -13,6 +14,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 
 const app = express();
+expressWs(app); // Enable WebSocket support
 const PORT = process.env.PORT || 6969;
 
 // ---------- REQUIRED CONFIG ----------
@@ -473,6 +475,73 @@ const ensureAuthenticated = (req, res, next) =>
     } catch (e) {
       console.warn('[Init] containers routes not mounted:', e?.message || e);
     }
+
+    // WebSocket terminal for containers (behind auth)
+    app.ws('/dashboard/ws/containers/:name/exec', async (ws, req) => {
+      try {
+        if (!req.isAuthenticated?.() || !req.user?.email) {
+          ws.close();
+          return;
+        }
+        const Docker = require('dockerode');
+        const docker = new Docker({ socketPath: '/var/run/docker.sock' });
+        const username = String(req.user.email).split('@')[0];
+        const nameParam = String(req.params.name || '').trim();
+        if (!nameParam) {
+          ws.close();
+          return;
+        }
+
+        const container = docker.getContainer(nameParam);
+        const info = await container.inspect();
+        const labels = info?.Config?.Labels || {};
+        if (labels['hydra.owner'] !== username || labels['hydra.managed_by'] !== 'hydra-saml-auth') {
+          ws.close();
+          return;
+        }
+
+        // Create exec instance
+        const exec = await container.exec({
+          Cmd: ['sh'],
+          AttachStdin: true,
+          AttachStdout: true,
+          AttachStderr: true,
+          Tty: true
+        });
+
+        const stream = await exec.start({ hijack: true, Tty: true, stdin: true });
+
+        // Pipe data between WebSocket and Docker stream
+        stream.on('data', (chunk) => {
+          try {
+            if (ws.readyState === ws.OPEN) {
+              ws.send(chunk);
+            }
+          } catch {}
+        });
+
+        stream.on('end', () => {
+          try { ws.close(); } catch {}
+        });
+
+        ws.on('message', (msg) => {
+          try {
+            stream.write(msg);
+          } catch {}
+        });
+
+        ws.on('close', () => {
+          try { stream.end(); } catch {}
+        });
+
+        ws.on('error', () => {
+          try { stream.end(); } catch {}
+        });
+      } catch (e) {
+        console.error('[ws] exec error:', e);
+        try { ws.close(); } catch {}
+      }
+    });
 
     // Basic pages
     app.get('/', (req, res) => {

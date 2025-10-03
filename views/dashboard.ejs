@@ -158,26 +158,103 @@
       </div>
 
         <section id="panel-containers" class="hidden">
-          <h3 class="text-xl font-semibold mb-2">Start a Project Container</h3>
-          <p class="text-gray-700 mb-4">Starts a demo container routed at <code>https://hydra.newpaltz.edu/students/&lt;username&gt;/&lt;project&gt;/</code>.</p>
-          <form id="container-start-form" class="space-y-3 max-w-md">
-            <div>
-              <label class="block text-sm font-medium" for="project-name">Project Name</label>
-              <input id="project-name" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2" placeholder="e.g. hello-world" />
-              <p class="text-xs text-gray-500 mt-1">Lowercase letters, digits, and dashes only.</p>
-            </div>
-            <button type="submit" class="inline-flex items-center px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700">Start Container</button>
-          </form>
-          <div id="container-start-message" class="mt-3"></div>
+          <h3 class="text-xl font-semibold mb-4">Container Projects</h3>
+          
+          <!-- Sub-tabs for Containers -->
+          <div class="flex border-b mb-4" role="tablist">
+            <button id="subtab-presets" class="px-4 py-2 text-sm font-medium border-b-2 border-[#052049] text-[#052049]" role="tab">Presets</button>
+            <button id="subtab-github" class="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900" role="tab">From GitHub</button>
+            <button id="subtab-my-containers" class="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900" role="tab">My Containers</button>
+          </div>
 
-          <div class="mt-8">
-            <h4 class="text-lg font-semibold mb-2">Your Containers</h4>
+          <!-- Presets Panel -->
+          <div id="subpanel-presets">
+            <p class="text-gray-700 mb-4">Choose a preset to quickly launch a container with pre-configured settings.</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              <!-- Jupyter Preset -->
+              <div class="border rounded p-4 hover:shadow-md transition">
+                <h4 class="font-semibold text-lg mb-2"><i class="fas fa-book"></i> Jupyter Notebook</h4>
+                <p class="text-sm text-gray-600 mb-3">Interactive Python notebook environment with persistent storage.</p>
+                <p class="text-xs text-gray-500 mb-2"><strong>Port:</strong> 8888 | <strong>Resources:</strong> 512MB RAM, 1 CPU</p>
+                <input type="text" id="preset-jupyter-name" placeholder="Project name" class="w-full rounded border border-gray-300 px-3 py-2 text-sm mb-2" />
+                <button onclick="startPreset('jupyter')" class="w-full px-4 py-2 rounded bg-purple-600 text-white hover:bg-purple-700 text-sm">Launch Jupyter</button>
+              </div>
+
+              <!-- Static Site Preset -->
+              <div class="border rounded p-4 hover:shadow-md transition">
+                <h4 class="font-semibold text-lg mb-2"><i class="fas fa-globe"></i> Static Website</h4>
+                <p class="text-sm text-gray-600 mb-3">Nginx server for hosting static HTML/CSS/JS files.</p>
+                <p class="text-xs text-gray-500 mb-2"><strong>Port:</strong> 80 | <strong>Resources:</strong> 256MB RAM, 0.5 CPU</p>
+                <input type="text" id="preset-static-name" placeholder="Project name" class="w-full rounded border border-gray-300 px-3 py-2 text-sm mb-2" />
+                <button onclick="startPreset('static')" class="w-full px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700 text-sm">Launch Static Site</button>
+              </div>
+            </div>
+            <div id="preset-message" class="mt-3"></div>
+          </div>
+
+          <!-- GitHub Panel -->
+          <div id="subpanel-github" class="hidden">
+            <p class="text-gray-700 mb-4">Clone and run a GitHub repository with automatic dependency installation.</p>
+            <form id="github-start-form" class="space-y-3 max-w-2xl">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-sm font-medium" for="github-project-name">Project Name *</label>
+                  <input id="github-project-name" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm" placeholder="my-app" required />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium" for="github-runtime">Runtime *</label>
+                  <select id="github-runtime" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm" required>
+                    <option value="">Select runtime...</option>
+                    <option value="node">Node.js (npm)</option>
+                    <option value="python">Python (pip)</option>
+                    <option value="static">Static (nginx)</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label class="block text-sm font-medium" for="github-url">Repository URL *</label>
+                <input id="github-url" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm" placeholder="https://github.com/user/repo.git" required />
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-sm font-medium" for="github-branch">Branch (optional)</label>
+                  <input id="github-branch" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm" placeholder="main" />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium" for="github-subdir">Subdirectory (optional)</label>
+                  <input id="github-subdir" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm" placeholder="app" />
+                </div>
+              </div>
+              <div>
+                <label class="block text-sm font-medium" for="github-start-cmd">Start Command (optional)</label>
+                <input id="github-start-cmd" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm" placeholder="npm start, python app.py, etc." />
+                <p class="text-xs text-gray-500 mt-1">Leave blank for default (npm start / uvicorn / nginx)</p>
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-sm font-medium" for="github-port">Internal Port (optional)</label>
+                  <input id="github-port" type="number" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm" placeholder="3000" />
+                </div>
+              </div>
+              <button type="submit" class="inline-flex items-center px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700">Clone & Launch</button>
+            </form>
+            <div id="github-message" class="mt-3"></div>
+          </div>
+
+          <!-- My Containers Panel -->
+          <div id="subpanel-my-containers" class="hidden">
+            <div class="flex items-center justify-between mb-4">
+              <h4 class="text-lg font-semibold">Your Running Containers</h4>
+              <button id="refresh-containers" class="px-3 py-2 rounded bg-gray-100 hover:bg-gray-200 border text-sm">
+                <i class="fas fa-sync-alt"></i> Refresh
+              </button>
+            </div>
             <div id="containers-list" class="space-y-2 text-sm"></div>
-            <button id="refresh-containers" class="mt-2 px-3 py-2 rounded bg-gray-100 hover:bg-gray-200 border">Refresh</button>
           </div>
         </section>
       
     </div>
+```    </div>
   </main>
 
   <script>
@@ -283,25 +360,103 @@
         changeN8nPassword();
       });
 
-      // Containers form handler
-      document.getElementById('container-start-form').addEventListener('submit', async function(e) {
-        e.preventDefault();
-        const msg = document.getElementById('container-start-message');
+      // Container sub-tabs
+      const containerSubtabs = [
+        { btn: 'subtab-presets', panel: 'subpanel-presets' },
+        { btn: 'subtab-github', panel: 'subpanel-github' },
+        { btn: 'subtab-my-containers', panel: 'subpanel-my-containers' }
+      ];
+      containerSubtabs.forEach(t => {
+        document.getElementById(t.btn).addEventListener('click', () => {
+          containerSubtabs.forEach(x => {
+            document.getElementById(x.btn).classList.remove('border-b-2','border-[#052049]','text-[#052049]');
+            document.getElementById(x.btn).classList.add('text-gray-600');
+            document.getElementById(x.panel).classList.add('hidden');
+          });
+          document.getElementById(t.btn).classList.add('border-b-2','border-[#052049]','text-[#052049]');
+          document.getElementById(t.btn).classList.remove('text-gray-600');
+          document.getElementById(t.panel).classList.remove('hidden');
+          
+          // Auto-load containers when switching to My Containers
+          if (t.btn === 'subtab-my-containers') {
+            loadMyContainers();
+          }
+        });
+      });
+
+      // Start preset container
+      window.startPreset = async function(preset) {
+        const msg = document.getElementById('preset-message');
         msg.textContent = '';
-        const project = document.getElementById('project-name').value.trim().toLowerCase();
-        if (!project) {
-          msg.innerHTML = '<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2">Enter a project name.</p>';
+        const project = document.getElementById(`preset-${preset}-name`).value.trim().toLowerCase();
+        if (!project || !/^[a-z0-9-]{1,40}$/.test(project)) {
+          msg.innerHTML = '<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2">Enter a valid project name (lowercase, digits, dashes only).</p>';
           return;
         }
         try {
+          msg.innerHTML = '<p class="text-gray-600">Starting container...</p>';
           const res = await fetch('/dashboard/api/containers/start', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ project })
+            body: JSON.stringify({ project, preset })
           });
           const data = await res.json();
           if (!res.ok || !data.success) throw new Error(data.message || 'Failed');
-          msg.innerHTML = `<p class="text-green-700 bg-green-100 border border-green-200 rounded p-2">Started: <a href="${data.url}" target="_blank" class="underline text-blue-600">${data.url}</a></p>`;
+          
+          let extra = '';
+          if (data.jupyterToken) {
+            extra = `<br><strong>Token:</strong> <code class="bg-gray-100 px-2 py-1 rounded text-xs">${data.jupyterToken}</code> <button onclick="navigator.clipboard.writeText('${data.jupyterToken}')" class="text-xs text-blue-600 underline">Copy</button>`;
+          }
+          msg.innerHTML = `<p class="text-green-700 bg-green-100 border border-green-200 rounded p-2">Started! <a href="${data.url}" target="_blank" class="underline text-blue-600">${data.url}</a>${extra}</p>`;
+          document.getElementById(`preset-${preset}-name`).value = '';
+        } catch (err) {
+          msg.innerHTML = `<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2">${err.message || 'Failed to start container'}</p>`;
+        }
+      };
+
+      // GitHub form handler
+      document.getElementById('github-start-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const msg = document.getElementById('github-message');
+        msg.textContent = '';
+        const project = document.getElementById('github-project-name').value.trim().toLowerCase();
+        const runtime = document.getElementById('github-runtime').value.trim();
+        const url = document.getElementById('github-url').value.trim();
+        const branch = document.getElementById('github-branch').value.trim();
+        const subdir = document.getElementById('github-subdir').value.trim();
+        const startCmd = document.getElementById('github-start-cmd').value.trim();
+        const internalPort = document.getElementById('github-port').value.trim();
+
+        if (!project || !/^[a-z0-9-]{1,40}$/.test(project)) {
+          msg.innerHTML = '<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2">Enter a valid project name.</p>';
+          return;
+        }
+        if (!runtime) {
+          msg.innerHTML = '<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2">Select a runtime.</p>';
+          return;
+        }
+        if (!url) {
+          msg.innerHTML = '<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2">Enter a repository URL.</p>';
+          return;
+        }
+
+        try {
+          msg.innerHTML = '<p class="text-gray-600">Cloning repository and starting container...</p>';
+          const body = { project, preset: 'repo', runtime, repo: { url } };
+          if (branch) body.repo.branch = branch;
+          if (subdir) body.repo.subdir = subdir;
+          if (startCmd) body.repo.startCmd = startCmd;
+          if (internalPort) body.internalPort = Number(internalPort);
+
+          const res = await fetch('/dashboard/api/containers/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+          });
+          const data = await res.json();
+          if (!res.ok || !data.success) throw new Error(data.message || 'Failed');
+          msg.innerHTML = `<p class="text-green-700 bg-green-100 border border-green-200 rounded p-2">Started! <a href="${data.url}" target="_blank" class="underline text-blue-600">${data.url}</a></p>`;
+          document.getElementById('github-start-form').reset();
         } catch (err) {
           msg.innerHTML = `<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2">${err.message || 'Failed to start container'}</p>`;
         }
@@ -315,40 +470,128 @@
           const data = await res.json();
           if (!res.ok || !data.success) throw new Error(data.message || 'Failed');
           if (!data.containers.length) {
-            listEl.innerHTML = '<p class="text-gray-500">No containers yet.</p>';
+            listEl.innerHTML = '<p class="text-gray-500">No containers yet. Start one from the Presets or GitHub tabs.</p>';
             return;
           }
           listEl.innerHTML = '';
           data.containers.forEach(c => {
             const row = document.createElement('div');
-            row.className = 'flex items-center justify-between border rounded p-2';
-            const left = document.createElement('div');
-            left.innerHTML = `<div class="font-mono">${c.name}</div>
-                              <div class="text-gray-600">${c.image} — ${c.state}</div>
-                              ${c.url ? `<div><a class="underline text-blue-600" target="_blank" href="${c.url}">${c.url}</a></div>` : ''}`;
-            const del = document.createElement('button');
-            del.className = 'px-3 py-1 rounded bg-red-600 text-white hover:bg-red-700';
-            del.textContent = 'Delete';
-            del.addEventListener('click', async () => {
-              if (!confirm('Delete this container?')) return;
-              const resp = await fetch(`/dashboard/api/containers/${encodeURIComponent(c.name)}`, { method: 'DELETE' });
-              const d = await resp.json();
-              if (!resp.ok || !d.success) {
-                alert(d.message || 'Failed to delete');
-              }
-              loadMyContainers();
-            });
-            row.appendChild(left);
-            row.appendChild(del);
+            row.className = 'border rounded p-3 bg-gray-50';
+            
+            const stateColor = c.state === 'running' ? 'text-green-600' : 'text-gray-500';
+            
+            row.innerHTML = `
+              <div class="flex items-start justify-between mb-2">
+                <div class="flex-1">
+                  <div class="font-mono font-semibold text-sm">${c.name}</div>
+                  <div class="text-xs text-gray-600">${c.image}</div>
+                  <div class="text-xs ${stateColor}"><i class="fas fa-circle" style="font-size:6px;"></i> ${c.state} — ${c.status}</div>
+                  ${c.url ? `<div class="mt-1"><a class="text-xs underline text-blue-600" target="_blank" href="${c.url}"><i class="fas fa-external-link-alt"></i> ${c.url}</a></div>` : ''}
+                </div>
+              </div>
+              <div class="flex gap-2 flex-wrap">
+                ${c.jupyterToken ? `<button onclick="showToken('${c.jupyterToken}')" class="px-2 py-1 text-xs rounded bg-purple-100 hover:bg-purple-200 border border-purple-300 text-purple-700">
+                  <i class="fas fa-key"></i> Show Token
+                </button>` : ''}
+                <button onclick="openLogs('${c.name}')" class="px-2 py-1 text-xs rounded bg-gray-200 hover:bg-gray-300 border">
+                  <i class="fas fa-file-alt"></i> Logs
+                </button>
+                <button onclick="openTerminal('${c.name}')" class="px-2 py-1 text-xs rounded bg-blue-100 hover:bg-blue-200 border border-blue-300 text-blue-700">
+                  <i class="fas fa-terminal"></i> Terminal
+                </button>
+                <button onclick="restartContainer('${c.name}')" class="px-2 py-1 text-xs rounded bg-yellow-100 hover:bg-yellow-200 border border-yellow-300 text-yellow-700">
+                  <i class="fas fa-redo"></i> Restart
+                </button>
+                <button onclick="deleteContainer('${c.name}')" class="px-2 py-1 text-xs rounded bg-red-600 hover:bg-red-700 text-white">
+                  <i class="fas fa-trash"></i> Delete
+                </button>
+              </div>
+            `;
             listEl.appendChild(row);
           });
         } catch (err) {
           listEl.innerHTML = `<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2">${err.message || 'Failed to load containers'}</p>`;
         }
       }
+
+      window.deleteContainer = async function(name) {
+        if (!confirm('Delete this container? This will remove the container and its data.')) return;
+        try {
+          const res = await fetch(`/dashboard/api/containers/${encodeURIComponent(name)}`, { method: 'DELETE' });
+          const data = await res.json();
+          if (!res.ok || !data.success) throw new Error(data.message || 'Failed');
+          loadMyContainers();
+        } catch (err) {
+          alert('Failed to delete: ' + err.message);
+        }
+      };
+
+      window.restartContainer = async function(name) {
+        try {
+          const res = await fetch(`/dashboard/api/containers/${encodeURIComponent(name)}/restart`, { method: 'POST' });
+          const data = await res.json();
+          if (!res.ok || !data.success) throw new Error(data.message || 'Failed');
+          alert('Container restarted successfully!');
+          loadMyContainers();
+        } catch (err) {
+          alert('Failed to restart: ' + err.message);
+        }
+      };
+
+      window.openLogs = function(name) {
+        const w = window.open('', '_blank', 'width=900,height=600');
+        w.document.write('<!DOCTYPE html><html><head><title>Logs: ' + name + '</title>');
+        w.document.write('<style>body { margin: 0; padding: 0; background: #1a1a1a; font-family: monospace; }');
+        w.document.write('#log { white-space: pre-wrap; margin: 0; padding: 12px; color: #ddd; height: 100vh; overflow: auto; font-size: 12px; line-height: 1.4; }</style></head>');
+        w.document.write('<body><pre id="log"></pre>');
+        w.document.write('<sc' + 'ript>');
+        w.document.write('const es = new EventSource("/dashboard/api/containers/' + encodeURIComponent(name) + '/logs/stream");');
+        w.document.write('const pre = document.getElementById("log");');
+        w.document.write('es.onmessage = (e) => { pre.textContent += e.data + "\\n"; pre.scrollTop = pre.scrollHeight; };');
+        w.document.write('es.onerror = () => { pre.textContent += "\\n[Stream closed]\\n"; es.close(); };');
+        w.document.write('window.addEventListener("beforeunload", () => es.close());');
+        w.document.write('</sc' + 'ript></body></html>');
+      };
+
+      window.showToken = function(token) {
+        const msg = `Jupyter Token: ${token}`;
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(token).then(() => {
+            alert(msg + '\n\n✓ Copied to clipboard!');
+          }).catch(() => {
+            alert(msg);
+          });
+        } else {
+          prompt('Jupyter Token (Ctrl+C to copy):', token);
+        }
+      };
+
+      window.openTerminal = function(name) {
+        const w = window.open('', '_blank', 'width=1000,height=700');
+        w.document.write('<!DOCTYPE html><html><head><title>Terminal: ' + name + '</title>');
+        w.document.write('<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />');
+        w.document.write('<style>body { margin: 0; padding: 0; background: #000; } #terminal { height: 100vh; padding: 8px; }</style>');
+        w.document.write('</head><body><div id="terminal"></div>');
+        w.document.write('<sc' + 'ript src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></sc' + 'ript>');
+        w.document.write('<sc' + 'ript>');
+        w.document.write('window.addEventListener("load", function() {');
+        w.document.write('  const term = new Terminal({ convertEol: true, fontFamily: "monospace", fontSize: 14, cursorBlink: true, theme: { background: "#000000", foreground: "#ffffff" } });');
+        w.document.write('  term.open(document.getElementById("terminal"));');
+        w.document.write('  term.writeln("Connecting to container...");');
+        w.document.write('  const proto = location.protocol === "https:" ? "wss" : "ws";');
+        w.document.write('  const ws = new WebSocket(proto + "://" + location.host + "/dashboard/ws/containers/' + encodeURIComponent(name) + '/exec");');
+        w.document.write('  ws.binaryType = "arraybuffer";');
+        w.document.write('  ws.onopen = function() { term.clear(); term.writeln("Connected! Type commands below:"); term.write("$ "); };');
+        w.document.write('  ws.onmessage = function(ev) { term.write(new Uint8Array(ev.data)); };');
+        w.document.write('  ws.onclose = function() { term.writeln("\\r\\n[Connection closed]"); };');
+        w.document.write('  ws.onerror = function() { term.writeln("\\r\\n[Connection error]"); };');
+        w.document.write('  term.onData(function(data) { if (ws.readyState === WebSocket.OPEN) ws.send(data); });');
+        w.document.write('});');
+        w.document.write('</sc' + 'ript></body></html>');
+      };
+
       document.getElementById('refresh-containers').addEventListener('click', loadMyContainers);
-      // Auto-load on tab switch
-      document.getElementById('tab-containers').addEventListener('click', loadMyContainers);
+      // Auto-load on tab switch handled in subtab click handler
     });
     
     // Function to check if user exists in OpenWebUI
