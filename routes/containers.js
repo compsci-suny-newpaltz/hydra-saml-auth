@@ -170,6 +170,8 @@ router.post('/start', async (req, res) => {
                 if [ ! -d /w/src/.git ]; then
                   GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=echo git clone --depth=1 ${branchOpt} ${repo.url} /w/src
                 fi
+                                # Mark the repository path as safe for Git inside this container (named volume ownership can differ)
+                                git config --global --add safe.directory /w/src || true
                 cd /w/src
                 git rev-parse HEAD > /w/commit_hash.txt
             `;
@@ -602,6 +604,8 @@ router.post('/:name/git-pull', async (req, res) => {
         const gitPullCmd = `
             set -e
             cd /w/src
+            # Ensure Git treats this path as safe (volume ownership may not match current user)
+            git config --global --add safe.directory /w/src || true
             git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"
             GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=echo git fetch origin
             GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=echo git reset --hard origin/HEAD
