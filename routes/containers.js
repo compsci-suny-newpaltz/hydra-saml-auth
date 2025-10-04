@@ -381,24 +381,79 @@ router.get('/mine', async (req, res) => {
             ] }
         });
 
-        const items = containers.map(c => ({
-            id: c.Id,
-            name: (c.Names && c.Names[0]) ? c.Names[0].replace(/^\//, '') : '',
-            image: c.Image,
-            state: c.State,
-            status: c.Status,
-            created: c.Created,
-            project: c.Labels?.['hydra.project'] || '',
-            url: c.Labels?.['hydra.public_url'] || '',
-            preset: c.Labels?.['hydra.preset'] || '',
-            jupyterToken: c.Labels?.['hydra.jupyter_token'] || null,
-            repoUrl: c.Labels?.['hydra.repo_url'] || null,
-            repoCommit: c.Labels?.['hydra.repo_commit'] || null
-        }));
-        return res.json({ success: true, containers: items });
+        // Find VS Code container and extract mounted project info
+        let vscodeInfo = null;
+        const vscodeContainerName = `student-${username}-vscode`;
+        const vscodeContainer = containers.find(c => 
+            (c.Names && c.Names[0] === `/${vscodeContainerName}`) ||
+            c.Labels?.['hydra.type'] === 'vscode'
+        );
+        
+        if (vscodeContainer && vscodeContainer.Labels) {
+            vscodeInfo = {
+                name: vscodeContainer.Names[0]?.replace(/^\//, '') || '',
+                mountedProject: vscodeContainer.Labels['hydra.mounted_project'] || '',
+                url: vscodeContainer.Labels['hydra.public_url'] || '',
+                password: vscodeContainer.Labels['hydra.vscode_password'] || '',
+                state: vscodeContainer.State
+            };
+        }
+
+        const items = containers
+            .filter(c => c.Labels?.['hydra.type'] !== 'vscode') // Exclude VS Code container from main list
+            .map(c => ({
+                id: c.Id,
+                name: (c.Names && c.Names[0]) ? c.Names[0].replace(/^\//, '') : '',
+                image: c.Image,
+                state: c.State,
+                status: c.Status,
+                created: c.Created,
+                project: c.Labels?.['hydra.project'] || '',
+                url: c.Labels?.['hydra.public_url'] || '',
+                preset: c.Labels?.['hydra.preset'] || '',
+                jupyterToken: c.Labels?.['hydra.jupyter_token'] || null,
+                repoUrl: c.Labels?.['hydra.repo_url'] || null,
+                repoCommit: c.Labels?.['hydra.repo_commit'] || null
+            }));
+        
+        return res.json({ success: true, containers: items, vscode: vscodeInfo });
     } catch (err) {
         console.error('[containers] list mine error:', err);
         return res.status(500).json({ success: false, message: 'Failed to list containers' });
+    }
+});
+
+// Delete a user's container with cleanup
+// Stop code-server container (must be before generic /:name routes)
+router.delete('/stop-vscode', async (req, res) => {
+    try {
+        if (!req.isAuthenticated?.() || !req.user?.email) {
+            return res.status(401).json({ success: false, message: 'Not authenticated' });
+        }
+
+        const username = String(req.user.email).split('@')[0];
+        const vscodeContainerName = `student-${username}-vscode`;
+
+        const container = docker.getContainer(vscodeContainerName);
+        const info = await container.inspect();
+        const labels = info?.Config?.Labels || {};
+        
+        if (labels['hydra.owner'] !== username || labels['hydra.managed_by'] !== 'hydra-saml-auth') {
+            return res.status(403).json({ success: false, message: 'Not authorized' });
+        }
+
+        try {
+            await container.stop({ t: 5 });
+        } catch (e) {}
+        await container.remove({ force: true });
+
+        return res.json({ success: true });
+    } catch (err) {
+        if (err.statusCode === 404) {
+            return res.json({ success: true, message: 'VS Code container not running' });
+        }
+        console.error('[containers] stop-vscode error:', err);
+        return res.status(500).json({ success: false, message: 'Failed to stop VS Code' });
     }
 });
 
@@ -650,5 +705,142 @@ router.post('/:name/git-pull', async (req, res) => {
         return res.status(500).json({ success: false, message: 'Failed to pull latest changes' });
     }
 });
+
+// Start code-server for a specific container
+router.post('/start-vscode', async (req, res) => {
+    try {
+        if (!req.isAuthenticated?.() || !req.user?.email) {
+            return res.status(401).json({ success: false, message: 'Not authenticated' });
+        }
+
+        const username = String(req.user.email).split('@')[0];
+        const targetProject = String(req.body?.project || '').trim();
+        
+        if (!targetProject) {
+            return res.status(400).json({ success: false, message: 'Project name required' });
+        }
+
+        const host = 'hydra.newpaltz.edu';
+        const vscodeContainerName = `student-${username}-vscode`;
+        const networkName = 'hydra_students_net';
+        const basePath = `/students/${username}/vscode`;
+        
+        // Public URL
+        const publicBase = (process.env.PUBLIC_STUDENTS_BASE || `https://${host}/students`).replace(/\/$/, '');
+        const publicUrl = `${publicBase}/${username}/vscode/`;
+
+        // Check if target project container exists and is owned by user
+        const targetContainerName = `student-${username}-${targetProject}`;
+        let targetContainer;
+        try {
+            targetContainer = docker.getContainer(targetContainerName);
+            const targetInfo = await targetContainer.inspect();
+            const targetLabels = targetInfo?.Config?.Labels || {};
+            
+            if (targetLabels['hydra.owner'] !== username || targetLabels['hydra.managed_by'] !== 'hydra-saml-auth') {
+                return res.status(403).json({ success: false, message: 'Target container not found or not owned by you' });
+            }
+        } catch (err) {
+            return res.status(404).json({ success: false, message: 'Target container not found' });
+        }
+
+        // Volume for the target project
+        const volumeName = `hydra-vol-${username}-${targetProject}`.replace(/[^a-z0-9-]/g, '').slice(0, 60);
+
+        // Generate random password for code-server
+        const crypto = require('crypto');
+        const vscodePassword = crypto.randomBytes(12).toString('base64').slice(0, 16);
+
+        // Check if code-server container already exists
+        let vscodeContainer;
+        try {
+            vscodeContainer = docker.getContainer(vscodeContainerName);
+            await vscodeContainer.inspect();
+            
+            // If it exists, stop and remove it
+            try {
+                await vscodeContainer.stop({ t: 5 });
+            } catch (e) {}
+            await vscodeContainer.remove({ force: true });
+        } catch (e) {
+            // Container doesn't exist, which is fine
+        }
+
+        // Pull code-server image
+        const codeServerImage = 'codercom/code-server:latest';
+        await pullImage(codeServerImage);
+
+        // Create code-server container
+        const labels = {
+            'traefik.enable': 'true',
+            'hydra.managed_by': 'hydra-saml-auth',
+            'hydra.owner': username,
+            'hydra.ownerEmail': req.user.email,
+            'hydra.type': 'vscode',
+            'hydra.mounted_project': targetProject,
+            'hydra.basePath': basePath,
+            'hydra.public_url': publicUrl,
+            'hydra.vscode_password': vscodePassword,
+            'hydra.created_at': new Date().toISOString(),
+            [`traefik.http.routers.${vscodeContainerName}.entrypoints`]: 'web',
+            [`traefik.http.routers.${vscodeContainerName}.rule`]: `PathPrefix(\`${basePath}\`)`,
+            [`traefik.http.services.${vscodeContainerName}.loadbalancer.server.port`]: '8080',
+            [`traefik.http.middlewares.${vscodeContainerName}-stripprefix.stripprefix.prefixes`]: basePath,
+            [`traefik.http.routers.${vscodeContainerName}.middlewares`]: `${vscodeContainerName}-stripprefix`
+        };
+
+        vscodeContainer = await docker.createContainer({
+            name: vscodeContainerName,
+            Image: codeServerImage,
+            Labels: labels,
+            User: '0:0', // Run as root to avoid permission issues
+            Env: [
+                `PASSWORD=${vscodePassword}`,
+                'SUDO_PASSWORD=disabled'
+            ],
+            WorkingDir: '/workspace',
+            HostConfig: {
+                NetworkMode: networkName,
+                RestartPolicy: { Name: 'unless-stopped' },
+                Memory: 1024 * 1024 * 1024, // 1GB
+                NanoCpus: 1e9, // 1 CPU
+                Mounts: [{
+                    Type: 'volume',
+                    Source: volumeName,
+                    Target: '/workspace'
+                }]
+            }
+        });
+
+        await vscodeContainer.start();
+        
+        // Fix permissions on the workspace directory (run as root then fix ownership)
+        // This ensures files are readable/writable by the code-server user
+        try {
+            const exec = await vscodeContainer.exec({
+                Cmd: ['sh', '-c', 'chown -R 1000:1000 /workspace 2>/dev/null || true'],
+                AttachStdout: true,
+                AttachStderr: true
+            });
+            await exec.start({});
+        } catch (e) {
+            // Ignore permission fix errors
+            console.warn('[containers] Could not fix workspace permissions:', e.message);
+        }
+
+        return res.json({
+            success: true,
+            url: publicUrl,
+            name: vscodeContainerName,
+            password: vscodePassword,
+            mountedProject: targetProject
+        });
+    } catch (err) {
+        console.error('[containers] start-vscode error:', err);
+        return res.status(500).json({ success: false, message: 'Failed to start VS Code' });
+    }
+});
+
+// ...stop-vscode handler moved earlier to avoid conflict with generic routes...
 
 module.exports = router;

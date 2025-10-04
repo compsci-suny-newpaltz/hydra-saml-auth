@@ -4,7 +4,7 @@ const router = express.Router();
 const axios = require('axios');
 
 // Config: target backend and API key loaded from env
-const OPENWEBUI_API_BASE = process.env.OPENWEBUI_API_BASE || 'http://chimera:7070/openwebui/api';
+const OPENWEBUI_API_BASE = process.env.OPENWEBUI_API_BASE || 'http://192.168.1.151:7070/openwebui/api';
 const OPENWEBUI_API_KEY = process.env.OPENWEBUI_API_KEY || process.env.WEBUI_API_KEY || process.env.API_KEY;
 
 // Middleware to ensure user is authenticated
