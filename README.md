@@ -32,3 +32,8 @@ sudo docker compose up -d hydra-saml-auth
 - `PORT`: Service port (default: 6969)
 - `DB_PATH`: Path to WebUI database (default: `/app/data/webui.db`)
 
+
+## Documentation
+
+- Student containers: see [docs/containers.md](docs/containers.md) for architecture, flows, routing, and troubleshooting.
+
