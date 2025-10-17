@@ -446,6 +446,30 @@ const ensureAuthenticated = (req, res, next) =>
       }
     });
 
+    app.get('/auth/verify', (req, res) => {
+      const token = req.cookies?.np_access;
+
+      if (!token) {
+        return res.status(401).send('Unauthorized: Missing token');
+      }
+
+      try {
+        const payload = verifyAccessToken(token);
+
+        // Set headers for Traefik to forward to backend
+        res.set('X-Forwarded-User', payload.email || payload.sub);
+        res.set('X-Forwarded-Email', payload.email);
+        res.set('X-Forwarded-Roles', (payload.roles || []).join(','));
+
+        // Return 200 to allow request
+        return res.status(200).send('OK');
+      } catch (e) {
+        const msg = String(e).toLowerCase();
+        const code = msg.includes('expired') ? 401 : 403;
+        return res.status(code).send('Unauthorized: Invalid or expired token');
+      }
+    });
+
     // JWKS for local verification by student backends
     app.get('/.well-known/jwks.json', (_req, res) => {
       if (!jwk) return res.status(501).json({ error: 'jwks_unavailable' });

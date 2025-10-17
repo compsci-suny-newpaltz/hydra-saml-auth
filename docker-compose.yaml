@@ -11,8 +11,12 @@ services:
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-    # Note: ports are not needed with host network mode
-    # The app will bind directly to host port 6969
+    labels:
+      # Make the /auth/verify endpoint accessible to Traefik
+      - "traefik.enable=true"
+      - "traefik.http.routers.hydra-auth.rule=Host(`hydra.newpaltz.edu`) && PathPrefix(`/auth/verify`)"
+      - "traefik.http.routers.hydra-auth.entrypoints=web"
+      - "traefik.http.services.hydra-auth.loadbalancer.server.port=6969"
 
   traefik:
     image: traefik:v2.11
@@ -31,6 +35,8 @@ services:
     restart: unless-stopped
     networks:
       - hydra_students_net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
 networks:
   hydra_students_net:

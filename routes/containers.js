@@ -348,7 +348,7 @@ router.post('/start', async (req, res) => {
                 NetworkMode: networkName,
                 RestartPolicy: { Name: 'unless-stopped' },
                 Memory: 128 * 1024 * 1024,
-                NanoCpus: 5e8
+                NanoCpus: 5e8 // 0.5 CPU, 1e9 = 1 CPU, 2e9 = 2 CPUs
             }
         });
 
@@ -398,7 +398,6 @@ router.get('/mine', async (req, res) => {
                 name: vscodeContainer.Names[0]?.replace(/^\//, '') || '',
                 mountedProject: vscodeContainer.Labels['hydra.mounted_project'] || '',
                 url: vscodeContainer.Labels['hydra.public_url'] || '',
-                password: vscodeContainer.Labels['hydra.vscode_password'] || '',
                 state: vscodeContainer.State
             };
         }
@@ -753,9 +752,7 @@ router.post('/start-vscode', async (req, res) => {
         // Volume for the target project
         const volumeName = `hydra-vol-${username}-${targetProject}`.replace(/[^a-z0-9-]/g, '').slice(0, 60);
 
-        // Generate random password for code-server
-        const crypto = require('crypto');
-        const vscodePassword = crypto.randomBytes(12).toString('base64').slice(0, 16);
+    // ForwardAuth is enabled via Traefik; no password needed for code-server
 
         // Check if code-server container already exists
         let vscodeContainer;
@@ -786,13 +783,21 @@ router.post('/start-vscode', async (req, res) => {
             'hydra.mounted_project': targetProject,
             'hydra.basePath': basePath,
             'hydra.public_url': publicUrl,
-            'hydra.vscode_password': vscodePassword,
             'hydra.created_at': new Date().toISOString(),
+            // Traefik routing
             [`traefik.http.routers.${vscodeContainerName}.entrypoints`]: 'web',
-            [`traefik.http.routers.${vscodeContainerName}.rule`]: `PathPrefix(\`${basePath}\`)`,
+            [`traefik.http.routers.${vscodeContainerName}.rule`]: `PathPrefix(\"${basePath}\")`,
             [`traefik.http.services.${vscodeContainerName}.loadbalancer.server.port`]: '8080',
+            
+            // StripPrefix middleware
             [`traefik.http.middlewares.${vscodeContainerName}-stripprefix.stripprefix.prefixes`]: basePath,
-            [`traefik.http.routers.${vscodeContainerName}.middlewares`]: `${vscodeContainerName}-stripprefix`
+            
+            // ForwardAuth middleware - verify token before allowing access
+            [`traefik.http.middlewares.${vscodeContainerName}-auth.forwardauth.address`]: 'http://host.docker.internal:6969/auth/verify',
+            [`traefik.http.middlewares.${vscodeContainerName}-auth.forwardauth.trustForwardHeader`]: 'true',
+            
+            // Chain middlewares: auth first, then stripprefix
+            [`traefik.http.routers.${vscodeContainerName}.middlewares`]: `${vscodeContainerName}-auth,${vscodeContainerName}-stripprefix`
         };
 
         vscodeContainer = await docker.createContainer({
@@ -801,9 +806,10 @@ router.post('/start-vscode', async (req, res) => {
             Labels: labels,
             User: '0:0', // Run as root to avoid permission issues
             Env: [
-                `PASSWORD=${vscodePassword}`,
                 'SUDO_PASSWORD=disabled'
             ],
+            // Disable built-in password; rely on ForwardAuth
+            Cmd: ['--auth', 'none', '--bind-addr', '0.0.0.0:8080', '.'],
             WorkingDir: '/workspace',
             HostConfig: {
                 NetworkMode: networkName,
@@ -838,7 +844,6 @@ router.post('/start-vscode', async (req, res) => {
             success: true,
             url: publicUrl,
             name: vscodeContainerName,
-            password: vscodePassword,
             mountedProject: targetProject
         });
     } catch (err) {

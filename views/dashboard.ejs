@@ -322,13 +322,7 @@
             <div id="vscode-running" class="hidden">
               <p class="text-sm mb-2"><span class="font-semibold">Mounted Project:</span> <span
                   id="vscode-mounted-project" class="font-mono"></span></p>
-              <p class="text-sm mb-2"><span class="font-semibold">Password:</span> <span id="vscode-password"
-                  class="font-mono bg-white px-2 py-1 rounded border"></span>
-                <button onclick="copyVSCodePassword()"
-                  class="ml-2 px-2 py-1 text-xs rounded bg-gray-200 hover:bg-gray-300 border">
-                  <i class="fas fa-copy"></i> Copy
-                </button>
-              </p>
+              <!-- Password removed; using ForwardAuth -->
               <a id="vscode-url" href="#" target="_blank"
                 class="inline-block mt-2 px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 text-sm">
                 <i class="fas fa-external-link-alt"></i> Open VS Code
@@ -724,7 +718,7 @@
           if (!res.ok || !data.success) throw new Error(data.message || 'Failed to start VS Code');
 
           msg.className = 'fixed top-4 right-4 bg-green-100 border border-green-300 rounded p-3 text-sm z-50';
-          msg.innerHTML = `VS Code started!<br>Password: <strong>${data.password}</strong>`;
+          msg.textContent = 'VS Code started!';
           setTimeout(() => msg.remove(), 5000);
 
           // Reload container list to update status
@@ -756,18 +750,7 @@
         }
       };
 
-      window.copyVSCodePassword = function () {
-        const pwd = document.getElementById('vscode-password').textContent;
-        if (navigator.clipboard) {
-          navigator.clipboard.writeText(pwd).then(() => {
-            alert('Password copied to clipboard!');
-          }).catch(() => {
-            prompt('VS Code Password (Ctrl+C to copy):', pwd);
-          });
-        } else {
-          prompt('VS Code Password (Ctrl+C to copy):', pwd);
-        }
-      };
+      // copyVSCodePassword removed; ForwardAuth in effect
 
       function updateVSCodeStatus(vscodeInfo) {
         const notRunning = document.getElementById('vscode-not-running');
@@ -780,7 +763,6 @@
           stopBtn.classList.remove('hidden');
 
           document.getElementById('vscode-mounted-project').textContent = vscodeInfo.mountedProject || 'Unknown';
-          document.getElementById('vscode-password').textContent = vscodeInfo.password || '';
           document.getElementById('vscode-url').href = vscodeInfo.url || '#';
         } else {
           notRunning.classList.remove('hidden');

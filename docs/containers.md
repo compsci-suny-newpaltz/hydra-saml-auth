@@ -183,7 +183,7 @@ Common hydra labels:
 Preset-specific:
 - Jupyter: `hydra.preset=jupyter`, `hydra.jupyter_token=<token>`
 - Repo: `hydra.preset=repo`, `hydra.runtime`, `hydra.repo_url`, `hydra.repo_branch?`, `hydra.repo_subdir?`, `hydra.repo_commit`
-- VS Code: `hydra.type=vscode`, `hydra.mounted_project`, `hydra.vscode_password`
+- VS Code: `hydra.type=vscode`, `hydra.mounted_project`
 
 Traefik labels per container:
 - `traefik.http.routers.<name>.entrypoints=web`
@@ -209,7 +209,7 @@ Traefik labels per container:
 
 - All operations require an authenticated session (SAML).
 - Every action verifies ownership by checking container labels (`hydra.owner` and `hydra.managed_by`).
-- VS Code passwords are random per start and stored in labels; dashboard displays them securely to the owner.
+- VS Code access is protected by Traefik ForwardAuth; code-server runs with `--auth none` and no password is stored or displayed.
 
 ## Troubleshooting
 
