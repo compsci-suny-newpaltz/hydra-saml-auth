@@ -51,7 +51,7 @@ function sanitizeReturnTo(input) {
     const u = new URL(input || '/', BASE_URL);
     const base = new URL(BASE_URL);
     if (u.origin === base.origin) return (u.pathname || '/') + (u.search || '') + (u.hash || '');
-  } catch (_e) {}
+  } catch (_e) { }
   return '/';
 }
 
@@ -279,7 +279,7 @@ function setNpCookie(res, token) {
   res.cookie('np_access', token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',      
+    sameSite: 'lax',
     domain: COOKIE_DOMAIN,       // remove or change if developing on localhost
     path: '/',
     maxAge: JWT_TTL_SECONDS * 1000
@@ -517,29 +517,29 @@ const ensureAuthenticated = (req, res, next) =>
             if (ws.readyState === ws.OPEN) {
               ws.send(chunk);
             }
-          } catch {}
+          } catch { }
         });
 
         stream.on('end', () => {
-          try { ws.close(); } catch {}
+          try { ws.close(); } catch { }
         });
 
         ws.on('message', (msg) => {
           try {
             stream.write(msg);
-          } catch {}
+          } catch { }
         });
 
         ws.on('close', () => {
-          try { stream.end(); } catch {}
+          try { stream.end(); } catch { }
         });
 
         ws.on('error', () => {
-          try { stream.end(); } catch {}
+          try { stream.end(); } catch { }
         });
       } catch (e) {
         console.error('[ws] exec error:', e);
-        try { ws.close(); } catch {}
+        try { ws.close(); } catch { }
       }
     });
 
@@ -563,7 +563,7 @@ const ensureAuthenticated = (req, res, next) =>
     app.get('/logout', (req, res, next) => {
       const returnTo = sanitizeReturnTo(req.query.returnTo || req.get('referer') || '/dashboard');
       console.log('Logout requested. ReturnTo:', returnTo);
-      
+
       res.clearCookie('np_access', { domain: COOKIE_DOMAIN, path: '/' });
       req.logout(err => (err ? next(err) : res.redirect(returnTo)));
     });

@@ -53,14 +53,14 @@ router.post('/create-user', ensureAuthenticated, async (req, res) => {
   try {
     const email = req.user?.email;
     if (!email) return res.status(400).json({ success: false, message: 'Missing authenticated email' });
-    
+
     // First check if user exists and is pending
     try {
       const checkUrl = `${N8N_HOST}/api/v1/users/${encodeURIComponent(email)}?includeRole=true`;
-      const { data: existingUser } = await axios.get(checkUrl, { 
-        headers: { 'X-N8N-API-KEY': N8N_API_KEY } 
+      const { data: existingUser } = await axios.get(checkUrl, {
+        headers: { 'X-N8N-API-KEY': N8N_API_KEY }
       });
-      
+
       if (existingUser && existingUser.id && existingUser.isPending) {
         // User exists but is pending - delete and recreate
         const deleteUrl = `${N8N_HOST}/api/v1/users/${existingUser.id}`;
@@ -77,7 +77,7 @@ router.post('/create-user', ensureAuthenticated, async (req, res) => {
         throw checkErr;
       }
     }
-    
+
     // Create new user/invite
     const url = `${N8N_HOST}/api/v1/users`;
     const payload = [{ email, role: 'global:member' }];
@@ -102,7 +102,7 @@ router.post('/change-password', ensureAuthenticated, async (req, res) => {
   try {
     const email = req.user?.email;
     if (!email) return res.status(400).json({ success: false, message: 'Missing authenticated email' });
-    
+
     const { newPassword } = req.body;
     if (!newPassword || newPassword.length < 8) {
       return res.status(400).json({ success: false, message: 'Password must be at least 8 characters' });
@@ -113,7 +113,7 @@ router.post('/change-password', ensureAuthenticated, async (req, res) => {
     }
 
     const url = `${N8N_HOST}/n8n-user-manager/api/users/change-password`;
-    const { data } = await axios.post(url, 
+    const { data } = await axios.post(url,
       { email, newPassword },
       {
         headers: {
@@ -122,7 +122,7 @@ router.post('/change-password', ensureAuthenticated, async (req, res) => {
         }
       }
     );
-    
+
     return res.json({ success: true, message: 'Password changed successfully' });
   } catch (err) {
     console.error('[n8n-api] change-password error:', err.message);

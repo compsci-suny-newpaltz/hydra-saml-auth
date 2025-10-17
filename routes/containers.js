@@ -144,7 +144,7 @@ router.post('/start', async (req, res) => {
                 if (!info.NetworkSettings.Networks?.[networkName]) {
                     await docker.getNetwork(networkName).connect({ Container: info.Id });
                 }
-            } catch {}
+            } catch { }
 
             await container.start();
             return res.json({ success: true, url: publicUrl, name: containerName, jupyterToken });
@@ -162,7 +162,7 @@ router.post('/start', async (req, res) => {
             const gitImg = 'alpine/git:latest';
             await pullImage(gitImg);
             await pullImage('busybox:latest'); // Also pull busybox for reading commit hash
-            
+
             const branchOpt = repo.branch ? `-b ${repo.branch}` : '';
             const gitCloneCmd = `
                 set -e
@@ -175,7 +175,7 @@ router.post('/start', async (req, res) => {
                 cd /w/src
                 git rev-parse HEAD > /w/commit_hash.txt
             `;
-            
+
             const gitInit = await docker.createContainer({
                 Image: gitImg,
                 Labels: { 'hydra.temp': 'true' },
@@ -185,18 +185,18 @@ router.post('/start', async (req, res) => {
             });
             await gitInit.start();
             const result = await gitInit.wait();
-            
+
             // Check if git clone succeeded
             if (result.StatusCode !== 0) {
                 console.error(`[containers] Git clone failed with status ${result.StatusCode}`);
                 try {
                     const logs = await gitInit.logs({ stdout: true, stderr: true });
                     console.error('[containers] Git clone logs:', logs.toString());
-                } catch {}
+                } catch { }
                 await gitInit.remove({ force: true });
                 return res.status(500).json({ success: false, message: 'Failed to clone repository' });
             }
-            
+
             // Get the commit hash
             let commitHash = '';
             try {
@@ -207,10 +207,10 @@ router.post('/start', async (req, res) => {
                 });
                 await hashReader.start();
                 await hashReader.wait();
-                
+
                 // Get logs as buffer and manually parse Docker stream header
                 const logBuffer = await hashReader.logs({ stdout: true, stderr: false });
-                
+
                 // Docker stream format: [8 bytes header][payload]
                 // Header: [stream type: 1 byte][3 bytes padding][size: 4 bytes big-endian]
                 if (logBuffer.length > 8) {
@@ -218,14 +218,14 @@ router.post('/start', async (req, res) => {
                     const payload = logBuffer.slice(8, 8 + payloadSize);
                     commitHash = payload.toString('utf8').trim();
                 }
-                
+
                 await hashReader.remove();
             } catch (e) {
                 console.error('[containers] Failed to read commit hash:', e);
             }
-            
+
             await gitInit.remove({ force: true });
-            
+
             // Store commit hash in labels
             if (commitHash) {
                 labels['hydra.repo_commit'] = commitHash;
@@ -377,20 +377,22 @@ router.get('/mine', async (req, res) => {
 
         const containers = await docker.listContainers({
             all: true,
-            filters: { label: [
-                `hydra.owner=${username}`,
-                'hydra.managed_by=hydra-saml-auth'
-            ] }
+            filters: {
+                label: [
+                    `hydra.owner=${username}`,
+                    'hydra.managed_by=hydra-saml-auth'
+                ]
+            }
         });
 
         // Find VS Code container and extract mounted project info
         let vscodeInfo = null;
         const vscodeContainerName = `student-${username}-vscode`;
-        const vscodeContainer = containers.find(c => 
+        const vscodeContainer = containers.find(c =>
             (c.Names && c.Names[0] === `/${vscodeContainerName}`) ||
             c.Labels?.['hydra.type'] === 'vscode'
         );
-        
+
         if (vscodeContainer && vscodeContainer.Labels) {
             vscodeInfo = {
                 name: vscodeContainer.Names[0]?.replace(/^\//, '') || '',
@@ -417,7 +419,7 @@ router.get('/mine', async (req, res) => {
                 repoUrl: c.Labels?.['hydra.repo_url'] || null,
                 repoCommit: c.Labels?.['hydra.repo_commit'] || null
             }));
-        
+
         return res.json({ success: true, containers: items, vscode: vscodeInfo });
     } catch (err) {
         console.error('[containers] list mine error:', err);
@@ -439,14 +441,14 @@ router.delete('/stop-vscode', async (req, res) => {
         const container = docker.getContainer(vscodeContainerName);
         const info = await container.inspect();
         const labels = info?.Config?.Labels || {};
-        
+
         if (labels['hydra.owner'] !== username || labels['hydra.managed_by'] !== 'hydra-saml-auth') {
             return res.status(403).json({ success: false, message: 'Not authorized' });
         }
 
         try {
             await container.stop({ t: 5 });
-        } catch (e) {}
+        } catch (e) { }
         await container.remove({ force: true });
 
         return res.json({ success: true });
@@ -476,7 +478,7 @@ router.delete('/:name', async (req, res) => {
             return res.status(403).json({ success: false, message: 'Not allowed' });
         }
 
-        try { await container.stop({ t: 5 }); } catch (_e) {}
+        try { await container.stop({ t: 5 }); } catch (_e) { }
         await container.remove({ force: true, v: true });
         return res.json({ success: true });
     } catch (err) {
@@ -558,15 +560,15 @@ router.get('/:name/logs/stream', async (req, res) => {
         };
 
         docker.modem.demuxStream(logStream, stdout, stderr);
-        
+
         logStream.on('end', () => res.end());
         logStream.on('error', () => res.end());
         req.on('close', () => {
-            try { logStream.destroy(); } catch {}
+            try { logStream.destroy(); } catch { }
         });
     } catch (err) {
         console.error('[containers] logs stream error:', err);
-        try { res.status(500).end(); } catch {}
+        try { res.status(500).end(); } catch { }
     }
 });
 
@@ -583,7 +585,7 @@ router.post('/:name/git-pull', async (req, res) => {
         const container = docker.getContainer(nameParam);
         const info = await container.inspect();
         const labels = info?.Config?.Labels || {};
-        
+
         if (labels['hydra.owner'] !== username || labels['hydra.managed_by'] !== 'hydra-saml-auth') {
             return res.status(403).json({ success: false, message: 'Not allowed' });
         }
@@ -619,7 +621,7 @@ router.post('/:name/git-pull', async (req, res) => {
             HostConfig: { Mounts: [{ Type: 'volume', Source: volumeName, Target: '/w' }] },
             Entrypoint: ['sh']
         });
-        
+
         await gitPull.start();
         const result = await gitPull.wait();
 
@@ -628,7 +630,7 @@ router.post('/:name/git-pull', async (req, res) => {
             try {
                 const logs = await gitPull.logs({ stdout: true, stderr: true });
                 console.error('[containers] Git pull logs:', logs.toString());
-            } catch {}
+            } catch { }
             await gitPull.remove({ force: true });
             return res.status(500).json({ success: false, message: 'Failed to pull latest changes' });
         }
@@ -643,10 +645,10 @@ router.post('/:name/git-pull', async (req, res) => {
             });
             await hashReader.start();
             await hashReader.wait();
-            
+
             // Get logs as buffer and manually parse Docker stream header
             const logBuffer = await hashReader.logs({ stdout: true, stderr: false });
-            
+
             // Docker stream format: [8 bytes header][payload]
             // Header: [stream type: 1 byte][3 bytes padding][size: 4 bytes big-endian]
             if (logBuffer.length > 8) {
@@ -654,7 +656,7 @@ router.post('/:name/git-pull', async (req, res) => {
                 const payload = logBuffer.slice(8, 8 + payloadSize);
                 commitHash = payload.toString('utf8').trim();
             }
-            
+
             await hashReader.remove();
         } catch (e) {
             console.error('[containers] Failed to read commit hash:', e);
@@ -668,14 +670,14 @@ router.post('/:name/git-pull', async (req, res) => {
                 const oldInfo = await container.inspect();
                 const oldConfig = oldInfo.Config;
                 const oldHostConfig = oldInfo.HostConfig;
-                
+
                 // Update labels
                 const updatedLabels = { ...oldConfig.Labels, 'hydra.repo_commit': commitHash };
-                
+
                 // Stop and remove old container
-                try { await container.stop({ t: 5 }); } catch {}
+                try { await container.stop({ t: 5 }); } catch { }
                 await container.remove({ force: true });
-                
+
                 // Recreate with updated labels
                 const newContainer = await docker.createContainer({
                     name: nameParam,
@@ -685,14 +687,14 @@ router.post('/:name/git-pull', async (req, res) => {
                     Env: oldConfig.Env,
                     HostConfig: oldHostConfig
                 });
-                
+
                 await newContainer.start();
             } catch (e) {
                 console.error('[containers] Failed to update container labels:', e);
                 // If recreation failed, try to restart the old one
                 try {
                     await container.restart();
-                } catch {}
+                } catch { }
             }
         } else {
             // No commit hash, just restart
@@ -719,7 +721,7 @@ router.post('/start-vscode', async (req, res) => {
 
         const username = String(req.user.email).split('@')[0];
         const targetProject = String(req.body?.project || '').trim();
-        
+
         if (!targetProject) {
             return res.status(400).json({ success: false, message: 'Project name required' });
         }
@@ -728,7 +730,7 @@ router.post('/start-vscode', async (req, res) => {
         const vscodeContainerName = `student-${username}-vscode`;
         const networkName = 'hydra_students_net';
         const basePath = `/students/${username}/vscode`;
-        
+
         // Public URL
         const publicBase = (process.env.PUBLIC_STUDENTS_BASE || `https://${host}/students`).replace(/\/$/, '');
         const publicUrl = `${publicBase}/${username}/vscode/`;
@@ -740,7 +742,7 @@ router.post('/start-vscode', async (req, res) => {
             targetContainer = docker.getContainer(targetContainerName);
             const targetInfo = await targetContainer.inspect();
             const targetLabels = targetInfo?.Config?.Labels || {};
-            
+
             if (targetLabels['hydra.owner'] !== username || targetLabels['hydra.managed_by'] !== 'hydra-saml-auth') {
                 return res.status(403).json({ success: false, message: 'Target container not found or not owned by you' });
             }
@@ -760,11 +762,11 @@ router.post('/start-vscode', async (req, res) => {
         try {
             vscodeContainer = docker.getContainer(vscodeContainerName);
             await vscodeContainer.inspect();
-            
+
             // If it exists, stop and remove it
             try {
                 await vscodeContainer.stop({ t: 5 });
-            } catch (e) {}
+            } catch (e) { }
             await vscodeContainer.remove({ force: true });
         } catch (e) {
             // Container doesn't exist, which is fine
@@ -817,7 +819,7 @@ router.post('/start-vscode', async (req, res) => {
         });
 
         await vscodeContainer.start();
-        
+
         // Fix permissions on the workspace directory (run as root then fix ownership)
         // This ensures files are readable/writable by the code-server user
         try {
@@ -844,7 +846,5 @@ router.post('/start-vscode', async (req, res) => {
         return res.status(500).json({ success: false, message: 'Failed to start VS Code' });
     }
 });
-
-// ...stop-vscode handler moved earlier to avoid conflict with generic routes...
 
 module.exports = router;

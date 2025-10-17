@@ -102,7 +102,7 @@ app.post(`${base}/create-account`, async (req, res) => {
     await db.run('COMMIT');
     return res.json({ success: true, message: 'Account created successfully' });
   } catch (error) {
-    try { await db.run('ROLLBACK'); } catch {}
+    try { await db.run('ROLLBACK'); } catch { }
     console.error('[openwebui_middleman] create-account error:', error);
     return res.status(500).json({ success: false, message: 'Error creating account' });
   } finally {
