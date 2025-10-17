@@ -96,11 +96,11 @@ sequenceDiagram
   participant T as Traefik
 
   B->>H: POST /containers/start (preset=jupyter)
-  H->>H: Generate JUPYTER_TOKEN
+  H->>H: Prepare base_url and ForwardAuth
   H->>D: Ensure network + volume
-  H->>D: Create J (env: JUPYTER_TOKEN, base_url)
+  H->>D: Create J (base_url, token disabled; Traefik ForwardAuth)
   H->>D: Start J (mount /home/jovyan/work)
-  H-->>B: 200 { url, jupyterToken }
+  H-->>B: 200 { url }
   B->>T: GET /students/<user>/<project>/tree?
   T->>J: Forward (no StripPrefix)
   J-->>B: Notebook UI (token required)
@@ -181,7 +181,7 @@ Common hydra labels:
 - `hydra.created_at=<ISO timestamp>`
 
 Preset-specific:
-- Jupyter: `hydra.preset=jupyter`, `hydra.jupyter_token=<token>`
+- Jupyter: `hydra.preset=jupyter` (auth via ForwardAuth; no token label)
 - Repo: `hydra.preset=repo`, `hydra.runtime`, `hydra.repo_url`, `hydra.repo_branch?`, `hydra.repo_subdir?`, `hydra.repo_commit`
 - VS Code: `hydra.type=vscode`, `hydra.mounted_project`
 

@@ -95,27 +95,30 @@ router.post('/start', async (req, res) => {
             image = process.env.JUPYTER_IMAGE || 'jupyter/minimal-notebook:latest';
             servicePort = 8888;
 
-            // Generate one-time token
-            const crypto = require('crypto');
-            const jupyterToken = crypto.randomBytes(16).toString('hex');
-            env.push(`JUPYTER_TOKEN=${jupyterToken}`);
-            // Configure Jupyter to run at the correct base URL (don't strip prefix)
-            env.push(`JUPYTER_BASE_URL=${basePath}`);
-            // Store token in labels for later retrieval
-            labels['hydra.jupyter_token'] = jupyterToken;
-
+            // Configure Jupyter to run at the correct base URL; disable token/password (ForwardAuth handles auth)
             // Add Traefik labels BEFORE creating container
-            // Note: We do NOT use stripprefix for Jupyter - it needs to know its full path
+            // Note: We do NOT use StripPrefix for Jupyter - it needs to know its full path
             labels[`traefik.http.routers.${containerName}.entrypoints`] = 'web';
             labels[`traefik.http.routers.${containerName}.rule`] = `PathPrefix(\"${basePath}\")`;
             labels[`traefik.http.services.${containerName}.loadbalancer.server.port`] = String(servicePort);
+            // ForwardAuth middleware - verify token before allowing access
+            labels[`traefik.http.middlewares.${containerName}-auth.forwardauth.address`] = 'http://host.docker.internal:6969/auth/verify';
+            labels[`traefik.http.middlewares.${containerName}-auth.forwardauth.trustForwardHeader`] = 'true';
+            // Attach auth middleware (no StripPrefix)
+            labels[`traefik.http.routers.${containerName}.middlewares`] = `${containerName}-auth`;
 
             await pullImage(image);
 
             const mounts = [{ Type: 'volume', Source: volumeName, Target: '/home/jovyan/work' }];
 
-            // Custom command to start Jupyter with base_url
-            cmd = ['start-notebook.sh', `--NotebookApp.base_url=${basePath}`, '--NotebookApp.allow_origin=*'];
+            // Custom command to start Jupyter with base_url and no token/password (ForwardAuth is enforced by Traefik)
+            cmd = [
+                'start-notebook.sh',
+                `--NotebookApp.base_url=${basePath}`,
+                '--NotebookApp.allow_origin=*',
+                '--NotebookApp.token=',
+                '--NotebookApp.password='
+            ];
 
             let container;
             try {
@@ -147,7 +150,7 @@ router.post('/start', async (req, res) => {
             } catch { }
 
             await container.start();
-            return res.json({ success: true, url: publicUrl, name: containerName, jupyterToken });
+            return res.json({ success: true, url: publicUrl, name: containerName });
         }
 
         // === PRESET: REPO (GitHub integration) ===
@@ -414,7 +417,7 @@ router.get('/mine', async (req, res) => {
                 project: c.Labels?.['hydra.project'] || '',
                 url: c.Labels?.['hydra.public_url'] || '',
                 preset: c.Labels?.['hydra.preset'] || '',
-                jupyterToken: c.Labels?.['hydra.jupyter_token'] || null,
+                // jupyterToken removed; Jupyter now uses ForwardAuth
                 repoUrl: c.Labels?.['hydra.repo_url'] || null,
                 repoCommit: c.Labels?.['hydra.repo_commit'] || null
             }));
