@@ -42,6 +42,21 @@ function fullUrl(req) {
 }
 
 /**
+ * External base URL for this app (handles reverse proxy prefixes).
+ * Prefers X-Forwarded-* headers; falls back to deriving prefix from originalUrl.
+ * Optionally honor APP_BASE_PATH if you want to force a prefix.
+ */
+function externalBase(req) {
+  const host = req.headers['x-forwarded-host'] || req.headers.host;
+
+  // Prefer X-Forwarded-Prefix (set by Traefik StripPrefix), or APP_BASE_PATH.
+  let basePath = req.headers['x-forwarded-prefix'] || process.env.APP_BASE_PATH || '';
+  if (!basePath) basePath = '/';
+  if (!basePath.endsWith('/')) basePath += '/';
+  return `https://${host}${basePath}`;
+}
+
+/**
  * Call Hydra /check with the token. Returns { ok:boolean, data?:object, status:number }.
  * We do NOT pass cookies to Hydra; we read np_access from *our* cookies and forward as Bearer.
  */
@@ -115,7 +130,7 @@ function requireCompsci(req, res, next) {
 router.get('/', async (req, res) => {
   const token = req.cookies?.np_access;
   const me = await verifyWithHydra(token); // lightweight check to show status
-  const returnTo = fullUrl(req);
+  const returnTo = externalBase(req);
 
   const loggedIn = me.ok && me.data?.active;
   const email = loggedIn ? me.data.email : null;
@@ -170,11 +185,11 @@ router.get('/', async (req, res) => {
     <div class="card">
       <strong>Debug:</strong>
       <ul>
-  <li><a href="/studentmvp/whoami">/whoami</a> – calls Hydra <code>/check</code> and shows what it returns</li>
-  <li><a href="/studentmvp/restricted">/restricted</a> – only for roles: <code>${ALLOWED_ROLES.join(', ')}</code></li>
-    <li><a href="/studentmvp/faculty">/faculty</a> – faculty only</li>
-    <li><a href="/studentmvp/student">/student</a> – students only</li>
-    <li><a href="/studentmvp/compsci">/compsci</a> – compsci/registered students only</li>
+  <li><a href="whoami">/whoami</a> – calls Hydra <code>/check</code> and shows what it returns</li>
+  <li><a href="restricted">/restricted</a> – only for roles: <code>${ALLOWED_ROLES.join(', ')}</code></li>
+    <li><a href="faculty">/faculty</a> – faculty only</li>
+    <li><a href="student">/student</a> – students only</li>
+    <li><a href="compsci">/compsci</a> – compsci/registered students only</li>
       </ul>
     </div>
   </body>
@@ -193,7 +208,7 @@ router.get('/restricted', requireNP, (req, res) => {
     <h1>Restricted Area</h1>
     <p>Welcome, ${req.user.email}.</p>
     <pre style="white-space:pre-wrap; background:#f6f6f6; padding:1rem; border-radius:.75rem;">${JSON.stringify(req.user, null, 2)}</pre>
-  <p><a href="/studentmvp/">← Back</a></p>
+  <p><a href=".">← Back</a></p>
   </body>
 </html>`);
 });
@@ -207,7 +222,7 @@ router.get('/faculty', requireNP, requireFaculty, (req, res) => {
     <h1>Faculty Only Area</h1>
     <p>Welcome, ${req.user.email}.</p>
     <pre style="white-space:pre-wrap; background:#f6f6f6; padding:1rem; border-radius:.75rem;">${JSON.stringify(req.user, null, 2)}</pre>
-    <p><a href="/studentmvp/">← Back</a></p>
+    <p><a href=".">← Back</a></p>
   </body>
 </html>`);
 });
@@ -221,7 +236,7 @@ router.get('/student', requireNP, requireStudent, (req, res) => {
     <h1>Student Only Area</h1>
     <p>Welcome, ${req.user.email}.</p>
     <pre style="white-space:pre-wrap; background:#f6f6f6; padding:1rem; border-radius:.75rem;">${JSON.stringify(req.user, null, 2)}</pre>
-    <p><a href="/studentmvp/">← Back</a></p>
+    <p><a href=".">← Back</a></p>
   </body>
 </html>`);
 });
@@ -235,7 +250,7 @@ router.get('/compsci', requireNP, requireCompsci, (req, res) => {
     <h1>Compsci/Registered Students Only Area</h1>
     <p>Welcome, ${req.user.email}.</p>
     <pre style="white-space:pre-wrap; background:#f6f6f6; padding:1rem; border-radius:.75rem;">${JSON.stringify(req.user, null, 2)}</pre>
-    <p><a href="/studentmvp/">← Back</a></p>
+    <p><a href=".">← Back</a></p>
   </body>
 </html>`);
 });
