@@ -115,7 +115,7 @@ function requireCompsci(req, res, next) {
 router.get('/', async (req, res) => {
   const token = req.cookies?.np_access;
   const me = await verifyWithHydra(token); // lightweight check to show status
-  const returnTo = "https://hydra.newpaltz.edu/studentmvp/"; // send users back here after SSO
+  const returnTo = fullUrl(req);
 
   const loggedIn = me.ok && me.data?.active;
   const email = loggedIn ? me.data.email : null;
