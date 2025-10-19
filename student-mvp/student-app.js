@@ -162,7 +162,7 @@ router.get('/', async (req, res) => {
       </div>
 
       <p>
-  <a class="btn btn-primary" href="/studentmvp/restricted">Go to restricted page</a>
+        <a class="btn btn-primary" href="restricted">Go to restricted page</a>
         <a class="btn" href="${HYDRA_BASE_URL}/logout?returnTo=${encodeURIComponent(returnTo)}">Log out</a>
       </p>
     ` : `

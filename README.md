@@ -81,8 +81,8 @@ High-level layout of important files and folders:
 
 ### Rebuilding
 ```
-sudo docker compose build hydra-saml-auth
-sudo docker compose up -d hydra-saml-auth
+docker compose build hydra-saml-auth
+docker compose up -d hydra-saml-auth
 ```
 
 ## Configuration

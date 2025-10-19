@@ -243,7 +243,11 @@ router.post('/start', async (req, res) => {
                 cmd = ['sh', '-c', `
                     set -e
                     cd /workspace/src${subdirPath}
-                    if [ -f package-lock.json ]; then npm ci; elif [ -f package.json ]; then npm i; fi
+                                        if [ -f package-lock.json ]; then 
+                                            npm ci --no-audit --no-fund || (echo "npm ci failed; falling back to npm install" >&2 && rm -f package-lock.json && npm install --no-audit --no-fund)
+                                        elif [ -f package.json ]; then 
+                                            npm install --no-audit --no-fund
+                                        fi
                     exec ${startCmd}
                 `];
             } else if (runtime === 'python') {
