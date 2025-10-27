@@ -1,0 +1,125 @@
+{
+  "folders": [
+    {
+      "name": "Hydra SAML Auth",
+      "path": ".."
+    },
+    {
+      "name": "Dev Environment",
+      "path": "."
+    }
+  ],
+  "settings": {
+    "files.exclude": {
+      "**/node_modules": true,
+      "**/.git": true
+    },
+    "search.exclude": {
+      "**/node_modules": true,
+      "**/jwt-keys": true
+    },
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": true
+    },
+    "eslint.validate": [
+      "javascript"
+    ],
+    "docker.defaultRegistryPath": "",
+    "terminal.integrated.env.linux": {
+      "NODE_ENV": "development"
+    },
+    "terminal.integrated.env.osx": {
+      "NODE_ENV": "development"
+    },
+    "terminal.integrated.env.windows": {
+      "NODE_ENV": "development"
+    }
+  },
+  "launch": {
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "type": "node",
+        "request": "attach",
+        "name": "Attach to Docker (Hydra)",
+        "port": 9229,
+        "address": "localhost",
+        "localRoot": "${workspaceFolder:Hydra SAML Auth}",
+        "remoteRoot": "/app",
+        "protocol": "inspector",
+        "restart": true
+      },
+      {
+        "type": "node",
+        "request": "launch",
+        "name": "Debug Local",
+        "program": "${workspaceFolder:Hydra SAML Auth}/index.js",
+        "envFile": "${workspaceFolder:Dev Environment}/.env.dev",
+        "skipFiles": [
+          "<node_internals>/**"
+        ]
+      }
+    ]
+  },
+  "tasks": {
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "Start Dev Environment",
+        "type": "shell",
+        "command": "make start",
+        "options": {
+          "cwd": "${workspaceFolder:Dev Environment}"
+        },
+        "group": {
+          "kind": "build",
+          "isDefault": true
+        },
+        "problemMatcher": []
+      },
+      {
+        "label": "Stop Dev Environment",
+        "type": "shell",
+        "command": "make stop",
+        "options": {
+          "cwd": "${workspaceFolder:Dev Environment}"
+        },
+        "group": "build",
+        "problemMatcher": []
+      },
+      {
+        "label": "View Logs",
+        "type": "shell",
+        "command": "make logs",
+        "options": {
+          "cwd": "${workspaceFolder:Dev Environment}"
+        },
+        "group": "build",
+        "problemMatcher": []
+      },
+      {
+        "label": "Rebuild Hydra",
+        "type": "shell",
+        "command": "make rebuild-hydra",
+        "options": {
+          "cwd": "${workspaceFolder:Dev Environment}"
+        },
+        "group": "build",
+        "problemMatcher": []
+      }
+    ]
+  },
+  "extensions": {
+    "recommendations": [
+      "ms-azuretools.vscode-docker",
+      "dbaeumer.vscode-eslint",
+      "esbenp.prettier-vscode",
+      "ms-vscode.vscode-typescript-tslint-plugin",
+      "christian-kohler.npm-intellisense",
+      "eg2.vscode-npm-script",
+      "mikestead.dotenv",
+      "humao.rest-client"
+    ]
+  }
+}
