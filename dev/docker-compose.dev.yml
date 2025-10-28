@@ -7,10 +7,15 @@ services:
     container_name: mock-saml-idp
     environment:
       SIMPLESAMLPHP_SP_ENTITY_ID: hydra.local
-      SIMPLESAMLPHP_SP_ASSERTION_CONSUMER_SERVICE: http://hydra.local:6969/login/callback
+      SIMPLESAMLPHP_SP_ASSERTION_CONSUMER_SERVICE: http://hydra.local/login/callback
+      SIMPLESAMLPHP_BASEURLPATH: http://mock-saml-idp/simplesaml/
     ports:
       - "8080:8080"
-      - "8443:8443"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.idp.rule=Host(`mock-saml-idp`)"
+      - "traefik.http.routers.idp.entrypoints=web"
+      - "traefik.http.services.idp.loadbalancer.server.port=8080"
     networks:
       - hydra-dev-net
 
@@ -40,8 +45,11 @@ services:
       - open-webui-dev:/app/backend/data
     depends_on:
       - ollama
-    ports:
-      - "3000:8080"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.gpt.rule=Host(`gpt.hydra.local`)"
+      - "traefik.http.routers.gpt.entrypoints=web"
+      - "traefik.http.services.gpt.loadbalancer.server.port=8080"
     environment:
       - OLLAMA_BASE_URL=http://ollama:11434
       - WEBUI_SECRET_KEY=dev-secret-key-change-me
@@ -81,8 +89,11 @@ services:
       - ../routes:/app/routes:ro
       - ../public:/app/public:ro
       - ./jwt-keys:/app/jwt-keys
-    ports:
-      - "6969:6969"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.hydra.rule=Host(`hydra.local`)"
+      - "traefik.http.routers.hydra.entrypoints=web"
+      - "traefik.http.services.hydra.loadbalancer.server.port=6969"
     networks:
       - hydra-dev-net
     extra_hosts:
@@ -129,8 +140,12 @@ services:
       - N8N_HOST=n8n.hydra.local
       - N8N_PORT=5678
       - N8N_WEBHOOK_BASE_URL=http://n8n.hydra.local
-    ports:
-      - "5678:5678"
+      - N8N_SECURE_COOKIE=false
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.n8n.rule=Host(`n8n.hydra.local`)"
+      - "traefik.http.routers.n8n.entrypoints=web"
+      - "traefik.http.services.n8n.loadbalancer.server.port=5678"
     volumes:
       - n8n-dev:/home/node/.n8n
     networks:

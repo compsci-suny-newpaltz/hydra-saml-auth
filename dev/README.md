@@ -34,6 +34,15 @@ This development setup provides a complete local environment that emulates the p
 - Make (optional, for convenience commands)
 - sudo access (for hosts file modification)
 
+### For Windows Users
+Add the following entries to your `C:\Windows\System32\drivers\etc\hosts` file:
+```bash
+127.0.0.1    hydra.local
+127.0.0.1    gpt.hydra.local
+127.0.0.1    n8n.hydra.local
+127.0.0.1    mock-saml-idp
+```
+
 ### Setup Steps
 
 1. **Clone and navigate to dev folder:**

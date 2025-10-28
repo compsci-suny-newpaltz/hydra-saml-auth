@@ -37,10 +37,10 @@ start:
 	@echo "Waiting for services to be ready..."
 	@$(SLEEP_CMD)
 	@echo "✓ Services should be available at:"
-	@echo "  - Main app: http://hydra.local:6969"
-	@echo "  - OpenWebUI: http://localhost:3000"
-	@echo "  - Mock SAML: http://localhost:8080"
-	@echo "  - Traefik: http://localhost:8081"
+	@echo "  - Main app:  http://hydra.local/dashboard"
+	@echo "  - OpenWebUI: http://gpt.hydra.local"
+	@echo "  - Mock SAML: http://mock-saml-idp"
+	@echo "  - Traefik:   http://traefik.hydra.local"
 
 # Start with logs
 start-logs:
@@ -76,6 +76,9 @@ shell-webui:
 
 shell-db:
 	docker compose -f docker-compose.dev.yml exec openwebui-middleman sqlite3 /app/data/webui.db
+
+keys-windows:
+	docker compose -f docker-compose.windows.yml run --rm hydra-saml-auth sh -lc "mkdir -p /app/jwt-keys && openssl genrsa -out /app/jwt-keys/private.pem 2048 && openssl rsa -in /app/jwt-keys/private.pem -pubout -out /app/jwt-keys/public.pem"
 
 # Clean up
 clean:
