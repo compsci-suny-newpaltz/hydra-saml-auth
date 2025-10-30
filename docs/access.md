@@ -302,30 +302,30 @@ for question in questions:
 ```mermaid
 graph TB
     subgraph "Internet"
-        Student[Student Applications<br/>Python/JS/PHP/Java]
-        Browser[Web Browser<br/>Dashboard Access]
+        Student[Student Applications - Python/JS/PHP/Java]
+        Browser[Web Browser - Dashboard Access]
     end
     
     subgraph "Hydra Infrastructure - hydra.newpaltz.edu"
         subgraph "Authentication Layer"
-            SAML[SAML Auth Service<br/>:6969]
-            Azure[Azure AD<br/>Identity Provider]
-            JWT[JWT/JWKS<br/>Token Service]
+            SAML[SAML Auth Service - :6969]
+            Azure[Azure AD - Identity Provider]
+            JWT[JWT/JWKS - Token Service]
         end
         
         subgraph "Reverse Proxy"
-            Traefik[Traefik<br/>Path-based Routing]
+            Traefik[Traefik - Path-based Routing]
         end
         
         subgraph "Core Services"
-            Dashboard[Hydra Dashboard<br/>Account Management]
-            OpenWebUI[OpenWebUI<br/>:3000/8080<br/>gpt.hydra.newpaltz.edu]
-            Middleman[OpenWebUI Middleman<br/>:7070<br/>Database API]
+            Dashboard[Hydra Dashboard - Account Management]
+            OpenWebUI[OpenWebUI - :3000/8080 - gpt.hydra.newpaltz.edu]
+            Middleman[OpenWebUI Middleman - :7070 - Database API]
         end
         
         subgraph "AI Backend"
-            Ollama[Ollama Service<br/>:11434<br/>Model Management]
-            Models[AI Models<br/>Llama/Mistral/etc]
+            Ollama[Ollama Service - :11434 - Model Management]
+            Models[AI Models - Llama/Mistral/etc]
         end
         
         subgraph "Student Containers"
@@ -336,8 +336,8 @@ graph TB
         end
         
         subgraph "Storage"
-            DB[(SQLite Database<br/>User Accounts)]
-            Volumes[(Docker Volumes<br/>Student Data)]
+            DB[(SQLite Database - User Accounts)]
+            Volumes[(Docker Volumes - Student Data)]
         end
     end
     
@@ -426,21 +426,21 @@ sequenceDiagram
 ```mermaid
 graph LR
     subgraph "Student Development"
-        Code[Student Code<br/>API Integration]
-        ENV[Environment Variables<br/>OPENWEBUI_API_KEY]
+        Code[Student Code - API Integration]
+        ENV[Environment Variables - OPENWEBUI_API_KEY]
     end
     
     subgraph "API Endpoints"
-        Auth[/api/auth<br/>Authentication]
-        Chat[/api/chat/completions<br/>Chat API]
-        Models[/api/models<br/>List Models]
-        Files[/api/v1/files<br/>RAG Upload]
+        Auth[/api/auth - Authentication]
+        Chat[/api/chat/completions - Chat API]
+        Models[/api/models - List Models]
+        Files[/api/v1/files - RAG Upload]
     end
     
     subgraph "Processing"
-        OpenWebUI[OpenWebUI<br/>Request Router]
-        Ollama[Ollama<br/>Model Engine]
-        RAG[RAG Pipeline<br/>Document Processing]
+        OpenWebUI[OpenWebUI - Request Router]
+        Ollama[Ollama - Model Engine]
+        RAG[RAG Pipeline - Document Processing]
     end
     
     Code -->|Bearer Token| Auth
@@ -465,28 +465,28 @@ graph LR
 ```mermaid
 graph TB
     subgraph "External Network"
-        Internet[Internet<br/>HTTPS Only]
+        Internet[Internet - HTTPS Only]
     end
     
     subgraph "DMZ - Traefik Proxy"
-        Traefik[Traefik<br/>:80/:443<br/>SSL Termination]
+        Traefik[Traefik - :80/:443 - SSL Termination]
     end
     
     subgraph "Internal Networks"
         subgraph "hydra-main-net"
-            SAML[SAML Auth<br/>10.10.0.2]
-            OpenWebUI[OpenWebUI<br/>10.10.0.3]
-            Dashboard[Dashboard<br/>10.10.0.4]
+            SAML[SAML Auth - 10.10.0.2]
+            OpenWebUI[OpenWebUI - 10.10.0.3]
+            Dashboard[Dashboard - 10.10.0.4]
         end
         
         subgraph "hydra-students-net"
-            Student1[Student Container 1<br/>172.20.0.x]
-            Student2[Student Container 2<br/>172.20.0.y]
-            StudentN[Student Container N<br/>172.20.0.z]
+            Student1[Student Container 1 - 172.20.0.x]
+            Student2[Student Container 2 - 172.20.0.y]
+            StudentN[Student Container N - 172.20.0.z]
         end
         
         subgraph "ollama-net"
-            Ollama[Ollama Service<br/>10.11.0.2]
+            Ollama[Ollama Service - 10.11.0.2]
             Models[(Model Storage)]
         end
     end
@@ -549,7 +549,7 @@ sequenceDiagram
     participant Model as Ollama/Model
     participant Cache as Response Cache
     
-    App->>API: POST /api/chat/completions<br/>Bearer: API_KEY
+    App->>API: POST /api/chat/completions - Bearer: API_KEY
     API->>Auth: Validate Token
     Auth-->>API: User Context
     
@@ -575,9 +575,9 @@ sequenceDiagram
 ```mermaid
 graph TD
     subgraph "Container Presets"
-        Jupyter[Jupyter Notebook<br/>Python Data Science]
-        Static[Static Website<br/>HTML/CSS/JS]
-        Repo[GitHub Repository<br/>Any Language]
+            Jupyter[Jupyter Notebook - Python Data Science]
+            Static[Static Website - HTML/CSS/JS]
+            Repo[GitHub Repository - Any Language]
     end
     
     subgraph "Jupyter Config"
@@ -723,14 +723,14 @@ sequenceDiagram
     participant M as Model
     
     Note over U,M: Document Upload Phase
-    U->>A: POST /api/v1/files<br/>Upload PDF/TXT
+    U->>A: POST /api/v1/files - Upload PDF/TXT
     A->>F: Store File
     F->>E: Generate Embeddings
     E->>V: Store Vectors
     A-->>U: Return file_id
     
     Note over U,M: Query Phase
-    U->>A: POST /api/chat/completions<br/>+ file_id
+    U->>A: POST /api/chat/completions - + file_id
     A->>V: Semantic Search
     V-->>A: Relevant Chunks
     A->>M: Prompt + Context
@@ -745,14 +745,14 @@ sequenceDiagram
 graph TB
     subgraph "Development Environment"
         DevCode[Student Code]
-        DevAPI[Local OpenWebUI<br/>localhost:3000]
-        DevOllama[Local Ollama<br/>localhost:11434]
+    DevAPI[Local OpenWebUI - localhost:3000]
+    DevOllama[Local Ollama - localhost:11434]
     end
     
     subgraph "Production - Hydra"
-        ProdTraefik[Traefik Proxy<br/>hydra.newpaltz.edu]
-        ProdAPI[OpenWebUI<br/>gpt.hydra.newpaltz.edu]
-        ProdOllama[Ollama Cluster<br/>GPU Enabled]
+    ProdTraefik[Traefik Proxy - hydra.newpaltz.edu]
+    ProdAPI[OpenWebUI - gpt.hydra.newpaltz.edu]
+    ProdOllama[Ollama Cluster - GPU Enabled]
         ProdDB[(Production DB)]
     end
     
