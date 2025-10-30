@@ -1,7 +1,84 @@
+
+
 # Open WebUI Integration Guide
 
 This guide will walk you through accessing Hydra GPT, creating an account, obtaining your API key, and integrating it with Open WebUI for local LLM access.
+# Table of Contents
 
+## Getting Started
+- [Accessing Hydra GPT](#accessing-hydra-gpt)
+- [Obtaining Your API Key](#obtaining-your-api-key)
+  - [Step 1: Navigate to Settings](#step-1-navigate-to-settings)
+  - [Step 2: Access API Keys Section](#step-2-access-api-keys-section)
+  - [Step 3: Generate a New API Key](#step-3-generate-a-new-api-key)
+  - [Step 4: Copy Your API Key](#step-4-copy-your-api-key)
+
+## Integration Guide
+- [Integrating with Open WebUI](#integrating-with-open-webui)
+  - [Configuration Parameters](#configuration-parameters)
+  - [Integration Methods](#integration-methods)
+    - [Method 1: Environment Variables](#method-1-environment-variables)
+    - [Method 2: Configuration File](#method-2-configuration-file)
+    - [Method 3: cURL Test](#method-3-curl-test)
+
+## Language-Specific Integration Examples
+- [Python Integration](#python-integration)
+  - [Using OpenAI SDK](#using-openai-sdk)
+  - [Using Requests Library](#using-requests-library)
+  - [Flask Web Application](#flask-web-application)
+- [JavaScript/Node.js Integration](#javascriptnodejs-integration)
+  - [Using Axios](#using-axios)
+  - [Using Fetch API](#using-fetch-api-browsernode18)
+  - [Express.js Server](#expressjs-server)
+  - [React Frontend Example](#react-frontend-example)
+- [PHP Integration](#php-integration)
+  - [Using cURL](#using-curl)
+  - [Using Guzzle HTTP Client](#using-guzzle-http-client)
+  - [Laravel Integration](#laravel-integration)
+- [Java Integration](#java-integration)
+  - [Using OkHttp](#using-okhttp)
+  - [Using Spring Boot](#using-spring-boot)
+- [C# / .NET Integration](#c--net-integration)
+  - [Using HttpClient](#using-httpclient)
+  - [ASP.NET Core Integration](#aspnet-core-integration)
+- [Ruby Integration](#ruby-integration)
+- [Go Integration](#go-integration)
+- [Rust Integration](#rust-integration)
+
+## Testing & Troubleshooting
+- [Testing Your Connection](#testing-your-connection)
+  - [Check API Connectivity](#1-check-api-connectivity)
+  - [List Available Models](#2-list-available-models)
+  - [Send a Test Message](#3-send-a-test-message)
+- [Troubleshooting](#troubleshooting)
+  - [Common Issues and Solutions](#common-issues-and-solutions)
+  - [Getting Help](#getting-help)
+
+## Additional Information
+- [Security Best Practices](#security-best-practices)
+- [Example Use Cases](#example-use-cases)
+  - [Simple Chat Application](#simple-chat-application-python)
+  - [Batch Processing](#batch-processing-python)
+  - [Conversational Chatbot](#conversational-chatbot-javascript)
+- [Additional Resources](#additional-resources)
+- [Changelog](#changelog)
+
+## System Architecture
+- [System Overview](#system-overview)
+- [Authentication Flow](#authentication-flow)
+- [Student API Access Pattern](#student-api-access-pattern)
+- [Network Architecture](#network-architecture)
+- [Container Lifecycle Management](#container-lifecycle-management)
+- [API Request Flow](#api-request-flow)
+- [Student Container Types](#student-container-types)
+- [OpenWebUI API Structure](#openwebui-api-structure)
+- [Security Architecture](#security-architecture)
+- [Data Flow for RAG](#data-flow-for-rag-retrieval-augmented-generation)
+- [Deployment Architecture](#deployment-architecture)
+- [Troubleshooting Decision Tree](#troubleshooting-decision-tree)
+- [Port Reference](#port-reference)
+- [Quick Start Workflow](#quick-start-workflow)
+- [Summary](#summary)
 ---
 
 ## Accessing Hydra GPT
