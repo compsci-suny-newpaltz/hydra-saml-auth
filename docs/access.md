@@ -1,6 +1,6 @@
 # Open WebUI Integration Guide
 
-This guide will walk you through accessing Hydra GPT, creating an account, obtaining your API key, and integrating it with Open WebUI for local LLM access.
+This guide will walk you through accessing [gpt.hydra.newpaltz.edu](https://gpt.hydra.newpaltz.edu/), creating an account, obtaining your API key, and integrating it with Open WebUI for local LLM access.
 
 ## Table of Contents
 
