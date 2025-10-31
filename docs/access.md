@@ -1601,16 +1601,6 @@ class ChatBot {
     console.log(await bot.chat('Thanks for the explanation!'));
 })();
 ```
-
----
-
-## Changelog
-
-- **v1.1** - Added comprehensive language examples (Python, JavaScript, PHP, Java, C#, Ruby, Go, Rust)
-- **v1.0** - Initial guide created with Hydra GPT integration instructions
-- Endpoint: `https://gpt.hydra.newpaltz.edu/api/chat/completions`
-- Default Model: `gemma3:12b`
-
 ---
 
 
