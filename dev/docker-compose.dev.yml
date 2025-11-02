@@ -1,0 +1,169 @@
+version: '3.8'
+
+services:
+  # Mock SAML IdP for local development
+  mock-saml-idp:
+    image: kristophjunge/test-saml-idp
+    container_name: mock-saml-idp
+    environment:
+      SIMPLESAMLPHP_SP_ENTITY_ID: hydra.local
+      SIMPLESAMLPHP_SP_ASSERTION_CONSUMER_SERVICE: http://hydra.local/login/callback
+      SIMPLESAMLPHP_BASEURLPATH: http://mock-saml-idp/simplesaml/
+    ports:
+      - "8080:8080"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.idp.rule=Host(`mock-saml-idp`)"
+      - "traefik.http.routers.idp.entrypoints=web"
+      - "traefik.http.services.idp.loadbalancer.server.port=8080"
+    networks:
+      - hydra-dev-net
+
+  # Ollama for AI models
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama-dev
+    volumes:
+      - ollama-dev:/root/.ollama
+    ports:
+      - "11434:11434"
+    networks:
+      - hydra-dev-net
+    # Remove GPU requirements for dev
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           capabilities: [gpu]
+
+  # Open WebUI
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open-webui-dev
+    volumes:
+      - open-webui-dev:/app/backend/data
+    depends_on:
+      - ollama
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.gpt.rule=Host(`gpt.hydra.local`)"
+      - "traefik.http.routers.gpt.entrypoints=web"
+      - "traefik.http.services.gpt.loadbalancer.server.port=8080"
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - WEBUI_SECRET_KEY=dev-secret-key-change-me
+    networks:
+      - hydra-dev-net
+
+  # OpenWebUI Middleman (Database API)
+  openwebui-middleman:
+    build:
+      context: ..
+      dockerfile: dev/Dockerfile.middleman
+    container_name: openwebui-middleman-dev
+    environment:
+      - OPENWEBUI_API_PORT=7070
+      - OPENWEBUI_API_KEY=dev-api-key-change-me
+      - DB_PATH=/app/data/webui.db
+    volumes:
+      - open-webui-dev:/app/data:rw
+    ports:
+      - "7070:7070"
+    networks:
+      - hydra-dev-net
+    depends_on:
+      - open-webui
+
+  # Main Hydra SAML Auth service
+  hydra-saml-auth:
+    build:
+      context: ..
+      dockerfile: dev/Dockerfile.hydra
+    container_name: hydra-saml-auth-dev
+    env_file:
+      - .env.dev
+    ports:
+      - "6969:6969"  # Expose auth verifier on host for ForwardAuth (host.docker.internal:6969)
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ../views:/app/views:ro
+      - ../routes:/app/routes:ro
+      - ../public:/app/public:ro
+      - ./jwt-keys:/app/jwt-keys
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.hydra.rule=Host(`hydra.local`)"
+      - "traefik.http.routers.hydra.entrypoints=web"
+      - "traefik.http.services.hydra.loadbalancer.server.port=6969"
+    networks:
+      - hydra-dev-net
+    extra_hosts:
+      - "hydra.local:host-gateway"
+      - "chimera:172.20.0.10"  # Points to openwebui-middleman
+    depends_on:
+      - openwebui-middleman
+      - mock-saml-idp
+
+  # Traefik for routing
+  traefik:
+    image: traefik:v2.11
+    container_name: traefik-dev
+    command:
+      - --api.dashboard=true
+      - --api.insecure=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --log.level=DEBUG
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8081:8080"  # Traefik dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - hydra-dev-net
+      - hydra_students_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik-dashboard.rule=Host(`traefik.hydra.local`)"
+      - "traefik.http.routers.traefik-dashboard.service=api@internal"
+
+  # Mock n8n service (optional, can be replaced with actual n8n)
+  mock-n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n-dev
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=admin
+      - N8N_HOST=n8n.hydra.local
+      - N8N_PORT=5678
+      - N8N_WEBHOOK_BASE_URL=http://n8n.hydra.local
+      - N8N_SECURE_COOKIE=false
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.n8n.rule=Host(`n8n.hydra.local`)"
+      - "traefik.http.routers.n8n.entrypoints=web"
+      - "traefik.http.services.n8n.loadbalancer.server.port=5678"
+    volumes:
+      - n8n-dev:/home/node/.n8n
+    networks:
+      - hydra-dev-net
+
+networks:
+  hydra-dev-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+  hydra_students_net:
+    driver: bridge
+    name: hydra_students_net
+
+volumes:
+  ollama-dev:
+  open-webui-dev:
+  n8n-dev:

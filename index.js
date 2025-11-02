@@ -2,6 +2,7 @@
 require('dotenv').config();
 
 const express = require('express');
+const expressWs = require('express-ws');
 const session = require('express-session');
 const passport = require('passport');
 const { Strategy: SamlStrategy } = require('passport-saml');
@@ -13,6 +14,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 
 const app = express();
+expressWs(app); // Enable WebSocket support
 const PORT = process.env.PORT || 6969;
 
 // ---------- REQUIRED CONFIG ----------
@@ -49,7 +51,7 @@ function sanitizeReturnTo(input) {
     const u = new URL(input || '/', BASE_URL);
     const base = new URL(BASE_URL);
     if (u.origin === base.origin) return (u.pathname || '/') + (u.search || '') + (u.hash || '');
-  } catch (_e) {}
+  } catch (_e) { }
   return '/';
 }
 
@@ -277,7 +279,7 @@ function setNpCookie(res, token) {
   res.cookie('np_access', token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',      
+    sameSite: 'lax',
     domain: COOKIE_DOMAIN,       // remove or change if developing on localhost
     path: '/',
     maxAge: JWT_TTL_SECONDS * 1000
@@ -444,6 +446,30 @@ const ensureAuthenticated = (req, res, next) =>
       }
     });
 
+    app.get('/auth/verify', (req, res) => {
+      const token = req.cookies?.np_access;
+
+      if (!token) {
+        return res.status(401).send('Unauthorized: Missing token');
+      }
+
+      try {
+        const payload = verifyAccessToken(token);
+
+        // Set headers for Traefik to forward to backend
+        res.set('X-Forwarded-User', payload.email || payload.sub);
+        res.set('X-Forwarded-Email', payload.email);
+        res.set('X-Forwarded-Roles', (payload.roles || []).join(','));
+
+        // Return 200 to allow request
+        return res.status(200).send('OK');
+      } catch (e) {
+        const msg = String(e).toLowerCase();
+        const code = msg.includes('expired') ? 401 : 403;
+        return res.status(code).send('Unauthorized: Invalid or expired token');
+      }
+    });
+
     // JWKS for local verification by student backends
     app.get('/.well-known/jwks.json', (_req, res) => {
       if (!jwk) return res.status(501).json({ error: 'jwks_unavailable' });
@@ -466,6 +492,81 @@ const ensureAuthenticated = (req, res, next) =>
       console.warn('[Init] n8n-api routes not mounted:', e?.message || e);
     }
 
+    // Mount API routes for student containers (behind auth)
+    try {
+      const containersRouter = require('./routes/containers');
+      app.use('/dashboard/api/containers', ensureAuthenticated, containersRouter);
+    } catch (e) {
+      console.warn('[Init] containers routes not mounted:', e?.message || e);
+    }
+
+    // WebSocket terminal for containers (behind auth)
+    app.ws('/dashboard/ws/containers/:name/exec', async (ws, req) => {
+      try {
+        if (!req.isAuthenticated?.() || !req.user?.email) {
+          ws.close();
+          return;
+        }
+        const Docker = require('dockerode');
+        const docker = new Docker({ socketPath: '/var/run/docker.sock' });
+        const username = String(req.user.email).split('@')[0];
+        const nameParam = String(req.params.name || '').trim();
+        if (!nameParam) {
+          ws.close();
+          return;
+        }
+
+        const container = docker.getContainer(nameParam);
+        const info = await container.inspect();
+        const labels = info?.Config?.Labels || {};
+        if (labels['hydra.owner'] !== username || labels['hydra.managed_by'] !== 'hydra-saml-auth') {
+          ws.close();
+          return;
+        }
+
+        // Create exec instance
+        const exec = await container.exec({
+          Cmd: ['sh'],
+          AttachStdin: true,
+          AttachStdout: true,
+          AttachStderr: true,
+          Tty: true
+        });
+
+        const stream = await exec.start({ hijack: true, Tty: true, stdin: true });
+
+        // Pipe data between WebSocket and Docker stream
+        stream.on('data', (chunk) => {
+          try {
+            if (ws.readyState === ws.OPEN) {
+              ws.send(chunk);
+            }
+          } catch { }
+        });
+
+        stream.on('end', () => {
+          try { ws.close(); } catch { }
+        });
+
+        ws.on('message', (msg) => {
+          try {
+            stream.write(msg);
+          } catch { }
+        });
+
+        ws.on('close', () => {
+          try { stream.end(); } catch { }
+        });
+
+        ws.on('error', () => {
+          try { stream.end(); } catch { }
+        });
+      } catch (e) {
+        console.error('[ws] exec error:', e);
+        try { ws.close(); } catch { }
+      }
+    });
+
     // Basic pages
     app.get('/', (req, res) => {
       res.redirect(req.isAuthenticated() ? '/dashboard' : '/login');
@@ -486,7 +587,7 @@ const ensureAuthenticated = (req, res, next) =>
     app.get('/logout', (req, res, next) => {
       const returnTo = sanitizeReturnTo(req.query.returnTo || req.get('referer') || '/dashboard');
       console.log('Logout requested. ReturnTo:', returnTo);
-      
+
       res.clearCookie('np_access', { domain: COOKIE_DOMAIN, path: '/' });
       req.logout(err => (err ? next(err) : res.redirect(returnTo)));
     });

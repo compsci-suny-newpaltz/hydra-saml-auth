@@ -1,8 +1,10 @@
 {
   "name": "student-mvp",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "student-app.js",
   "scripts": {
+    "start": "node student-app.js",
+    "dev": "nodemon --watch . --ext js,json --exec node student-app.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -10,7 +12,11 @@
   "license": "ISC",
   "dependencies": {
     "cookie-parser": "^1.4.7",
+    "dotenv": "^10.0.0",
     "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
   },
   "description": ""
 }
