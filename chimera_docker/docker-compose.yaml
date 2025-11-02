@@ -6,7 +6,7 @@ services:
     pull_policy: always
     tty: true
     restart: unless-stopped
-    image: ollama/ollama:${OLLAMA_DOCKER_TAG-latest}
+    image: ollama/ollama
     ports:
       - "11434:11434"
     deploy:
@@ -19,7 +19,7 @@ services:
                 - gpu
 
   open-webui:
-    image: ghcr.io/open-webui/open-webui:${WEBUI_DOCKER_TAG-main}
+    image: ghcr.io/open-webui/open-webui
     container_name: open-webui
     volumes:
       - open-webui:/app/backend/data
@@ -50,6 +50,18 @@ services:
       - "7070:7070"
     restart: unless-stopped
     depends_on:
+      - open-webui
+
+  watchtower:
+    image: containrrr/watchtower
+    container_name: watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    # watch both services (ollama and open-webui) every 300 seconds
+    command: --interval 300 ollama open-webui
+    depends_on:
+      - ollama
       - open-webui
 
 volumes:
