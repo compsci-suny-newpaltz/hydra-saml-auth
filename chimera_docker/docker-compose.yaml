@@ -6,7 +6,7 @@ services:
     pull_policy: always
     tty: true
     restart: unless-stopped
-    image: ollama/ollama:${OLLAMA_DOCKER_TAG-latest}
+    image: ollama/ollama
     ports:
       - "11434:11434"
     deploy:
@@ -19,7 +19,7 @@ services:
                 - gpu
 
   open-webui:
-    image: ghcr.io/open-webui/open-webui:${WEBUI_DOCKER_TAG-main}
+    image: ghcr.io/open-webui/open-webui
     container_name: open-webui
     volumes:
       - open-webui:/app/backend/data
