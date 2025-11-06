@@ -52,6 +52,18 @@ services:
     depends_on:
       - open-webui
 
+  watchtower:
+    image: containrrr/watchtower
+    container_name: watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    # watch both services (ollama and open-webui) every 300 seconds
+    command: --interval 300 ollama open-webui
+    depends_on:
+      - ollama
+      - open-webui
+
 volumes:
   ollama:
     external: true
