@@ -1,69 +1,39 @@
-
-
 # Open WebUI Integration Guide
 
-This guide will walk you through accessing Hydra GPT, creating an account, obtaining your API key, and integrating it with Open WebUI for local LLM access.
-# Table of Contents
+This guide will walk you through accessing [gpt.hydra.newpaltz.edu](https://gpt.hydra.newpaltz.edu/), creating an account, obtaining your API key, and integrating it with Open WebUI for local LLM access.
 
-## Getting Started
+## Table of Contents
+
+### Getting Started
 - [Accessing Hydra GPT](#accessing-hydra-gpt)
 - [Obtaining Your API Key](#obtaining-your-api-key)
-  - [Step 1: Navigate to Settings](#step-1-navigate-to-settings)
-  - [Step 2: Access API Keys Section](#step-2-access-api-keys-section)
-  - [Step 3: Generate a New API Key](#step-3-generate-a-new-api-key)
-  - [Step 4: Copy Your API Key](#step-4-copy-your-api-key)
 
-## Integration Guide
+### Integration Guide
 - [Integrating with Open WebUI](#integrating-with-open-webui)
   - [Configuration Parameters](#configuration-parameters)
   - [Integration Methods](#integration-methods)
-    - [Method 1: Environment Variables](#method-1-environment-variables)
-    - [Method 2: Configuration File](#method-2-configuration-file)
-    - [Method 3: cURL Test](#method-3-curl-test)
 
-## Language-Specific Integration Examples
+### Language-Specific Integration Examples
 - [Python Integration](#python-integration)
-  - [Using OpenAI SDK](#using-openai-sdk)
-  - [Using Requests Library](#using-requests-library)
-  - [Flask Web Application](#flask-web-application)
 - [JavaScript/Node.js Integration](#javascriptnodejs-integration)
-  - [Using Axios](#using-axios)
-  - [Using Fetch API](#using-fetch-api-browsernode18)
-  - [Express.js Server](#expressjs-server)
-  - [React Frontend Example](#react-frontend-example)
 - [PHP Integration](#php-integration)
-  - [Using cURL](#using-curl)
-  - [Using Guzzle HTTP Client](#using-guzzle-http-client)
-  - [Laravel Integration](#laravel-integration)
 - [Java Integration](#java-integration)
-  - [Using OkHttp](#using-okhttp)
-  - [Using Spring Boot](#using-spring-boot)
 - [C# / .NET Integration](#c--net-integration)
-  - [Using HttpClient](#using-httpclient)
-  - [ASP.NET Core Integration](#aspnet-core-integration)
 - [Ruby Integration](#ruby-integration)
 - [Go Integration](#go-integration)
 - [Rust Integration](#rust-integration)
 
-## Testing & Troubleshooting
+### Testing & Troubleshooting
 - [Testing Your Connection](#testing-your-connection)
-  - [Check API Connectivity](#1-check-api-connectivity)
-  - [List Available Models](#2-list-available-models)
-  - [Send a Test Message](#3-send-a-test-message)
 - [Troubleshooting](#troubleshooting)
-  - [Common Issues and Solutions](#common-issues-and-solutions)
-  - [Getting Help](#getting-help)
 
-## Additional Information
+### Additional Information
 - [Security Best Practices](#security-best-practices)
 - [Example Use Cases](#example-use-cases)
-  - [Simple Chat Application](#simple-chat-application-python)
-  - [Batch Processing](#batch-processing-python)
-  - [Conversational Chatbot](#conversational-chatbot-javascript)
 - [Additional Resources](#additional-resources)
 - [Changelog](#changelog)
 
-## System Architecture
+### System Architecture
 - [System Overview](#system-overview)
 - [Authentication Flow](#authentication-flow)
 - [Student API Access Pattern](#student-api-access-pattern)
@@ -79,6 +49,7 @@ This guide will walk you through accessing Hydra GPT, creating an account, obtai
 - [Port Reference](#port-reference)
 - [Quick Start Workflow](#quick-start-workflow)
 - [Summary](#summary)
+
 ---
 
 ## Accessing Hydra GPT
@@ -86,40 +57,40 @@ This guide will walk you through accessing Hydra GPT, creating an account, obtai
 Hydra GPT is a local LLM platform hosted at SUNY New Paltz. To access it:
 
 1. **Navigate to the platform:**
-    
     - Open your web browser
     - Go to: **https://gpt.hydra.newpaltz.edu** if you have an account already
-    - If not make one on https://hydra.newpaltz.edu/dashboard
+    - If not, make one on https://hydra.newpaltz.edu/dashboard
 
 ---
 
 ## Obtaining Your API Key
 
-Once you're logged into Open WebUI (Hydra GPT), you need to generate an API key:
+Once you're logged into **Open WebUI (Hydra GPT)**, you can generate an API key by following these steps:
 
 ### Step 1: Navigate to Settings
 
-1. Click on your **profile icon** or **username** in the top-right corner
-2. Select **Settings** from the dropdown menu
+1. Click your **profile icon** or **username** in the top-right corner.
+2. Select **Settings** from the dropdown menu.
 
-### Step 2: Access API Keys Section
+### Step 2: Access the API Keys Section
 
-1. In the Settings menu, look for the **Account** or **API Keys** section
-2. Click on **API Keys** (or similar option)
+1. In the **Settings** menu, go to the **Account** section.
+2. Click **Generate New API Key**.
+3. Give the API key a descriptive name (e.g., `Monitoring API Key`).
+4. Copy the generated key and store it securely — you'll need it for your monitoring setup.
 
-### Step 3: Generate a New API Key
+### Step 3: Copy Your API Key
 
-1. Click the **"Create new secret key"** or **"Generate API Key"** button
-2. **Optional:** Give your key a descriptive name (e.g., "Local Development" or "Personal Access")
-3. Click **"Create"** or **"Generate"**
+1. Your new API key will be displayed **only once**.
+2. **Important:** Copy the key immediately and store it securely.
+3. The format will look something like:
 
-### Step 4: Copy Your API Key
+   ```
+   sk-140ddce3f0sd480984b4c74b07ed60sd
+   ```
 
-1. Your new API key will be displayed **only once**
-2. **Important:** Copy the key immediately and store it securely
-3. The format will look something like: `sk-140ddce3f0sd480984b4c74b07ed60sd`
-
-> **⚠️ Security Note:** Treat your API key like a password. Never share it publicly or commit it to version control systems.
+> ⚠️ **Security Note:**
+> Treat your API key like a password. **Never share it publicly** or commit it to version control systems (e.g., GitHub).
 
 ---
 
@@ -1403,7 +1374,7 @@ Use the cURL example from Method 3 above to send a test message and verify you r
 
 ### Common Issues and Solutions
 
-#### 1. **401 Unauthorized Error**
+#### 1. 401 Unauthorized Error
 
 - **Cause:** Invalid or expired API key
 - **Solution:**
@@ -1411,14 +1382,7 @@ Use the cURL example from Method 3 above to send a test message and verify you r
     - Generate a new API key if needed
     - Ensure no extra spaces or characters in the key
 
-#### 2. **Connection Timeout**
-
-- **Cause:** Not connected to SUNY New Paltz network
-- **Solution:**
-    - Connect to campus VPN if off-campus
-    - Verify you can access https://gpt.hydra.newpaltz.edu in your browser
-
-#### 3. **Model Not Found Error**
+#### 2. Model Not Found Error
 
 - **Cause:** Specified model doesn't exist or isn't available
 - **Solution:**
@@ -1426,44 +1390,15 @@ Use the cURL example from Method 3 above to send a test message and verify you r
     - Verify `gemma3:12b` is in the list
     - Check for typos in the model name
 
-#### 4. **SSL Certificate Errors**
-
-- **Cause:** Certificate verification issues
-- **Solution:**
-    - Ensure your system's CA certificates are up to date
-    - If using Python, you may need to install `certifi`
-
-#### 5. **Rate Limiting**
-
-- **Cause:** Too many requests in a short time
-- **Solution:**
-    - Implement exponential backoff in your code
-    - Contact Hydra Lab administrators for rate limit details
-
-#### 6. **CORS Errors (Browser)**
-
-- **Cause:** Cross-Origin Resource Sharing restrictions
-- **Solution:**
-    - Make API calls from your backend server instead of frontend
-    - Use a proxy server for development
-    - Contact administrators if CORS needs to be configured
-
 ### Getting Help
 
 If you continue to experience issues:
 
 1. **Check Hydra Lab Status:**
-    - Visit the Hydra Lab website or contact the administrators
+    - Visit the Hydra Lab website or contact the admins
 2. **Documentation:**
     - Refer to the Open WebUI documentation: https://docs.openwebui.com
     - Check for updates to the integration process
-
----
-
-## Additional Resources
-
-- **Hydra GPT Platform:** https://gpt.hydra.newpaltz.edu
-- **Open WebUI Documentation:** https://docs.openwebui.com
 
 ---
 
@@ -1601,8 +1536,15 @@ class ChatBot {
     console.log(await bot.chat('Thanks for the explanation!'));
 })();
 ```
+
 ---
 
+## Additional Resources
+
+- **Hydra GPT Platform:** https://gpt.hydra.newpaltz.edu
+- **Open WebUI Documentation:** https://docs.openwebui.com
+
+---
 
 # Hydra Infrastructure Architecture & API Access Guide
 
