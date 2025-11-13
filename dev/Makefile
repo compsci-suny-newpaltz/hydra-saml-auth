@@ -1,6 +1,6 @@
 # Hydra SAML Auth - Development Makefile
 
-.PHONY: help setup start stop restart logs clean reset shell test
+.PHONY: help setup start stop restart logs clean reset shell test rm-students
 
 # Default target
 help:
@@ -17,6 +17,7 @@ help:
 	@echo "make clean     - Stop and remove containers"
 	@echo "make reset     - Full reset (removes volumes too)"
 	@echo "make test-saml - Test SAML authentication flow"
+	@echo "make rm-students - Force remove all student-* containers"
 
 # Cross-platform sleep command: use Windows timeout when running on Windows
 ifeq ($(OS),Windows_NT)
@@ -88,6 +89,12 @@ reset:
 	docker compose -f docker-compose.dev.yml down -v
 	rm -rf jwt-keys/
 	@echo "Full reset complete. Run 'make setup' to reinitialize."
+
+# Remove all student containers (names start with student-)
+rm-students:
+	@echo "Removing student-* containers (if any)..."
+	@docker ps -a --format '{{.ID}} {{.Names}}' | awk '$$2 ~ /^student-/' | awk '{print $$1}' | xargs -r docker rm -f
+	@echo "Done."
 
 # Rebuild specific services
 rebuild-hydra:

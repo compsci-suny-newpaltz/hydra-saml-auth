@@ -4,6 +4,14 @@ const Docker = require('dockerode');
 const router = express.Router();
 const docker = new Docker({ socketPath: '/var/run/docker.sock' });
 
+// Constants
+const STUDENT_IMAGE = 'hydra-student-container:latest';
+const MAIN_NETWORK = 'hydra_students_net';
+const CODE_SERVER_PORT = 8443;
+const JUPYTER_PORT = 8888;
+const RESERVED_PORTS = [CODE_SERVER_PORT, JUPYTER_PORT];
+const RESERVED_ENDPOINTS = ['vscode', 'jupyter'];
+
 // Helper to pull Docker images
 async function pullImage(img) {
     return new Promise((resolve, reject) => {
@@ -14,8 +22,22 @@ async function pullImage(img) {
     });
 }
 
+// Helper to check if image exists locally
+async function imageExists(imageName) {
+    try {
+        const image = docker.getImage(imageName);
+        await image.inspect();
+        return true;
+    } catch (err) {
+        if (err.statusCode === 404) {
+            return false;
+        }
+        throw err;
+    }
+}
+
 // Helper to ensure volume exists
-async function ensureVolume(volumeName, username, project) {
+async function ensureVolume(volumeName, username) {
     try {
         const vol = docker.getVolume(volumeName);
         await vol.inspect();
@@ -24,520 +46,689 @@ async function ensureVolume(volumeName, username, project) {
             Name: volumeName,
             Labels: {
                 'hydra.managed_by': 'hydra-saml-auth',
-                'hydra.owner': username,
-                'hydra.project': project
+                'hydra.owner': username
             }
         });
     }
 }
 
-// Start a container with presets, GitHub repos, or custom config
-// POST /dashboard/api/containers/start { project, preset?, runtime?, repo?, custom?, resources? }
+// Helper to ensure network exists
+async function ensureNetwork(networkName) {
+    try {
+        const net = docker.getNetwork(networkName);
+        await net.inspect();
+    } catch {
+        await docker.createNetwork({
+            Name: networkName,
+            Driver: 'bridge',
+            Attachable: true
+        });
+    }
+}
+
+// Helper to get student's container
+async function getStudentContainer(username) {
+    const containerName = `student-${username}`;
+    try {
+        const container = docker.getContainer(containerName);
+        const info = await container.inspect();
+        return { container, info };
+    } catch (err) {
+        if (err.statusCode === 404) {
+            return null;
+        }
+        throw err;
+    }
+}
+
+// Helper to generate Traefik labels for a route
+function generateTraefikLabels(username, route) {
+    const routerName = `student-${username}-${route.endpoint}`;
+    const basePath = `/students/${username}/${route.endpoint}`;
+
+    // Jupyter needs base_url and should NOT use stripprefix
+    // Other services like code-server use relative paths and work with stripprefix
+    const middlewares = route.endpoint === 'jupyter'
+        ? `${routerName}-auth`
+        : `${routerName}-auth,${routerName}-strip`;
+
+    return {
+        [`traefik.http.routers.${routerName}.entrypoints`]: 'web',
+        [`traefik.http.routers.${routerName}.rule`]: `PathPrefix(\`${basePath}\`)`,
+        [`traefik.http.routers.${routerName}.service`]: routerName,
+        [`traefik.http.services.${routerName}.loadbalancer.server.port`]: String(route.port),
+        [`traefik.http.middlewares.${routerName}-strip.stripprefix.prefixes`]: basePath,
+        [`traefik.http.middlewares.${routerName}-auth.forwardauth.address`]: 'http://host.docker.internal:6969/auth/verify',
+        [`traefik.http.middlewares.${routerName}-auth.forwardauth.trustForwardHeader`]: 'true',
+        [`traefik.http.routers.${routerName}.middlewares`]: middlewares
+    };
+}
+
+// Initialize/Create student mega container
+// POST /dashboard/api/containers/init
+router.post('/init', async (req, res) => {
+    try {
+        if (!req.isAuthenticated?.() || !req.user?.email) {
+            return res.status(401).json({ success: false, message: 'Not authenticated' });
+        }
+
+        const username = String(req.user.email).split('@')[0];
+        const containerName = `student-${username}`;
+        const volumeName = `hydra-vol-${username}`;
+        const studentNetworkName = `hydra-student-${username}`;
+        const host = 'hydra.newpaltz.edu';
+
+        // Check if container already exists
+        const existing = await getStudentContainer(username);
+        if (existing) {
+            return res.json({
+                success: true,
+                message: 'Container already exists',
+                name: containerName,
+                state: existing.info.State.Status
+            });
+        }
+
+        // Ensure networks exist
+        await ensureNetwork(MAIN_NETWORK);
+        await ensureNetwork(studentNetworkName);
+
+        // Ensure volume exists
+        await ensureVolume(volumeName, username);
+
+        // Default routes for code-server and jupyter
+        const defaultRoutes = [
+            { endpoint: 'vscode', port: CODE_SERVER_PORT },
+            { endpoint: 'jupyter', port: JUPYTER_PORT }
+        ];
+
+        // Base labels
+        const labels = {
+            'traefik.enable': 'true',
+            'traefik.docker.network': 'hydra_students_net',
+            'hydra.managed_by': 'hydra-saml-auth',
+            'hydra.owner': username,
+            'hydra.ownerEmail': req.user.email,
+            'hydra.port_routes': JSON.stringify(defaultRoutes),
+            'hydra.created_at': new Date().toISOString()
+        };
+
+        // Add Traefik labels for each default route
+        defaultRoutes.forEach(route => {
+            Object.assign(labels, generateTraefikLabels(username, route));
+        });
+
+        // Check if image exists locally, if not try to pull it
+        const imagePresent = await imageExists(STUDENT_IMAGE);
+        if (!imagePresent) {
+            try {
+                await pullImage(STUDENT_IMAGE);
+            } catch (err) {
+                console.error('[containers] Failed to pull student image:', err);
+                return res.status(500).json({
+                    success: false,
+                    message: 'Student container image not found. Please build it locally with: docker build -t hydra-student-container:latest .'
+                });
+            }
+        }
+
+        // Create container
+        const container = await docker.createContainer({
+            name: containerName,
+            Image: STUDENT_IMAGE,
+            Labels: labels,
+            Env: [
+                `USERNAME=${username}`,
+                `HOME=/home/student`
+            ],
+            HostConfig: {
+                NetworkMode: MAIN_NETWORK,
+                RestartPolicy: { Name: 'unless-stopped' },
+                Mounts: [{
+                    Type: 'volume',
+                    Source: volumeName,
+                    Target: '/home/student'
+                }],
+                Memory: 4 * 1024 * 1024 * 1024, // 4GB
+                NanoCpus: 2e9, // 2 CPUs
+                Privileged: true // For Docker-in-Docker
+            }
+        });
+
+        // Connect to student network
+        const studentNet = docker.getNetwork(studentNetworkName);
+        await studentNet.connect({ Container: containerName });
+
+        // Start container
+        await container.start();
+
+        const publicBase = (process.env.PUBLIC_STUDENTS_BASE || `https://${host}/students`).replace(/\/$/, '');
+
+        return res.json({
+            success: true,
+            name: containerName,
+            vscodeUrl: `${publicBase}/${username}/vscode/`,
+            jupyterUrl: `${publicBase}/${username}/jupyter/`
+        });
+    } catch (err) {
+        console.error('[containers] init error:', err);
+        return res.status(500).json({ success: false, message: err.message || 'Failed to initialize container' });
+    }
+});
+
+// Start student container
+// POST /dashboard/api/containers/start
 router.post('/start', async (req, res) => {
     try {
         if (!req.isAuthenticated?.() || !req.user?.email) {
             return res.status(401).json({ success: false, message: 'Not authenticated' });
         }
 
-        const project = String(req.body?.project || '').trim().toLowerCase();
-        if (!project || !/^[a-z0-9-]{1,40}$/.test(project)) {
-            return res.status(400).json({ success: false, message: 'Invalid project name' });
-        }
-
-        const preset = String(req.body?.preset || '').trim(); // 'jupyter' | 'static' | 'repo'
-        const runtime = String(req.body?.runtime || '').trim(); // 'python' | 'node' | 'static'
-        const repo = req.body?.repo || null; // { url, branch?, subdir?, startCmd? }
-        const custom = req.body?.custom || {};
-        const limits = req.body?.resources || {};
-
         const username = String(req.user.email).split('@')[0];
-        const host = 'hydra.newpaltz.edu';
-        const basePath = `/students/${username}/${project}`;
-        const containerName = `student-${username}-${project}`;
-        const networkName = 'hydra_students_net';
+        const result = await getStudentContainer(username);
 
-        // Public URL + labels
-        const publicBase = (process.env.PUBLIC_STUDENTS_BASE || `https://${host}/students`).replace(/\/$/, '');
-        const publicUrl = `${publicBase}/${username}/${project}/`;
-
-        const labels = {
-            'traefik.enable': 'true',
-            'hydra.managed_by': 'hydra-saml-auth',
-            'hydra.owner': username,
-            'hydra.ownerEmail': req.user.email,
-            'hydra.project': project,
-            'hydra.basePath': basePath,
-            'hydra.public_url': publicUrl,
-            'hydra.created_at': new Date().toISOString()
-        };
-
-        // Runtime/image defaults
-        let image = 'nginx:alpine';
-        let servicePort = 80;
-        let cmd = undefined;
-        const env = [];
-
-        // Per-project Docker named volume (no host bind mounts)
-        const volumeName = `hydra-vol-${username}-${project}`.replace(/[^a-z0-9-]/g, '').slice(0, 60);
-
-        // Ensure network exists
-        const networks = await docker.listNetworks({ filters: { name: [networkName] } });
-        if (!networks.length) {
-            await docker.createNetwork({ Name: networkName, Driver: 'bridge' });
+        if (!result) {
+            return res.status(404).json({ success: false, message: 'Container not found. Please initialize first.' });
         }
 
-        // Ensure volume exists (idempotent)
-        await ensureVolume(volumeName, username, project);
+        const { container, info } = result;
 
-        // === PRESET: JUPYTER ===
-        if (preset === 'jupyter') {
-            labels['hydra.preset'] = 'jupyter';
-            image = process.env.JUPYTER_IMAGE || 'jupyter/minimal-notebook:latest';
-            servicePort = 8888;
-
-            // Configure Jupyter to run at the correct base URL; disable token/password (ForwardAuth handles auth)
-            // Add Traefik labels BEFORE creating container
-            // Note: We do NOT use StripPrefix for Jupyter - it needs to know its full path
-            labels[`traefik.http.routers.${containerName}.entrypoints`] = 'web';
-            labels[`traefik.http.routers.${containerName}.rule`] = `PathPrefix(\"${basePath}\")`;
-            labels[`traefik.http.services.${containerName}.loadbalancer.server.port`] = String(servicePort);
-            // ForwardAuth middleware - verify token before allowing access
-            labels[`traefik.http.middlewares.${containerName}-auth.forwardauth.address`] = 'http://host.docker.internal:6969/auth/verify';
-            labels[`traefik.http.middlewares.${containerName}-auth.forwardauth.trustForwardHeader`] = 'true';
-            // Attach auth middleware (no StripPrefix)
-            labels[`traefik.http.routers.${containerName}.middlewares`] = `${containerName}-auth`;
-
-            await pullImage(image);
-
-            const mounts = [{ Type: 'volume', Source: volumeName, Target: '/home/jovyan/work' }];
-
-            // Custom command to start Jupyter with base_url and no token/password (ForwardAuth is enforced by Traefik)
-            cmd = [
-                'start-notebook.sh',
-                `--NotebookApp.base_url=${basePath}`,
-                '--NotebookApp.allow_origin=*',
-                '--NotebookApp.token=',
-                '--NotebookApp.password='
-            ];
-
-            let container;
-            try {
-                container = docker.getContainer(containerName);
-                await container.inspect();
-            } catch {
-                container = await docker.createContainer({
-                    name: containerName,
-                    Image: image,
-                    Labels: labels,
-                    Env: env,
-                    Cmd: cmd,
-                    HostConfig: {
-                        NetworkMode: networkName,
-                        RestartPolicy: { Name: 'unless-stopped' },
-                        Mounts: mounts,
-                        Memory: limits.memMB ? limits.memMB * 1024 * 1024 : 512 * 1024 * 1024,
-                        NanoCpus: limits.cpus ? Math.floor(Number(limits.cpus) * 1e9) : 1e9
-                    }
-                });
-            }
-
-            // Connect to network if needed
-            try {
-                const info = await container.inspect();
-                if (!info.NetworkSettings.Networks?.[networkName]) {
-                    await docker.getNetwork(networkName).connect({ Container: info.Id });
-                }
-            } catch { }
-
-            await container.start();
-            return res.json({ success: true, url: publicUrl, name: containerName });
+        if (info.State.Running) {
+            return res.json({ success: true, message: 'Container already running' });
         }
-
-        // === PRESET: REPO (GitHub integration) ===
-        if (preset === 'repo' && repo?.url) {
-            labels['hydra.preset'] = 'repo';
-            labels['hydra.runtime'] = runtime || '';
-            labels['hydra.repo_url'] = repo.url;
-            if (repo.branch) labels['hydra.repo_branch'] = repo.branch;
-            if (repo.subdir) labels['hydra.repo_subdir'] = repo.subdir;
-
-            // 1) Pre-clone repo into the named volume using alpine/git
-            const gitImg = 'alpine/git:latest';
-            await pullImage(gitImg);
-            await pullImage('busybox:latest'); // Also pull busybox for reading commit hash
-
-            const branchOpt = repo.branch ? `-b ${repo.branch}` : '';
-            const gitCloneCmd = `
-                set -e
-                mkdir -p /w
-                if [ ! -d /w/src/.git ]; then
-                  GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=echo git clone --depth=1 ${branchOpt} ${repo.url} /w/src
-                fi
-                                # Mark the repository path as safe for Git inside this container (named volume ownership can differ)
-                                git config --global --add safe.directory /w/src || true
-                cd /w/src
-                git rev-parse HEAD > /w/commit_hash.txt
-            `;
-
-            const gitInit = await docker.createContainer({
-                Image: gitImg,
-                Labels: { 'hydra.temp': 'true' },
-                Cmd: ['-c', gitCloneCmd],
-                HostConfig: { Mounts: [{ Type: 'volume', Source: volumeName, Target: '/w' }] },
-                Entrypoint: ['sh'] // Override the entrypoint to use shell
-            });
-            await gitInit.start();
-            const result = await gitInit.wait();
-
-            // Check if git clone succeeded
-            if (result.StatusCode !== 0) {
-                console.error(`[containers] Git clone failed with status ${result.StatusCode}`);
-                try {
-                    const logs = await gitInit.logs({ stdout: true, stderr: true });
-                    console.error('[containers] Git clone logs:', logs.toString());
-                } catch { }
-                await gitInit.remove({ force: true });
-                return res.status(500).json({ success: false, message: 'Failed to clone repository' });
-            }
-
-            // Get the commit hash
-            let commitHash = '';
-            try {
-                const hashReader = await docker.createContainer({
-                    Image: 'busybox:latest',
-                    Cmd: ['cat', '/w/commit_hash.txt'],
-                    HostConfig: { Mounts: [{ Type: 'volume', Source: volumeName, Target: '/w' }] }
-                });
-                await hashReader.start();
-                await hashReader.wait();
-
-                // Get logs as buffer and manually parse Docker stream header
-                const logBuffer = await hashReader.logs({ stdout: true, stderr: false });
-
-                // Docker stream format: [8 bytes header][payload]
-                // Header: [stream type: 1 byte][3 bytes padding][size: 4 bytes big-endian]
-                if (logBuffer.length > 8) {
-                    const payloadSize = logBuffer.readUInt32BE(4);
-                    const payload = logBuffer.slice(8, 8 + payloadSize);
-                    commitHash = payload.toString('utf8').trim();
-                }
-
-                await hashReader.remove();
-            } catch (e) {
-                console.error('[containers] Failed to read commit hash:', e);
-            }
-
-            await gitInit.remove({ force: true });
-
-            // Store commit hash in labels
-            if (commitHash) {
-                labels['hydra.repo_commit'] = commitHash;
-            }
-
-            // 2) Choose runtime image + bootstrap
-            if (runtime === 'node') {
-                image = 'node:20-alpine';
-                servicePort = Number(req.body?.internalPort || 3000);
-                const subdirPath = repo.subdir ? `/${repo.subdir}` : '';
-                const startCmd = repo.startCmd || 'npm start';
-                cmd = ['sh', '-c', `
-                    set -e
-                    cd /workspace/src${subdirPath}
-                                        if [ -f package-lock.json ]; then 
-                                            npm ci --no-audit --no-fund || (echo "npm ci failed; falling back to npm install" >&2 && rm -f package-lock.json && npm install --no-audit --no-fund)
-                                        elif [ -f package.json ]; then 
-                                            npm install --no-audit --no-fund
-                                        fi
-                    exec ${startCmd}
-                `];
-            } else if (runtime === 'python') {
-                image = 'python:3.11-slim';
-                servicePort = Number(req.body?.internalPort || 8000);
-                const subdirPath = repo.subdir ? `/${repo.subdir}` : '';
-                const startCmd = repo.startCmd || `uvicorn app:app --host 0.0.0.0 --port ${servicePort}`;
-                cmd = ['sh', '-c', `
-                    set -e
-                    cd /workspace/src${subdirPath}
-                    [ -d /workspace/.venv ] || python -m venv /workspace/.venv
-                    . /workspace/.venv/bin/activate
-                    if [ -f requirements.txt ]; then pip install --upgrade pip && pip install -r requirements.txt; fi
-                    exec ${startCmd}
-                `];
-            } else if (runtime === 'static') {
-                image = 'nginx:alpine';
-                servicePort = 80;
-                const subdirPath = repo.subdir ? `/${repo.subdir}` : '';
-                cmd = ['sh', '-c', `
-                    set -e
-                    rm -rf /usr/share/nginx/html/*
-                    cp -R /workspace/src${subdirPath}/* /usr/share/nginx/html/ || true
-                    exec nginx -g 'daemon off;'
-                `];
-            } else {
-                return res.status(400).json({ success: false, message: 'Unsupported runtime' });
-            }
-
-            // Add Traefik labels BEFORE creating container
-            labels[`traefik.http.routers.${containerName}.entrypoints`] = 'web';
-            labels[`traefik.http.routers.${containerName}.rule`] = `PathPrefix(\"${basePath}\")`;
-            labels[`traefik.http.services.${containerName}.loadbalancer.server.port`] = String(servicePort);
-            labels[`traefik.http.middlewares.${containerName}-stripprefix.stripprefix.prefixes`] = basePath;
-            labels[`traefik.http.routers.${containerName}.middlewares`] = `${containerName}-stripprefix`;
-
-            // 3) Pull runtime image and create container with the named volume
-            await pullImage(image);
-            const container = await docker.createContainer({
-                name: containerName,
-                Image: image,
-                Labels: labels,
-                Cmd: cmd,
-                Env: env.length ? env : undefined,
-                HostConfig: {
-                    NetworkMode: networkName,
-                    RestartPolicy: { Name: 'unless-stopped' },
-                    Mounts: [{ Type: 'volume', Source: volumeName, Target: '/workspace' }],
-                    Memory: limits.memMB ? limits.memMB * 1024 * 1024 : 512 * 1024 * 1024,
-                    NanoCpus: limits.cpus ? Math.floor(Number(limits.cpus) * 1e9) : 1e9
-                }
-            });
-
-            await container.start();
-            return res.json({ success: true, url: publicUrl, name: containerName });
-        }
-
-        // === PRESET: STATIC (simple static site) ===
-        if (preset === 'static') {
-            labels['hydra.preset'] = 'static';
-            image = 'nginx:alpine';
-            servicePort = 80;
-
-            // Add Traefik labels BEFORE creating container
-            labels[`traefik.http.routers.${containerName}.entrypoints`] = 'web';
-            labels[`traefik.http.routers.${containerName}.rule`] = `PathPrefix(\"${basePath}\")`;
-            labels[`traefik.http.services.${containerName}.loadbalancer.server.port`] = String(servicePort);
-            labels[`traefik.http.middlewares.${containerName}-stripprefix.stripprefix.prefixes`] = basePath;
-            labels[`traefik.http.routers.${containerName}.middlewares`] = `${containerName}-stripprefix`;
-
-            await pullImage(image);
-
-            const mounts = [{ Type: 'volume', Source: volumeName, Target: '/usr/share/nginx/html' }];
-
-            const container = await docker.createContainer({
-                name: containerName,
-                Image: image,
-                Labels: labels,
-                HostConfig: {
-                    NetworkMode: networkName,
-                    RestartPolicy: { Name: 'unless-stopped' },
-                    Mounts: mounts,
-                    Memory: limits.memMB ? limits.memMB * 1024 * 1024 : 256 * 1024 * 1024,
-                    NanoCpus: limits.cpus ? Math.floor(Number(limits.cpus) * 1e9) : 5e8
-                }
-            });
-
-            await container.start();
-            return res.json({ success: true, url: publicUrl, name: containerName });
-        }
-
-        // === FALLBACK: Simple hello container ===
-        labels['hydra.preset'] = 'hello';
-        image = 'busybox';
-        servicePort = 80;
-
-        await pullImage(image);
-
-        const container = await docker.createContainer({
-            name: containerName,
-            Image: image,
-            Labels: labels,
-            Cmd: ['sh', '-c', 'echo "Hello from Hydra!" > index.html && httpd -f -p 80 -h /'],
-            HostConfig: {
-                NetworkMode: networkName,
-                RestartPolicy: { Name: 'unless-stopped' },
-                Memory: 128 * 1024 * 1024,
-                NanoCpus: 5e8 // 0.5 CPU, 1e9 = 1 CPU, 2e9 = 2 CPUs
-            }
-        });
-
-        labels[`traefik.http.routers.${containerName}.entrypoints`] = 'web';
-        labels[`traefik.http.routers.${containerName}.rule`] = `PathPrefix(\"${basePath}\")`;
-        labels[`traefik.http.services.${containerName}.loadbalancer.server.port`] = String(servicePort);
-        labels[`traefik.http.middlewares.${containerName}-stripprefix.stripprefix.prefixes`] = basePath;
-        labels[`traefik.http.routers.${containerName}.middlewares`] = `${containerName}-stripprefix`;
 
         await container.start();
-
-        return res.json({ success: true, url: publicUrl, name: containerName });
+        return res.json({ success: true });
     } catch (err) {
         console.error('[containers] start error:', err);
         return res.status(500).json({ success: false, message: 'Failed to start container' });
     }
 });
 
-// List current user's containers
-router.get('/mine', async (req, res) => {
+// Stop student container
+// POST /dashboard/api/containers/stop
+router.post('/stop', async (req, res) => {
     try {
         if (!req.isAuthenticated?.() || !req.user?.email) {
             return res.status(401).json({ success: false, message: 'Not authenticated' });
         }
-        const username = String(req.user.email).split('@')[0];
 
-        const containers = await docker.listContainers({
-            all: true,
-            filters: {
-                label: [
-                    `hydra.owner=${username}`,
-                    'hydra.managed_by=hydra-saml-auth'
-                ]
+        const username = String(req.user.email).split('@')[0];
+        const result = await getStudentContainer(username);
+
+        if (!result) {
+            return res.status(404).json({ success: false, message: 'Container not found' });
+        }
+
+        const { container, info } = result;
+
+        if (!info.State.Running) {
+            return res.json({ success: true, message: 'Container already stopped' });
+        }
+
+        await container.stop({ t: 10 });
+        return res.json({ success: true });
+    } catch (err) {
+        console.error('[containers] stop error:', err);
+        return res.status(500).json({ success: false, message: 'Failed to stop container' });
+    }
+});
+
+// Get container status
+// GET /dashboard/api/containers/status
+router.get('/status', async (req, res) => {
+    try {
+        if (!req.isAuthenticated?.() || !req.user?.email) {
+            return res.status(401).json({ success: false, message: 'Not authenticated' });
+        }
+
+        const username = String(req.user.email).split('@')[0];
+        const result = await getStudentContainer(username);
+
+        if (!result) {
+            return res.json({
+                success: true,
+                exists: false,
+                state: 'not_created'
+            });
+        }
+
+        const { info } = result;
+
+        return res.json({
+            success: true,
+            exists: true,
+            state: info.State.Status,
+            running: info.State.Running,
+            startedAt: info.State.StartedAt,
+            finishedAt: info.State.FinishedAt
+        });
+    } catch (err) {
+        console.error('[containers] status error:', err);
+        return res.status(500).json({ success: false, message: 'Failed to get status' });
+    }
+});
+
+// Get service statuses (via supervisorctl)
+// GET /dashboard/api/containers/services
+router.get('/services', async (req, res) => {
+    try {
+        if (!req.isAuthenticated?.() || !req.user?.email) {
+            return res.status(401).json({ success: false, message: 'Not authenticated' });
+        }
+
+        const username = String(req.user.email).split('@')[0];
+        const result = await getStudentContainer(username);
+
+        if (!result) {
+            return res.status(404).json({ success: false, message: 'Container not found' });
+        }
+
+        const { container, info } = result;
+
+        if (!info.State.Running) {
+            return res.json({ success: true, services: [], containerRunning: false });
+        }
+
+        // Execute supervisorctl status
+        const exec = await container.exec({
+            Cmd: ['supervisorctl', 'status'],
+            AttachStdout: true,
+            AttachStderr: true
+        });
+
+        const stream = await exec.start({ Detach: false, Tty: false });
+
+        let output = '';
+        stream.on('data', (chunk) => {
+            // Strip Docker stream header (first 8 bytes)
+            if (chunk.length > 8) {
+                output += chunk.slice(8).toString('utf8');
             }
         });
 
-        // Find VS Code container and extract mounted project info
-        let vscodeInfo = null;
-        const vscodeContainerName = `student-${username}-vscode`;
-        const vscodeContainer = containers.find(c =>
-            (c.Names && c.Names[0] === `/${vscodeContainerName}`) ||
-            c.Labels?.['hydra.type'] === 'vscode'
-        );
+        await new Promise((resolve, reject) => {
+            stream.on('end', resolve);
+            stream.on('error', reject);
+        });
 
-        if (vscodeContainer && vscodeContainer.Labels) {
-            vscodeInfo = {
-                name: vscodeContainer.Names[0]?.replace(/^\//, '') || '',
-                mountedProject: vscodeContainer.Labels['hydra.mounted_project'] || '',
-                url: vscodeContainer.Labels['hydra.public_url'] || '',
-                state: vscodeContainer.State
-            };
+        // Parse supervisorctl output
+        // Format: "program_name    STATE    pid 123, uptime 1:23:45"
+        const services = [];
+        const lines = output.trim().split('\n');
+
+        for (const line of lines) {
+            const match = line.match(/^(\S+)\s+(\S+)/);
+            if (match) {
+                const [, name, state] = match;
+                // Only include code-server and jupyter
+                if (name === 'code-server' || name === 'jupyter') {
+                    services.push({
+                        name,
+                        running: state === 'RUNNING',
+                        state
+                    });
+                }
+            }
         }
 
-        const items = containers
-            .filter(c => c.Labels?.['hydra.type'] !== 'vscode') // Exclude VS Code container from main list
-            .map(c => ({
-                id: c.Id,
-                name: (c.Names && c.Names[0]) ? c.Names[0].replace(/^\//, '') : '',
-                image: c.Image,
-                state: c.State,
-                status: c.Status,
-                created: c.Created,
-                project: c.Labels?.['hydra.project'] || '',
-                url: c.Labels?.['hydra.public_url'] || '',
-                preset: c.Labels?.['hydra.preset'] || '',
-                // jupyterToken removed; Jupyter now uses ForwardAuth
-                repoUrl: c.Labels?.['hydra.repo_url'] || null,
-                repoCommit: c.Labels?.['hydra.repo_commit'] || null
-            }));
-
-        return res.json({ success: true, containers: items, vscode: vscodeInfo });
+        return res.json({ success: true, services, containerRunning: true });
     } catch (err) {
-        console.error('[containers] list mine error:', err);
-        return res.status(500).json({ success: false, message: 'Failed to list containers' });
+        console.error('[containers] services error:', err);
+        return res.status(500).json({ success: false, message: 'Failed to get service status' });
     }
 });
 
-// Delete a user's container with cleanup
-// Stop code-server container (must be before generic /:name routes)
-router.delete('/stop-vscode', async (req, res) => {
+// Start a service
+// POST /dashboard/api/containers/services/:service/start
+router.post('/services/:service/start', async (req, res) => {
+    try {
+        if (!req.isAuthenticated?.() || !req.user?.email) {
+            return res.status(401).json({ success: false, message: 'Not authenticated' });
+        }
+
+        const serviceName = String(req.params.service || '').trim();
+        if (!['code-server', 'jupyter'].includes(serviceName)) {
+            return res.status(400).json({ success: false, message: 'Invalid service name' });
+        }
+
+        const username = String(req.user.email).split('@')[0];
+        const result = await getStudentContainer(username);
+
+        if (!result) {
+            return res.status(404).json({ success: false, message: 'Container not found' });
+        }
+
+        const { container, info } = result;
+
+        if (!info.State.Running) {
+            return res.status(400).json({ success: false, message: 'Container not running' });
+        }
+
+        // Execute supervisorctl start
+        const exec = await container.exec({
+            Cmd: ['supervisorctl', 'start', serviceName],
+            AttachStdout: true,
+            AttachStderr: true
+        });
+
+        await exec.start({ Detach: false, Tty: false });
+
+        return res.json({ success: true });
+    } catch (err) {
+        console.error('[containers] start service error:', err);
+        return res.status(500).json({ success: false, message: 'Failed to start service' });
+    }
+});
+
+// Stop a service
+// POST /dashboard/api/containers/services/:service/stop
+router.post('/services/:service/stop', async (req, res) => {
+    try {
+        if (!req.isAuthenticated?.() || !req.user?.email) {
+            return res.status(401).json({ success: false, message: 'Not authenticated' });
+        }
+
+        const serviceName = String(req.params.service || '').trim();
+        if (!['code-server', 'jupyter'].includes(serviceName)) {
+            return res.status(400).json({ success: false, message: 'Invalid service name' });
+        }
+
+        const username = String(req.user.email).split('@')[0];
+        const result = await getStudentContainer(username);
+
+        if (!result) {
+            return res.status(404).json({ success: false, message: 'Container not found' });
+        }
+
+        const { container, info } = result;
+
+        if (!info.State.Running) {
+            return res.status(400).json({ success: false, message: 'Container not running' });
+        }
+
+        // Execute supervisorctl stop
+        const exec = await container.exec({
+            Cmd: ['supervisorctl', 'stop', serviceName],
+            AttachStdout: true,
+            AttachStderr: true
+        });
+
+        await exec.start({ Detach: false, Tty: false });
+
+        return res.json({ success: true });
+    } catch (err) {
+        console.error('[containers] stop service error:', err);
+        return res.status(500).json({ success: false, message: 'Failed to stop service' });
+    }
+});
+
+// Get port routes
+// GET /dashboard/api/containers/routes
+router.get('/routes', async (req, res) => {
     try {
         if (!req.isAuthenticated?.() || !req.user?.email) {
             return res.status(401).json({ success: false, message: 'Not authenticated' });
         }
 
         const username = String(req.user.email).split('@')[0];
-        const vscodeContainerName = `student-${username}-vscode`;
+        const result = await getStudentContainer(username);
 
-        const container = docker.getContainer(vscodeContainerName);
-        const info = await container.inspect();
-        const labels = info?.Config?.Labels || {};
-
-        if (labels['hydra.owner'] !== username || labels['hydra.managed_by'] !== 'hydra-saml-auth') {
-            return res.status(403).json({ success: false, message: 'Not authorized' });
+        if (!result) {
+            return res.status(404).json({ success: false, message: 'Container not found' });
         }
 
+        const { info } = result;
+        const labels = info.Config.Labels || {};
+        const routesJson = labels['hydra.port_routes'] || '[]';
+
+        let routes = [];
         try {
-            await container.stop({ t: 5 });
-        } catch (e) { }
+            routes = JSON.parse(routesJson);
+        } catch (e) {
+            console.error('[containers] Failed to parse port_routes:', e);
+        }
+
+        const host = 'hydra.newpaltz.edu';
+        const publicBase = (process.env.PUBLIC_STUDENTS_BASE || `https://${host}/students`).replace(/\/$/, '');
+
+        // Add URLs to routes
+        const routesWithUrls = routes.map(route => ({
+            ...route,
+            url: `${publicBase}/${username}/${route.endpoint}/`
+        }));
+
+        return res.json({ success: true, routes: routesWithUrls });
+    } catch (err) {
+        console.error('[containers] get routes error:', err);
+        return res.status(500).json({ success: false, message: 'Failed to get routes' });
+    }
+});
+
+// Add a port route
+// POST /dashboard/api/containers/routes { endpoint, port }
+router.post('/routes', async (req, res) => {
+    try {
+        if (!req.isAuthenticated?.() || !req.user?.email) {
+            return res.status(401).json({ success: false, message: 'Not authenticated' });
+        }
+
+        const endpoint = String(req.body?.endpoint || '').trim().toLowerCase();
+        const port = Number(req.body?.port);
+
+        // Validate endpoint
+        if (!endpoint || !/^[a-z0-9-]{1,40}$/.test(endpoint)) {
+            return res.status(400).json({ success: false, message: 'Invalid endpoint name (alphanumeric and hyphens only)' });
+        }
+
+        if (RESERVED_ENDPOINTS.includes(endpoint)) {
+            return res.status(400).json({ success: false, message: 'Endpoint name is reserved' });
+        }
+
+        // Validate port
+        if (!port || port < 1024 || port > 65535) {
+            return res.status(400).json({ success: false, message: 'Port must be between 1024 and 65535' });
+        }
+
+        if (RESERVED_PORTS.includes(port)) {
+            return res.status(400).json({ success: false, message: 'Port is reserved for essential services' });
+        }
+
+        const username = String(req.user.email).split('@')[0];
+        const containerName = `student-${username}`;
+        const result = await getStudentContainer(username);
+
+        if (!result) {
+            return res.status(404).json({ success: false, message: 'Container not found' });
+        }
+
+        const { container, info } = result;
+        const oldLabels = info.Config.Labels || {};
+        const routesJson = oldLabels['hydra.port_routes'] || '[]';
+
+        let routes = [];
+        try {
+            routes = JSON.parse(routesJson);
+        } catch (e) {
+            console.error('[containers] Failed to parse port_routes:', e);
+        }
+
+        // Check if endpoint already exists
+        if (routes.some(r => r.endpoint === endpoint)) {
+            return res.status(400).json({ success: false, message: 'Endpoint already exists' });
+        }
+
+        // Check if port already in use
+        if (routes.some(r => r.port === port)) {
+            return res.status(400).json({ success: false, message: 'Port already in use by another endpoint' });
+        }
+
+        // Add new route
+        const newRoute = { endpoint, port };
+        routes.push(newRoute);
+
+        // Prepare new labels
+        const newLabels = { ...oldLabels };
+        newLabels['hydra.port_routes'] = JSON.stringify(routes);
+
+        // Add Traefik labels for new route
+        Object.assign(newLabels, generateTraefikLabels(username, newRoute));
+
+        // Recreate container with new labels
+        const wasRunning = info.State.Running;
+
+        if (wasRunning) {
+            await container.stop({ t: 10 });
+        }
         await container.remove({ force: true });
 
-        return res.json({ success: true });
-    } catch (err) {
-        if (err.statusCode === 404) {
-            return res.json({ success: true, message: 'VS Code container not running' });
+        const newContainer = await docker.createContainer({
+            name: containerName,
+            Image: info.Config.Image,
+            Labels: newLabels,
+            Env: info.Config.Env,
+            Cmd: info.Config.Cmd,
+            HostConfig: info.HostConfig
+        });
+
+        if (wasRunning) {
+            await newContainer.start();
+
+            // Reconnect to student network
+            const studentNetworkName = `hydra-student-${username}`;
+            try {
+                const studentNet = docker.getNetwork(studentNetworkName);
+                await studentNet.connect({ Container: containerName });
+            } catch (e) {
+                console.error('[containers] Failed to reconnect to student network:', e);
+            }
         }
-        console.error('[containers] stop-vscode error:', err);
-        return res.status(500).json({ success: false, message: 'Failed to stop VS Code' });
+
+        const host = 'hydra.newpaltz.edu';
+        const publicBase = (process.env.PUBLIC_STUDENTS_BASE || `https://${host}/students`).replace(/\/$/, '');
+
+        return res.json({
+            success: true,
+            route: {
+                ...newRoute,
+                url: `${publicBase}/${username}/${endpoint}/`
+            }
+        });
+    } catch (err) {
+        console.error('[containers] add route error:', err);
+        return res.status(500).json({ success: false, message: 'Failed to add route' });
     }
 });
 
-// Delete a user's container with cleanup
-router.delete('/:name', async (req, res) => {
+// Delete a port route
+// DELETE /dashboard/api/containers/routes/:endpoint
+router.delete('/routes/:endpoint', async (req, res) => {
     try {
         if (!req.isAuthenticated?.() || !req.user?.email) {
             return res.status(401).json({ success: false, message: 'Not authenticated' });
         }
+
+        const endpoint = String(req.params.endpoint || '').trim().toLowerCase();
+
+        if (RESERVED_ENDPOINTS.includes(endpoint)) {
+            return res.status(400).json({ success: false, message: 'Cannot delete reserved endpoint' });
+        }
+
         const username = String(req.user.email).split('@')[0];
-        const nameParam = String(req.params.name || '').trim();
-        if (!nameParam) return res.status(400).json({ success: false, message: 'Missing container name' });
+        const containerName = `student-${username}`;
+        const result = await getStudentContainer(username);
 
-        const container = docker.getContainer(nameParam);
-        const info = await container.inspect();
-        const labels = info?.Config?.Labels || {};
-        if (labels['hydra.owner'] !== username || labels['hydra.managed_by'] !== 'hydra-saml-auth') {
-            return res.status(403).json({ success: false, message: 'Not allowed' });
+        if (!result) {
+            return res.status(404).json({ success: false, message: 'Container not found' });
         }
 
-        try { await container.stop({ t: 5 }); } catch (_e) { }
-        await container.remove({ force: true, v: true });
-        return res.json({ success: true });
-    } catch (err) {
-        console.error('[containers] delete error:', err);
-        return res.status(500).json({ success: false, message: 'Failed to delete container' });
-    }
-});
+        const { container, info } = result;
+        const oldLabels = info.Config.Labels || {};
+        const routesJson = oldLabels['hydra.port_routes'] || '[]';
 
-// Restart a user's container
-router.post('/:name/restart', async (req, res) => {
-    try {
-        if (!req.isAuthenticated?.() || !req.user?.email) {
-            return res.status(401).json({ success: false, message: 'Not authenticated' });
-        }
-        const username = String(req.user.email).split('@')[0];
-        const nameParam = String(req.params.name || '').trim();
-        if (!nameParam) return res.status(400).json({ success: false, message: 'Missing container name' });
-
-        const container = docker.getContainer(nameParam);
-        const info = await container.inspect();
-        const labels = info?.Config?.Labels || {};
-        if (labels['hydra.owner'] !== username || labels['hydra.managed_by'] !== 'hydra-saml-auth') {
-            return res.status(403).json({ success: false, message: 'Not allowed' });
-        }
-
+        let routes = [];
         try {
-            await container.restart();
+            routes = JSON.parse(routesJson);
         } catch (e) {
-            await container.start();
+            console.error('[containers] Failed to parse port_routes:', e);
         }
+
+        // Check if endpoint exists
+        const routeIndex = routes.findIndex(r => r.endpoint === endpoint);
+        if (routeIndex === -1) {
+            return res.status(404).json({ success: false, message: 'Endpoint not found' });
+        }
+
+        // Remove route
+        routes.splice(routeIndex, 1);
+
+        // Prepare new labels - remove all Traefik labels for this endpoint
+        const newLabels = {};
+        const routerName = `student-${username}-${endpoint}`;
+
+        for (const [key, value] of Object.entries(oldLabels)) {
+            // Skip labels related to the deleted endpoint
+            if (key.includes(routerName)) {
+                continue;
+            }
+            newLabels[key] = value;
+        }
+
+        newLabels['hydra.port_routes'] = JSON.stringify(routes);
+
+        // Recreate container with new labels
+        const wasRunning = info.State.Running;
+
+        if (wasRunning) {
+            await container.stop({ t: 10 });
+        }
+        await container.remove({ force: true });
+
+        const newContainer = await docker.createContainer({
+            name: containerName,
+            Image: info.Config.Image,
+            Labels: newLabels,
+            Env: info.Config.Env,
+            Cmd: info.Config.Cmd,
+            HostConfig: info.HostConfig
+        });
+
+        if (wasRunning) {
+            await newContainer.start();
+
+            // Reconnect to student network
+            const studentNetworkName = `hydra-student-${username}`;
+            try {
+                const studentNet = docker.getNetwork(studentNetworkName);
+                await studentNet.connect({ Container: containerName });
+            } catch (e) {
+                console.error('[containers] Failed to reconnect to student network:', e);
+            }
+        }
+
         return res.json({ success: true });
     } catch (err) {
-        console.error('[containers] restart error:', err);
-        return res.status(500).json({ success: false, message: 'Failed to restart container' });
+        console.error('[containers] delete route error:', err);
+        return res.status(500).json({ success: false, message: 'Failed to delete route' });
     }
 });
 
 // Stream logs (SSE)
-router.get('/:name/logs/stream', async (req, res) => {
+// GET /dashboard/api/containers/logs/stream
+router.get('/logs/stream', async (req, res) => {
     try {
         if (!req.isAuthenticated?.() || !req.user?.email) {
             return res.status(401).end();
         }
-        const username = String(req.user.email).split('@')[0];
-        const nameParam = String(req.params.name || '').trim();
-        if (!nameParam) return res.status(400).end();
 
-        const container = docker.getContainer(nameParam);
-        const info = await container.inspect();
-        const labels = info?.Config?.Labels || {};
-        if (labels['hydra.owner'] !== username || labels['hydra.managed_by'] !== 'hydra-saml-auth') {
-            return res.status(403).end();
+        const username = String(req.user.email).split('@')[0];
+        const result = await getStudentContainer(username);
+
+        if (!result) {
+            return res.status(404).end();
         }
+
+        const { container } = result;
 
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');
@@ -578,284 +769,42 @@ router.get('/:name/logs/stream', async (req, res) => {
     }
 });
 
-// Pull latest changes from git repo
-router.post('/:name/git-pull', async (req, res) => {
-    try {
-        if (!req.isAuthenticated?.() || !req.user?.email) {
-            return res.status(401).json({ success: false, message: 'Not authenticated' });
-        }
-        const username = String(req.user.email).split('@')[0];
-        const nameParam = String(req.params.name || '').trim();
-        if (!nameParam) return res.status(400).json({ success: false, message: 'Missing container name' });
-
-        const container = docker.getContainer(nameParam);
-        const info = await container.inspect();
-        const labels = info?.Config?.Labels || {};
-
-        if (labels['hydra.owner'] !== username || labels['hydra.managed_by'] !== 'hydra-saml-auth') {
-            return res.status(403).json({ success: false, message: 'Not allowed' });
-        }
-
-        // Only works for repo containers
-        if (labels['hydra.preset'] !== 'repo' || !labels['hydra.repo_url']) {
-            return res.status(400).json({ success: false, message: 'Not a repository container' });
-        }
-
-        const project = labels['hydra.project'];
-        const volumeName = `hydra-vol-${username}-${project}`.replace(/[^a-z0-9-]/g, '').slice(0, 60);
-
-        // Pull latest changes using alpine/git
-        const gitImg = 'alpine/git:latest';
-        await pullImage(gitImg);
-        await pullImage('busybox:latest'); // Also pull busybox for reading commit hash
-
-        const gitPullCmd = `
-            set -e
-            cd /w/src
-            # Ensure Git treats this path as safe (volume ownership may not match current user)
-            git config --global --add safe.directory /w/src || true
-            git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"
-            GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=echo git fetch origin
-            GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=echo git reset --hard origin/HEAD
-            git rev-parse HEAD > /w/commit_hash.txt
-        `;
-
-        const gitPull = await docker.createContainer({
-            Image: gitImg,
-            Labels: { 'hydra.temp': 'true' },
-            Cmd: ['-c', gitPullCmd],
-            HostConfig: { Mounts: [{ Type: 'volume', Source: volumeName, Target: '/w' }] },
-            Entrypoint: ['sh']
-        });
-
-        await gitPull.start();
-        const result = await gitPull.wait();
-
-        if (result.StatusCode !== 0) {
-            console.error(`[containers] Git pull failed with status ${result.StatusCode}`);
-            try {
-                const logs = await gitPull.logs({ stdout: true, stderr: true });
-                console.error('[containers] Git pull logs:', logs.toString());
-            } catch { }
-            await gitPull.remove({ force: true });
-            return res.status(500).json({ success: false, message: 'Failed to pull latest changes' });
-        }
-
-        // Get the new commit hash
-        let commitHash = '';
-        try {
-            const hashReader = await docker.createContainer({
-                Image: 'busybox:latest',
-                Cmd: ['cat', '/w/commit_hash.txt'],
-                HostConfig: { Mounts: [{ Type: 'volume', Source: volumeName, Target: '/w' }] }
-            });
-            await hashReader.start();
-            await hashReader.wait();
-
-            // Get logs as buffer and manually parse Docker stream header
-            const logBuffer = await hashReader.logs({ stdout: true, stderr: false });
-
-            // Docker stream format: [8 bytes header][payload]
-            // Header: [stream type: 1 byte][3 bytes padding][size: 4 bytes big-endian]
-            if (logBuffer.length > 8) {
-                const payloadSize = logBuffer.readUInt32BE(4);
-                const payload = logBuffer.slice(8, 8 + payloadSize);
-                commitHash = payload.toString('utf8').trim();
-            }
-
-            await hashReader.remove();
-        } catch (e) {
-            console.error('[containers] Failed to read commit hash:', e);
-        }
-
-        await gitPull.remove({ force: true });
-
-        // Update the container labels with new commit hash (requires recreation)
-        if (commitHash) {
-            try {
-                const oldInfo = await container.inspect();
-                const oldConfig = oldInfo.Config;
-                const oldHostConfig = oldInfo.HostConfig;
-
-                // Update labels
-                const updatedLabels = { ...oldConfig.Labels, 'hydra.repo_commit': commitHash };
-
-                // Stop and remove old container
-                try { await container.stop({ t: 5 }); } catch { }
-                await container.remove({ force: true });
-
-                // Recreate with updated labels
-                const newContainer = await docker.createContainer({
-                    name: nameParam,
-                    Image: oldConfig.Image,
-                    Labels: updatedLabels,
-                    Cmd: oldConfig.Cmd,
-                    Env: oldConfig.Env,
-                    HostConfig: oldHostConfig
-                });
-
-                await newContainer.start();
-            } catch (e) {
-                console.error('[containers] Failed to update container labels:', e);
-                // If recreation failed, try to restart the old one
-                try {
-                    await container.restart();
-                } catch { }
-            }
-        } else {
-            // No commit hash, just restart
-            try {
-                await container.restart();
-            } catch (e) {
-                await container.start();
-            }
-        }
-
-        return res.json({ success: true, commitHash });
-    } catch (err) {
-        console.error('[containers] git-pull error:', err);
-        return res.status(500).json({ success: false, message: 'Failed to pull latest changes' });
-    }
-});
-
-// Start code-server for a specific container
-router.post('/start-vscode', async (req, res) => {
+// Delete student container (admin only or self-destruct)
+// DELETE /dashboard/api/containers/destroy
+router.delete('/destroy', async (req, res) => {
     try {
         if (!req.isAuthenticated?.() || !req.user?.email) {
             return res.status(401).json({ success: false, message: 'Not authenticated' });
         }
 
         const username = String(req.user.email).split('@')[0];
-        const targetProject = String(req.body?.project || '').trim();
+        const result = await getStudentContainer(username);
 
-        if (!targetProject) {
-            return res.status(400).json({ success: false, message: 'Project name required' });
+        if (!result) {
+            return res.json({ success: true, message: 'Container does not exist' });
         }
 
-        const host = 'hydra.newpaltz.edu';
-        const vscodeContainerName = `student-${username}-vscode`;
-        const networkName = 'hydra_students_net';
-        const basePath = `/students/${username}/vscode`;
+        const { container } = result;
+        const volumeName = `hydra-vol-${username}`;
 
-        // Public URL
-        const publicBase = (process.env.PUBLIC_STUDENTS_BASE || `https://${host}/students`).replace(/\/$/, '');
-        const publicUrl = `${publicBase}/${username}/vscode/`;
-
-        // Check if target project container exists and is owned by user
-        const targetContainerName = `student-${username}-${targetProject}`;
-        let targetContainer;
         try {
-            targetContainer = docker.getContainer(targetContainerName);
-            const targetInfo = await targetContainer.inspect();
-            const targetLabels = targetInfo?.Config?.Labels || {};
+            await container.stop({ t: 10 });
+        } catch (_e) { }
 
-            if (targetLabels['hydra.owner'] !== username || targetLabels['hydra.managed_by'] !== 'hydra-saml-auth') {
-                return res.status(403).json({ success: false, message: 'Target container not found or not owned by you' });
-            }
-        } catch (err) {
-            return res.status(404).json({ success: false, message: 'Target container not found' });
-        }
+        await container.remove({ force: true, v: true });
 
-        // Volume for the target project
-        const volumeName = `hydra-vol-${username}-${targetProject}`.replace(/[^a-z0-9-]/g, '').slice(0, 60);
-
-    // ForwardAuth is enabled via Traefik; no password needed for code-server
-
-        // Check if code-server container already exists
-        let vscodeContainer;
+        // Remove volume
         try {
-            vscodeContainer = docker.getContainer(vscodeContainerName);
-            await vscodeContainer.inspect();
-
-            // If it exists, stop and remove it
-            try {
-                await vscodeContainer.stop({ t: 5 });
-            } catch (e) { }
-            await vscodeContainer.remove({ force: true });
+            const volume = docker.getVolume(volumeName);
+            await volume.remove({ force: true });
         } catch (e) {
-            // Container doesn't exist, which is fine
+            console.warn('[containers] Failed to remove volume:', e.message);
         }
 
-        // Pull code-server image
-        const codeServerImage = 'codercom/code-server:latest';
-        await pullImage(codeServerImage);
-
-        // Create code-server container
-        const labels = {
-            'traefik.enable': 'true',
-            'hydra.managed_by': 'hydra-saml-auth',
-            'hydra.owner': username,
-            'hydra.ownerEmail': req.user.email,
-            'hydra.type': 'vscode',
-            'hydra.mounted_project': targetProject,
-            'hydra.basePath': basePath,
-            'hydra.public_url': publicUrl,
-            'hydra.created_at': new Date().toISOString(),
-            // Traefik routing
-            [`traefik.http.routers.${vscodeContainerName}.entrypoints`]: 'web',
-            [`traefik.http.routers.${vscodeContainerName}.rule`]: `PathPrefix(\"${basePath}\")`,
-            [`traefik.http.services.${vscodeContainerName}.loadbalancer.server.port`]: '8080',
-            
-            // StripPrefix middleware
-            [`traefik.http.middlewares.${vscodeContainerName}-stripprefix.stripprefix.prefixes`]: basePath,
-            
-            // ForwardAuth middleware - verify token before allowing access
-            [`traefik.http.middlewares.${vscodeContainerName}-auth.forwardauth.address`]: 'http://host.docker.internal:6969/auth/verify',
-            [`traefik.http.middlewares.${vscodeContainerName}-auth.forwardauth.trustForwardHeader`]: 'true',
-            
-            // Chain middlewares: auth first, then stripprefix
-            [`traefik.http.routers.${vscodeContainerName}.middlewares`]: `${vscodeContainerName}-auth,${vscodeContainerName}-stripprefix`
-        };
-
-        vscodeContainer = await docker.createContainer({
-            name: vscodeContainerName,
-            Image: codeServerImage,
-            Labels: labels,
-            User: '0:0', // Run as root to avoid permission issues
-            Env: [
-                'SUDO_PASSWORD=disabled'
-            ],
-            // Disable built-in password; rely on ForwardAuth
-            Cmd: ['--auth', 'none', '--bind-addr', '0.0.0.0:8080', '.'],
-            WorkingDir: '/workspace',
-            HostConfig: {
-                NetworkMode: networkName,
-                RestartPolicy: { Name: 'unless-stopped' },
-                Memory: 1024 * 1024 * 1024, // 1GB
-                NanoCpus: 1e9, // 1 CPU
-                Mounts: [{
-                    Type: 'volume',
-                    Source: volumeName,
-                    Target: '/workspace'
-                }]
-            }
-        });
-
-        await vscodeContainer.start();
-
-        // Fix permissions on the workspace directory (run as root then fix ownership)
-        // This ensures files are readable/writable by the code-server user
-        try {
-            const exec = await vscodeContainer.exec({
-                Cmd: ['sh', '-c', 'chown -R 1000:1000 /workspace 2>/dev/null || true'],
-                AttachStdout: true,
-                AttachStderr: true
-            });
-            await exec.start({});
-        } catch (e) {
-            // Ignore permission fix errors
-            console.warn('[containers] Could not fix workspace permissions:', e.message);
-        }
-
-        return res.json({
-            success: true,
-            url: publicUrl,
-            name: vscodeContainerName,
-            mountedProject: targetProject
-        });
+        return res.json({ success: true });
     } catch (err) {
-        console.error('[containers] start-vscode error:', err);
-        return res.status(500).json({ success: false, message: 'Failed to start VS Code' });
+        console.error('[containers] destroy error:', err);
+        return res.status(500).json({ success: false, message: 'Failed to destroy container' });
     }
 });
 

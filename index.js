@@ -581,7 +581,7 @@ const ensureAuthenticated = (req, res, next) =>
         displayName: req.user.display_name || req.user.name || req.user.email || '',
         oid: req.user.oid || req.user.id || ''
       };
-      res.render('dashboard', { user: viewUser });
+      res.render('dashboard', { user: viewUser, baseUrl: BASE_URL });
     });
 
     app.get('/logout', (req, res, next) => {
