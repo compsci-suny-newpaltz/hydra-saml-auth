@@ -175,6 +175,7 @@ router.post('/init', async (req, res) => {
         // Create container
         const container = await docker.createContainer({
             name: containerName,
+            Hostname: containerName,
             Image: STUDENT_IMAGE,
             Labels: labels,
             Env: [
@@ -584,6 +585,7 @@ router.post('/routes', async (req, res) => {
 
         const newContainer = await docker.createContainer({
             name: containerName,
+            Hostname: containerName,
             Image: info.Config.Image,
             Labels: newLabels,
             Env: info.Config.Env,
@@ -686,6 +688,7 @@ router.delete('/routes/:endpoint', async (req, res) => {
 
         const newContainer = await docker.createContainer({
             name: containerName,
+            Hostname: containerName,
             Image: info.Config.Image,
             Labels: newLabels,
             Env: info.Config.Env,
