@@ -1,0 +1,17 @@
+# Normalize all text files to LF
+* text=auto
+* text eol=lf
+
+# Keep binaries as binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.zip binary
+*.tar.gz binary
+*.tar.bz2 binary
+*.7z binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
