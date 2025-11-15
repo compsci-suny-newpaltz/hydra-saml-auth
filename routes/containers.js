@@ -772,6 +772,121 @@ router.get('/logs/stream', async (req, res) => {
     }
 });
 
+// Wipe and recreate student container
+// POST /dashboard/api/containers/wipe
+router.post('/wipe', async (req, res) => {
+    try {
+        if (!req.isAuthenticated?.() || !req.user?.email) {
+            return res.status(401).json({ success: false, message: 'Not authenticated' });
+        }
+
+        const username = String(req.user.email).split('@')[0];
+        const containerName = `student-${username}`;
+        const volumeName = `hydra-vol-${username}`;
+
+        // 1. Destroy existing container and volume
+        const existing = await getStudentContainer(username);
+        if (existing) {
+            const { container } = existing;
+            try {
+                await container.stop({ t: 10 });
+            } catch (_e) { /* ignore */ }
+            await container.remove({ force: true, v: true });
+        }
+
+        try {
+            const volume = docker.getVolume(volumeName);
+            await volume.remove({ force: true });
+        } catch (e) {
+            console.warn(`[containers] Failed to remove volume ${volumeName} during wipe:`, e.message);
+        }
+
+        // 2. Re-initialize container (logic copied and adapted from /init)
+        const studentNetworkName = `hydra-student-${username}`;
+        const host = 'hydra.newpaltz.edu';
+
+        // Ensure networks exist
+        await ensureNetwork(MAIN_NETWORK);
+        await ensureNetwork(studentNetworkName);
+
+        // Ensure volume exists
+        await ensureVolume(volumeName, username);
+
+        // Default routes for code-server and jupyter
+        const defaultRoutes = [
+            { endpoint: 'vscode', port: CODE_SERVER_PORT },
+            { endpoint: 'jupyter', port: JUPYTER_PORT }
+        ];
+
+        // Base labels
+        const labels = {
+            'traefik.enable': 'true',
+            'traefik.docker.network': 'hydra_students_net',
+            'hydra.managed_by': 'hydra-saml-auth',
+            'hydra.owner': username,
+            'hydra.ownerEmail': req.user.email,
+            'hydra.port_routes': JSON.stringify(defaultRoutes),
+            'hydra.created_at': new Date().toISOString()
+        };
+
+        // Add Traefik labels for each default route
+        defaultRoutes.forEach(route => {
+            Object.assign(labels, generateTraefikLabels(username, route));
+        });
+
+        // Check if image exists locally, if not try to pull it
+        const imagePresent = await imageExists(STUDENT_IMAGE);
+        if (!imagePresent) {
+            try {
+                await pullImage(STUDENT_IMAGE);
+            } catch (err) {
+                console.error('[containers] Failed to pull student image:', err);
+                return res.status(500).json({
+                    success: false,
+                    message: 'Student container image not found. Please build it locally with: docker build -t hydra-student-container:latest .'
+                });
+            }
+        }
+
+        // Create container
+        const newContainer = await docker.createContainer({
+            name: containerName,
+            Hostname: containerName,
+            Image: STUDENT_IMAGE,
+            Labels: labels,
+            Env: [
+                `USERNAME=${username}`,
+                `HOME=/home/student`
+            ],
+            HostConfig: {
+                NetworkMode: MAIN_NETWORK,
+                RestartPolicy: { Name: 'unless-stopped' },
+                Mounts: [{
+                    Type: 'volume',
+                    Source: volumeName,
+                    Target: '/home/student'
+                }],
+                Memory: 4 * 1024 * 1024 * 1024, // 4GB
+                NanoCpus: 2e9, // 2 CPUs
+                Privileged: true // For Docker-in-Docker
+            }
+        });
+
+        // Connect to student network
+        const studentNet = docker.getNetwork(studentNetworkName);
+        await studentNet.connect({ Container: containerName });
+
+        // Start container
+        await newContainer.start();
+
+        return res.json({ success: true, message: 'Container wiped and recreated' });
+
+    } catch (err) {
+        console.error('[containers] wipe error:', err);
+        return res.status(500).json({ success: false, message: 'Failed to wipe and recreate container' });
+    }
+});
+
 // Delete student container (admin only or self-destruct)
 // DELETE /dashboard/api/containers/destroy
 router.delete('/destroy', async (req, res) => {

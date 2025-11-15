@@ -526,7 +526,7 @@ const ensureAuthenticated = (req, res, next) =>
 
         // Create exec instance
         const exec = await container.exec({
-          Cmd: ['sh'],
+          Cmd: ['bash'],
           AttachStdin: true,
           AttachStdout: true,
           AttachStderr: true,

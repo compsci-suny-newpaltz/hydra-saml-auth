@@ -235,9 +235,41 @@
                 class="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700">
                 <i class="fas fa-terminal"></i> Terminal
               </button>
+              <button onclick="showWipeModal()" id="wipe-btn"
+                class="px-4 py-2 rounded bg-yellow-500 text-white hover:bg-yellow-600">
+                <i class="fas fa-exclamation-triangle"></i> Wipe Volume
+              </button>
             </div>
           </div>
           <div id="container-message" class="mt-3"></div>
+        </div>
+
+        <!-- Wipe Confirmation Modal -->
+        <div id="wipe-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
+          <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3 text-center">
+              <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+                <i class="fas fa-exclamation-triangle text-red-600 text-xl"></i>
+              </div>
+              <h3 class="text-lg leading-6 font-medium text-gray-900">Wipe Container Volume?</h3>
+              <div class="mt-2 px-7 py-3">
+                <p class="text-sm text-gray-500">
+                  This will permanently delete all data in your container's volume, including all files and settings. This cannot be undone.
+                  Your container will be recreated fresh.
+                </p>
+              </div>
+              <div class="items-center px-4 py-3">
+                <button id="cancel-wipe-btn"
+                  class="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 mr-2">
+                  Cancel
+                </button>
+                <button id="confirm-wipe-btn"
+                  class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">
+                  Yes, Wipe It
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Essential Services Section -->
@@ -556,6 +588,35 @@
           msg.innerHTML = `<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2">${err.message || 'Failed to stop'}</p>`;
         }
       };
+
+      window.showWipeModal = function () {
+        document.getElementById('wipe-modal').classList.remove('hidden');
+      };
+
+      document.getElementById('cancel-wipe-btn').addEventListener('click', () => {
+        document.getElementById('wipe-modal').classList.add('hidden');
+      });
+
+      document.getElementById('confirm-wipe-btn').addEventListener('click', () => {
+        document.getElementById('wipe-modal').classList.add('hidden');
+        wipeContainer();
+      });
+
+      async function wipeContainer() {
+        const msg = document.getElementById('container-message');
+        msg.innerHTML = '<p class="text-gray-600">Wiping container volume and recreating...</p>';
+        try {
+          const res = await fetch('/dashboard/api/containers/wipe', { method: 'POST' });
+          const data = await res.json();
+          if (!res.ok || !data.success) throw new Error(data.message || 'Failed');
+
+          msg.innerHTML = '<p class="text-green-700 bg-green-100 border border-green-200 rounded p-2">Container wiped and recreated successfully!</p>';
+          setTimeout(() => { msg.innerHTML = ''; }, 5000);
+          loadContainerStatus();
+        } catch (err) {
+          msg.innerHTML = `<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2">${err.message || 'Failed to wipe container'}</p>`;
+        }
+      }
 
       async function loadServices() {
         try {
