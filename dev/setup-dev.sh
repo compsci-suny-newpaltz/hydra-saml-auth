@@ -33,6 +33,7 @@ setup_hosts() {
         echo "127.0.0.1 gpt.hydra.local" >> /etc/hosts
         echo "127.0.0.1 n8n.hydra.local" >> /etc/hosts
         echo "127.0.0.1 traefik.hydra.local" >> /etc/hosts
+        echo "127.0.0.1 mock-saml-idp" >> /etc/hosts
         echo -e "${GREEN}✓ Added local domains to /etc/hosts${NC}"
     else
         echo -e "${YELLOW}Local domains already configured${NC}"
@@ -144,11 +145,11 @@ Next steps:
    ${YELLOW}docker compose -f docker-compose.dev.yml up${NC}
 
 2. Wait for all services to start, then visit:
-   - Main app: ${YELLOW}http://hydra.local:6969${NC}
-   - OpenWebUI: ${YELLOW}http://localhost:3000${NC}
-   - Mock SAML IdP: ${YELLOW}http://localhost:8080${NC}
-   - Traefik Dashboard: ${YELLOW}http://localhost:8081${NC}
-   - n8n: ${YELLOW}http://localhost:5678${NC}
+   - Main app: ${YELLOW}http://hydra.local${NC}
+   - OpenWebUI: ${YELLOW}http://gpt.hydra.local${NC}
+   - Mock SAML IdP: ${YELLOW}http://mock-saml-idp${NC}
+   - Traefik Dashboard: ${YELLOW}http://traefik.hydra.local${NC}
+   - n8n: ${YELLOW}http://n8n.hydra.local${NC}
 
 3. Login with mock users (see mock-users.md)
 
