@@ -1,7 +1,7 @@
 services:
   ollama:
     volumes:
-      - ollama:/root/.ollama
+      - /models:/root/.ollama
     container_name: ollama
     pull_policy: always
     tty: true
@@ -19,7 +19,7 @@ services:
                 - gpu
 
   open-webui:
-    image: ghcr.io/open-webui/open-webui
+    image: ghcr.io/open-webui/open-webui:v0.6.37
     container_name: open-webui
     volumes:
       - open-webui:/app/backend/data
@@ -33,6 +33,14 @@ services:
     extra_hosts:
       - host.docker.internal:host-gateway
     restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 3
+              capabilities:
+                - gpu
 
   openwebui_middleman:
     build:
@@ -54,20 +62,17 @@ services:
 
   watchtower:
     image: containrrr/watchtower
-    container_name: watchtower
+    container_name: watchtower-openwebui
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-    # watch both services (ollama and open-webui) every 300 seconds
-    command: --interval 300 ollama open-webui
+    # Check for updates every 6 hours (21600 seconds)
+    command: --interval 21600 ollama open-webui
     depends_on:
       - ollama
       - open-webui
 
 volumes:
-  ollama:
-    external: true
-    name: comp_ollama
   open-webui:
     external: true
     name: comp_open-webui
