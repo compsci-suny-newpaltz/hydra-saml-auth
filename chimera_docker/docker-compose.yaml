@@ -9,6 +9,13 @@ services:
     image: ollama/ollama
     ports:
       - "11434:11434"
+    environment:
+      # Performance Optimizations - Phase 1
+      - OLLAMA_KEEP_ALIVE=-1  # Keep models in VRAM indefinitely for instant responses
+      - OLLAMA_FLASH_ATTENTION=1  # Enable Flash Attention for 30-50% memory reduction
+      - OLLAMA_MAX_LOADED_MODELS=6  # Allow 6 models in VRAM (mix of sizes)
+      - OLLAMA_GPU_OVERHEAD=0.15  # Reserve 15% VRAM for system stability
+      - OLLAMA_NUM_PARALLEL=4  # Handle 4 concurrent requests per model
     deploy:
       resources:
         reservations:
@@ -30,6 +37,8 @@ services:
     environment:
       - 'OLLAMA_BASE_URL=http://ollama:11434'
       - 'WEBUI_SECRET_KEY='
+      # Performance Optimizations - Phase 1
+      - CHAT_RESPONSE_STREAM_DELTA_CHUNK_SIZE=5  # Batch 5 tokens for better concurrency
     extra_hosts:
       - host.docker.internal:host-gateway
     restart: unless-stopped
