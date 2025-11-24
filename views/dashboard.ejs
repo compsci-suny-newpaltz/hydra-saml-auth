@@ -201,142 +201,169 @@
       </div>
 
       <section id="panel-containers" class="hidden">
-        <h3 class="text-xl font-semibold mb-4">Container Projects</h3>
+        <h3 class="text-xl font-semibold mb-4">Student Container</h3>
+        <p class="text-gray-700 mb-4">Manage your personal development container with VS Code, Jupyter, and custom port routing.</p>
 
-        <!-- Sub-tabs for Containers -->
-        <div class="flex border-b mb-4" role="tablist">
-          <button id="subtab-presets" class="px-4 py-2 text-sm font-medium border-b-2 border-[#052049] text-[#052049]"
-            role="tab">Presets</button>
-          <button id="subtab-github" class="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900"
-            role="tab">From GitHub</button>
-          <button id="subtab-my-containers" class="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900"
-            role="tab">My Containers</button>
-        </div>
-
-        <!-- Presets Panel -->
-        <div id="subpanel-presets">
-          <p class="text-gray-700 mb-4">Choose a preset to quickly launch a container with pre-configured settings.</p>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <!-- Jupyter Preset -->
-            <div class="border rounded p-4 hover:shadow-md transition">
-              <h4 class="font-semibold text-lg mb-2"><i class="fas fa-book"></i> Jupyter Notebook</h4>
-              <p class="text-sm text-gray-600 mb-3">Interactive Python notebook environment with persistent storage.</p>
-              <p class="text-xs text-gray-500 mb-2"><strong>Port:</strong> 8888 | <strong>Resources:</strong> 512MB RAM,
-                1 CPU</p>
-              <input type="text" id="preset-jupyter-name" placeholder="Project name"
-                class="w-full rounded border border-gray-300 px-3 py-2 text-sm mb-2" />
-              <button onclick="startPreset('jupyter')"
-                class="w-full px-4 py-2 rounded bg-purple-600 text-white hover:bg-purple-700 text-sm">Launch
-                Jupyter</button>
-            </div>
-
-            <!-- Static Site Preset -->
-            <div class="border rounded p-4 hover:shadow-md transition">
-              <h4 class="font-semibold text-lg mb-2"><i class="fas fa-globe"></i> Static Website</h4>
-              <p class="text-sm text-gray-600 mb-3">Nginx server for hosting static HTML/CSS/JS files.</p>
-              <p class="text-xs text-gray-500 mb-2"><strong>Port:</strong> 80 | <strong>Resources:</strong> 256MB RAM,
-                0.5 CPU</p>
-              <input type="text" id="preset-static-name" placeholder="Project name"
-                class="w-full rounded border border-gray-300 px-3 py-2 text-sm mb-2" />
-              <button onclick="startPreset('static')"
-                class="w-full px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700 text-sm">Launch Static
-                Site</button>
-            </div>
+        <!-- Container Status Section -->
+        <div id="container-status-section" class="mb-6 border rounded p-4 bg-gray-50">
+          <div class="flex items-center justify-between mb-3">
+            <h4 class="text-lg font-semibold"><i class="fas fa-server"></i> Container Status</h4>
+            <span id="container-state-badge" class="px-3 py-1 rounded text-sm font-medium"></span>
           </div>
-          <div id="preset-message" class="mt-3"></div>
-        </div>
-
-        <!-- GitHub Panel -->
-        <div id="subpanel-github" class="hidden">
-          <p class="text-gray-700 mb-4">Clone and run a GitHub repository with automatic dependency installation.</p>
-          <form id="github-start-form" class="space-y-3 max-w-2xl">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <label class="block text-sm font-medium" for="github-project-name">Project Name *</label>
-                <input id="github-project-name"
-                  class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm" placeholder="my-app"
-                  required />
-              </div>
-              <div>
-                <label class="block text-sm font-medium" for="github-runtime">Runtime *</label>
-                <select id="github-runtime" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm"
-                  required>
-                  <option value="">Select runtime...</option>
-                  <option value="node">Node.js (npm)</option>
-                  <option value="python">Python (pip)</option>
-                  <option value="static">Static (nginx)</option>
-                </select>
-              </div>
-            </div>
-            <div>
-              <label class="block text-sm font-medium" for="github-url">Repository URL *</label>
-              <input id="github-url" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm"
-                placeholder="https://github.com/user/repo.git" required />
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <label class="block text-sm font-medium" for="github-branch">Branch (optional)</label>
-                <input id="github-branch" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm"
-                  placeholder="main" />
-              </div>
-              <div>
-                <label class="block text-sm font-medium" for="github-subdir">Subdirectory (optional)</label>
-                <input id="github-subdir" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm"
-                  placeholder="app" />
-              </div>
-            </div>
-            <div>
-              <label class="block text-sm font-medium" for="github-start-cmd">Start Command (optional)</label>
-              <input id="github-start-cmd" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm"
-                placeholder="npm start, python app.py, etc." />
-              <p class="text-xs text-gray-500 mt-1">Leave blank for default (npm start / uvicorn / nginx)</p>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <label class="block text-sm font-medium" for="github-port">Internal Port (optional)</label>
-                <input id="github-port" type="number"
-                  class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm" placeholder="3000" />
-              </div>
-            </div>
-            <button type="submit"
-              class="inline-flex items-center px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700">Clone &
-              Launch</button>
-          </form>
-          <div id="github-message" class="mt-3"></div>
-        </div>
-
-        <!-- My Containers Panel -->
-        <div id="subpanel-my-containers" class="hidden">
-          <!-- VS Code Status Section -->
-          <div id="vscode-status-section" class="mb-6 border rounded p-4 bg-blue-50">
-            <div class="flex items-center justify-between mb-2">
-              <h4 class="text-lg font-semibold"><i class="fas fa-code"></i> VS Code</h4>
-              <button id="stop-vscode-btn" onclick="stopVSCode()"
-                class="px-3 py-2 rounded bg-red-100 hover:bg-red-200 border border-red-300 text-red-700 text-sm hidden">
-                <i class="fas fa-stop"></i> Stop VS Code
-              </button>
-            </div>
-            <div id="vscode-not-running" class="text-gray-600 text-sm">
-              <p>No VS Code instance running. Click "VS Code" next to any container to start.</p>
-            </div>
-            <div id="vscode-running" class="hidden">
-              <p class="text-sm mb-2"><span class="font-semibold">Mounted Project:</span> <span
-                  id="vscode-mounted-project" class="font-mono"></span></p>
-              <!-- Password removed; using ForwardAuth -->
-              <a id="vscode-url" href="#" target="_blank"
-                class="inline-block mt-2 px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 text-sm">
-                <i class="fas fa-external-link-alt"></i> Open VS Code
-              </a>
-            </div>
-          </div>
-
-          <div class="flex items-center justify-between mb-4">
-            <h4 class="text-lg font-semibold">Your Running Containers</h4>
-            <button id="refresh-containers" class="px-3 py-2 rounded bg-gray-100 hover:bg-gray-200 border text-sm">
-              <i class="fas fa-sync-alt"></i> Refresh
+          <div id="container-not-created" class="hidden">
+            <p class="text-gray-600 text-sm mb-3">Your student container has not been created yet.</p>
+            <button onclick="initContainer()" id="init-btn"
+              class="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700">
+              <i class="fas fa-plus-circle"></i> Initialize Container
             </button>
           </div>
-          <div id="containers-list" class="space-y-2 text-sm"></div>
+          <div id="container-controls" class="hidden">
+            <div class="flex gap-2">
+              <button onclick="startContainer()" id="start-btn"
+                class="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700">
+                <i class="fas fa-play"></i> Start
+              </button>
+              <button onclick="stopContainer()" id="stop-btn"
+                class="px-4 py-2 rounded bg-red-600 text-white hover:bg-red-700">
+                <i class="fas fa-stop"></i> Stop
+              </button>
+              <button onclick="openLogs()" id="logs-btn"
+                class="px-4 py-2 rounded bg-gray-600 text-white hover:bg-gray-700">
+                <i class="fas fa-file-alt"></i> Logs
+              </button>
+              <button onclick="openTerminal()" id="terminal-btn"
+                class="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700">
+                <i class="fas fa-terminal"></i> Terminal
+              </button>
+              <button onclick="showWipeModal()" id="wipe-btn"
+                class="px-4 py-2 rounded bg-yellow-500 text-white hover:bg-yellow-600">
+                <i class="fas fa-exclamation-triangle"></i> Wipe Volume
+              </button>
+            </div>
+          </div>
+          <div id="container-message" class="mt-3"></div>
+        </div>
+
+        <!-- Wipe Confirmation Modal -->
+        <div id="wipe-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
+          <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3 text-center">
+              <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+                <i class="fas fa-exclamation-triangle text-red-600 text-xl"></i>
+              </div>
+              <h3 class="text-lg leading-6 font-medium text-gray-900">Wipe Container Volume?</h3>
+              <div class="mt-2 px-7 py-3">
+                <p class="text-sm text-gray-500">
+                  This will permanently delete all data in your container's volume, including all files and settings. This cannot be undone.
+                  Your container will be recreated fresh.
+                </p>
+              </div>
+              <div class="items-center px-4 py-3">
+                <button id="cancel-wipe-btn"
+                  class="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 mr-2">
+                  Cancel
+                </button>
+                <button id="confirm-wipe-btn"
+                  class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">
+                  Yes, Wipe It
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Essential Services Section -->
+        <div id="services-section" class="mb-6 border rounded p-4 hidden">
+          <h4 class="text-lg font-semibold mb-3"><i class="fas fa-cogs"></i> Essential Services</h4>
+          <div class="space-y-3">
+            <div class="flex items-center justify-between border-b pb-3">
+              <div class="flex items-center gap-3">
+                <i class="fas fa-code text-indigo-600"></i>
+                <div>
+                  <div class="font-semibold">VS Code</div>
+                  <div id="vscode-service-status" class="text-sm text-gray-600"></div>
+                </div>
+              </div>
+              <div class="flex gap-2">
+                <button onclick="startService('code-server')" id="vscode-start-btn"
+                  class="px-3 py-1 text-sm rounded bg-green-100 hover:bg-green-200 border border-green-300 text-green-700">
+                  Start
+                </button>
+                <button onclick="stopService('code-server')" id="vscode-stop-btn"
+                  class="px-3 py-1 text-sm rounded bg-red-100 hover:bg-red-200 border border-red-300 text-red-700">
+                  Stop
+                </button>
+                <button onclick="openServiceURL('vscode')" id="vscode-open-btn"
+                  class="px-3 py-1 text-sm rounded bg-blue-600 text-white hover:bg-blue-700">
+                  <i class="fas fa-external-link-alt"></i> Open
+                </button>
+              </div>
+            </div>
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <i class="fas fa-book text-purple-600"></i>
+                <div>
+                  <div class="font-semibold">Jupyter Notebook</div>
+                  <div id="jupyter-service-status" class="text-sm text-gray-600"></div>
+                </div>
+              </div>
+              <div class="flex gap-2">
+                <button onclick="startService('jupyter')" id="jupyter-start-btn"
+                  class="px-3 py-1 text-sm rounded bg-green-100 hover:bg-green-200 border border-green-300 text-green-700">
+                  Start
+                </button>
+                <button onclick="stopService('jupyter')" id="jupyter-stop-btn"
+                  class="px-3 py-1 text-sm rounded bg-red-100 hover:bg-red-200 border border-red-300 text-red-700">
+                  Stop
+                </button>
+                <button onclick="openServiceURL('jupyter')" id="jupyter-open-btn"
+                  class="px-3 py-1 text-sm rounded bg-blue-600 text-white hover:bg-blue-700">
+                  <i class="fas fa-external-link-alt"></i> Open
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Port Routing Section -->
+        <div id="routing-section" class="mb-6 border rounded p-4 hidden">
+          <h4 class="text-lg font-semibold mb-3"><i class="fas fa-route"></i> Port Routing</h4>
+          <div class="overflow-x-auto mb-4">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-100">
+                <tr>
+                  <th class="px-3 py-2 text-left">Endpoint</th>
+                  <th class="px-3 py-2 text-left">Port</th>
+                  <th class="px-3 py-2 text-left">URL</th>
+                  <th class="px-3 py-2 text-left">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="routes-tbody" class="divide-y">
+                <!-- Populated by JavaScript -->
+              </tbody>
+            </table>
+          </div>
+          <div class="border-t pt-4">
+            <h5 class="font-semibold mb-2">Add Custom Route</h5>
+            <div class="flex gap-2 items-end">
+              <div class="flex-1">
+                <label class="block text-xs font-medium mb-1" for="new-endpoint">Endpoint</label>
+                <input type="text" id="new-endpoint" placeholder="myapp"
+                  class="w-full rounded border border-gray-300 px-3 py-2 text-sm" />
+              </div>
+              <div class="flex-1">
+                <label class="block text-xs font-medium mb-1" for="new-port">Port</label>
+                <input type="number" id="new-port" placeholder="3000" min="1024" max="65535"
+                  class="w-full rounded border border-gray-300 px-3 py-2 text-sm" />
+              </div>
+              <button onclick="addRoute()"
+                class="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700">
+                <i class="fas fa-plus"></i> Add
+              </button>
+            </div>
+            <p class="text-xs text-gray-500 mt-2">Route your container's internal ports to custom endpoints. Reserved ports: 8443 (VS Code), 8888 (Jupyter).</p>
+          </div>
+          <div id="routing-message" class="mt-3"></div>
         </div>
       </section>
 
@@ -446,232 +473,312 @@
         changeN8nPassword();
       });
 
-      // Container sub-tabs
-      const containerSubtabs = [
-        { btn: 'subtab-presets', panel: 'subpanel-presets' },
-        { btn: 'subtab-github', panel: 'subpanel-github' },
-        { btn: 'subtab-my-containers', panel: 'subpanel-my-containers' }
-      ];
-      containerSubtabs.forEach(t => {
-        document.getElementById(t.btn).addEventListener('click', () => {
-          containerSubtabs.forEach(x => {
-            document.getElementById(x.btn).classList.remove('border-b-2', 'border-[#052049]', 'text-[#052049]');
-            document.getElementById(x.btn).classList.add('text-gray-600');
-            document.getElementById(x.panel).classList.add('hidden');
-          });
-          document.getElementById(t.btn).classList.add('border-b-2', 'border-[#052049]', 'text-[#052049]');
-          document.getElementById(t.btn).classList.remove('text-gray-600');
-          document.getElementById(t.panel).classList.remove('hidden');
-
-          // Auto-load containers when switching to My Containers
-          if (t.btn === 'subtab-my-containers') {
-            loadMyContainers();
-          }
-        });
+      // Container management - load status when tab is opened
+      let containerStatusInterval = null;
+      document.getElementById('tab-containers').addEventListener('click', () => {
+        loadContainerStatus();
+        // Start polling every 5 seconds
+        if (containerStatusInterval) clearInterval(containerStatusInterval);
+        containerStatusInterval = setInterval(loadContainerStatus, 5000);
       });
 
-      // Start preset container
-      window.startPreset = async function (preset) {
-        const msg = document.getElementById('preset-message');
-        msg.textContent = '';
-        const project = document.getElementById(`preset-${preset}-name`).value.trim().toLowerCase();
-        if (!project || !/^[a-z0-9-]{1,40}$/.test(project)) {
-          msg.innerHTML = '<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2">Enter a valid project name (lowercase, digits, dashes only).</p>';
-          return;
-        }
-        try {
-          msg.innerHTML = '<p class="text-gray-600">Starting container...</p>';
-          const res = await fetch('/dashboard/api/containers/start', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ project, preset })
-          });
-          const data = await res.json();
-          if (!res.ok || !data.success) throw new Error(data.message || 'Failed');
-
-          msg.innerHTML = `<p class="text-green-700 bg-green-100 border border-green-200 rounded p-2">Started! <a href="${data.url}" target="_blank" class="underline text-blue-600">${data.url}</a></p>`;
-          document.getElementById(`preset-${preset}-name`).value = '';
-        } catch (err) {
-          msg.innerHTML = `<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2">${err.message || 'Failed to start container'}</p>`;
-        }
-      };
-
-      // GitHub form handler
-      document.getElementById('github-start-form').addEventListener('submit', async function (e) {
-        e.preventDefault();
-        const msg = document.getElementById('github-message');
-        msg.textContent = '';
-        const project = document.getElementById('github-project-name').value.trim().toLowerCase();
-        const runtime = document.getElementById('github-runtime').value.trim();
-        const url = document.getElementById('github-url').value.trim();
-        const branch = document.getElementById('github-branch').value.trim();
-        const subdir = document.getElementById('github-subdir').value.trim();
-        const startCmd = document.getElementById('github-start-cmd').value.trim();
-        const internalPort = document.getElementById('github-port').value.trim();
-
-        if (!project || !/^[a-z0-9-]{1,40}$/.test(project)) {
-          msg.innerHTML = '<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2">Enter a valid project name.</p>';
-          return;
-        }
-        if (!runtime) {
-          msg.innerHTML = '<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2">Select a runtime.</p>';
-          return;
-        }
-        if (!url) {
-          msg.innerHTML = '<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2">Enter a repository URL.</p>';
-          return;
-        }
-
-        try {
-          msg.innerHTML = '<p class="text-gray-600">Cloning repository and starting container...</p>';
-          const body = { project, preset: 'repo', runtime, repo: { url } };
-          if (branch) body.repo.branch = branch;
-          if (subdir) body.repo.subdir = subdir;
-          if (startCmd) body.repo.startCmd = startCmd;
-          if (internalPort) body.internalPort = Number(internalPort);
-
-          const res = await fetch('/dashboard/api/containers/start', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
-          });
-          const data = await res.json();
-          if (!res.ok || !data.success) throw new Error(data.message || 'Failed');
-          msg.innerHTML = `<p class="text-green-700 bg-green-100 border border-green-200 rounded p-2">Started! <a href="${data.url}" target="_blank" class="underline text-blue-600">${data.url}</a></p>`;
-          document.getElementById('github-start-form').reset();
-        } catch (err) {
-          msg.innerHTML = `<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2">${err.message || 'Failed to start container'}</p>`;
-        }
-      });
-
-      async function loadMyContainers() {
-        const listEl = document.getElementById('containers-list');
-        listEl.innerHTML = '<p class="text-gray-500">Loading…</p>';
-        try {
-          const res = await fetch('/dashboard/api/containers/mine');
-          const data = await res.json();
-          if (!res.ok || !data.success) throw new Error(data.message || 'Failed');
-
-          // Update VS Code status
-          updateVSCodeStatus(data.vscode);
-
-          if (!data.containers.length) {
-            listEl.innerHTML = '<p class="text-gray-500">No containers yet. Start one from the Presets or GitHub tabs.</p>';
-            return;
-          }
-          listEl.innerHTML = '';
-          data.containers.forEach(c => {
-            const row = document.createElement('div');
-            row.className = 'border rounded p-3 bg-gray-50';
-
-            const stateColor = c.state === 'running' ? 'text-green-600' : 'text-gray-500';
-
-            // Build repo info display if this is a repo container
-            let repoInfo = '';
-            if (c.repoUrl) {
-              const repoMatch = c.repoUrl.match(/github\.com\/([^\/]+\/[^\/\.]+)/);
-              const repoSlug = repoMatch ? repoMatch[1] : null;
-              const commitShort = c.repoCommit ? c.repoCommit.substring(0, 7) : 'unknown';
-              const commitLink = repoSlug && c.repoCommit
-                ? `https://github.com/${repoSlug}/commit/${c.repoCommit}`
-                : c.repoUrl;
-
-              repoInfo = `
-                <div class="text-xs text-gray-600 mt-1">
-                  <i class="fab fa-github"></i> 
-                  <a href="${c.repoUrl}" target="_blank" class="underline">${repoSlug || c.repoUrl}</a>
-                  @ <a href="${commitLink}" target="_blank" class="font-mono underline">${commitShort}</a>
-                </div>
-              `;
+      // Stop polling when switching away from containers tab
+      tabs.forEach(t => {
+        if (t.btn !== 'tab-containers') {
+          document.getElementById(t.btn).addEventListener('click', () => {
+            if (containerStatusInterval) {
+              clearInterval(containerStatusInterval);
+              containerStatusInterval = null;
             }
-
-            row.innerHTML = `
-              <div class="flex items-start justify-between mb-2">
-                <div class="flex-1">
-                  <div class="font-mono font-semibold text-sm">${c.name}</div>
-                  <div class="text-xs text-gray-600">${c.image}</div>
-                  <div class="text-xs ${stateColor}"><i class="fas fa-circle" style="font-size:6px;"></i> ${c.state} — ${c.status}</div>
-                  ${c.url ? `<div class="mt-1"><a class="text-xs underline text-blue-600" target="_blank" href="${c.url}"><i class="fas fa-external-link-alt"></i> ${c.url}</a></div>` : ''}
-                  ${repoInfo}
-                </div>
-              </div>
-              <div class="flex gap-2 flex-wrap">
-                <button onclick="openVSCode('${c.project}')" class="px-2 py-1 text-xs rounded bg-indigo-100 hover:bg-indigo-200 border border-indigo-300 text-indigo-700">
-                  <i class="fas fa-code"></i> VS Code
-                </button>
-                
-                ${c.repoUrl ? `<button onclick="gitPull('${c.name}')" class="px-2 py-1 text-xs rounded bg-green-100 hover:bg-green-200 border border-green-300 text-green-700">
-                  <i class="fas fa-sync-alt"></i> Pull Latest
-                </button>` : ''}
-                <button onclick="openLogs('${c.name}')" class="px-2 py-1 text-xs rounded bg-gray-200 hover:bg-gray-300 border">
-                  <i class="fas fa-file-alt"></i> Logs
-                </button>
-                <button onclick="openTerminal('${c.name}')" class="px-2 py-1 text-xs rounded bg-blue-100 hover:bg-blue-200 border border-blue-300 text-blue-700">
-                  <i class="fas fa-terminal"></i> Terminal
-                </button>
-                <button onclick="restartContainer('${c.name}')" class="px-2 py-1 text-xs rounded bg-yellow-100 hover:bg-yellow-200 border border-yellow-300 text-yellow-700">
-                  <i class="fas fa-redo"></i> Restart
-                </button>
-                <button onclick="deleteContainer('${c.name}')" class="px-2 py-1 text-xs rounded bg-red-600 hover:bg-red-700 text-white">
-                  <i class="fas fa-trash"></i> Delete
-                </button>
-              </div>
-            `;
-            listEl.appendChild(row);
           });
+        }
+      });
+
+      // Container Management Functions
+      async function loadContainerStatus() {
+        try {
+          const res = await fetch('/dashboard/api/containers/status');
+          const data = await res.json();
+
+          const badge = document.getElementById('container-state-badge');
+          const notCreated = document.getElementById('container-not-created');
+          const controls = document.getElementById('container-controls');
+          const servicesSection = document.getElementById('services-section');
+          const routingSection = document.getElementById('routing-section');
+
+          if (!data.exists) {
+            // Container not created
+            badge.textContent = 'Not Created';
+            badge.className = 'px-3 py-1 rounded text-sm font-medium bg-gray-200 text-gray-700';
+            notCreated.classList.remove('hidden');
+            controls.classList.add('hidden');
+            servicesSection.classList.add('hidden');
+            routingSection.classList.add('hidden');
+          } else {
+            // Container exists
+            notCreated.classList.add('hidden');
+            controls.classList.remove('hidden');
+
+            if (data.running) {
+              badge.textContent = 'Running';
+              badge.className = 'px-3 py-1 rounded text-sm font-medium bg-green-100 text-green-700';
+              servicesSection.classList.remove('hidden');
+              routingSection.classList.remove('hidden');
+
+              // Load services and routes
+              loadServices();
+              loadRoutes();
+            } else {
+              badge.textContent = 'Stopped';
+              badge.className = 'px-3 py-1 rounded text-sm font-medium bg-yellow-100 text-yellow-700';
+              servicesSection.classList.add('hidden');
+              routingSection.classList.add('hidden');
+            }
+          }
         } catch (err) {
-          listEl.innerHTML = `<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2">${err.message || 'Failed to load containers'}</p>`;
+          console.error('Failed to load container status:', err);
         }
       }
 
-      window.deleteContainer = async function (name) {
-        if (!confirm('Delete this container? This will remove the container and its data.')) return;
+      window.initContainer = async function () {
+        const msg = document.getElementById('container-message');
+        msg.innerHTML = '<p class="text-gray-600">Initializing container...</p>';
         try {
-          const res = await fetch(`/dashboard/api/containers/${encodeURIComponent(name)}`, { method: 'DELETE' });
+          const res = await fetch('/dashboard/api/containers/init', { method: 'POST' });
           const data = await res.json();
           if (!res.ok || !data.success) throw new Error(data.message || 'Failed');
-          loadMyContainers();
+
+          msg.innerHTML = '<p class="text-green-700 bg-green-100 border border-green-200 rounded p-2">Container initialized successfully!</p>';
+          setTimeout(() => { msg.innerHTML = ''; }, 3000);
+          loadContainerStatus();
         } catch (err) {
-          alert('Failed to delete: ' + err.message);
+          msg.innerHTML = `<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2">${err.message || 'Failed to initialize'}</p>`;
         }
       };
 
-      window.restartContainer = async function (name) {
+      window.startContainer = async function () {
+        const msg = document.getElementById('container-message');
+        msg.innerHTML = '<p class="text-gray-600">Starting container...</p>';
         try {
-          const res = await fetch(`/dashboard/api/containers/${encodeURIComponent(name)}/restart`, { method: 'POST' });
+          const res = await fetch('/dashboard/api/containers/start', { method: 'POST' });
           const data = await res.json();
           if (!res.ok || !data.success) throw new Error(data.message || 'Failed');
-          alert('Container restarted successfully!');
-          loadMyContainers();
+
+          msg.innerHTML = '<p class="text-green-700 bg-green-100 border border-green-200 rounded p-2">Container started!</p>';
+          setTimeout(() => { msg.innerHTML = ''; }, 3000);
+          loadContainerStatus();
         } catch (err) {
-          alert('Failed to restart: ' + err.message);
+          msg.innerHTML = `<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2">${err.message || 'Failed to start'}</p>`;
         }
       };
 
-      window.gitPull = async function (name) {
-        if (!confirm('Pull latest changes from the repository? This will update the code and restart the container.')) return;
+      window.stopContainer = async function () {
+        if (!confirm('Stop your container? Services will be unavailable until you start it again.')) return;
+        const msg = document.getElementById('container-message');
+        msg.innerHTML = '<p class="text-gray-600">Stopping container...</p>';
         try {
-          const res = await fetch(`/dashboard/api/containers/${encodeURIComponent(name)}/git-pull`, { method: 'POST' });
+          const res = await fetch('/dashboard/api/containers/stop', { method: 'POST' });
           const data = await res.json();
           if (!res.ok || !data.success) throw new Error(data.message || 'Failed');
-          const msg = data.commitHash
-            ? `Successfully updated to commit ${data.commitHash.substring(0, 7)}!`
-            : 'Successfully pulled latest changes!';
-          alert(msg);
-          loadMyContainers();
+
+          msg.innerHTML = '<p class="text-green-700 bg-green-100 border border-green-200 rounded p-2">Container stopped!</p>';
+          setTimeout(() => { msg.innerHTML = ''; }, 3000);
+          loadContainerStatus();
         } catch (err) {
-          alert('Failed to pull latest changes: ' + err.message);
+          msg.innerHTML = `<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2">${err.message || 'Failed to stop'}</p>`;
         }
       };
 
-      window.openLogs = function (name) {
+      window.showWipeModal = function () {
+        document.getElementById('wipe-modal').classList.remove('hidden');
+      };
+
+      document.getElementById('cancel-wipe-btn').addEventListener('click', () => {
+        document.getElementById('wipe-modal').classList.add('hidden');
+      });
+
+      document.getElementById('confirm-wipe-btn').addEventListener('click', () => {
+        document.getElementById('wipe-modal').classList.add('hidden');
+        wipeContainer();
+      });
+
+      async function wipeContainer() {
+        const msg = document.getElementById('container-message');
+        msg.innerHTML = '<p class="text-gray-600">Wiping container volume and recreating...</p>';
+        try {
+          const res = await fetch('/dashboard/api/containers/wipe', { method: 'POST' });
+          const data = await res.json();
+          if (!res.ok || !data.success) throw new Error(data.message || 'Failed');
+
+          msg.innerHTML = '<p class="text-green-700 bg-green-100 border border-green-200 rounded p-2">Container wiped and recreated successfully!</p>';
+          setTimeout(() => { msg.innerHTML = ''; }, 5000);
+          loadContainerStatus();
+        } catch (err) {
+          msg.innerHTML = `<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2">${err.message || 'Failed to wipe container'}</p>`;
+        }
+      }
+
+      async function loadServices() {
+        try {
+          const res = await fetch('/dashboard/api/containers/services');
+          const data = await res.json();
+
+          if (!data.success || !data.containerRunning) return;
+
+          const services = data.services || [];
+          const vscode = services.find(s => s.name === 'code-server');
+          const jupyter = services.find(s => s.name === 'jupyter');
+
+          // Update VS Code status
+          if (vscode) {
+            document.getElementById('vscode-service-status').textContent = vscode.running ? '● Running' : '○ Stopped';
+            document.getElementById('vscode-service-status').className = vscode.running ? 'text-sm text-green-600' : 'text-sm text-gray-500';
+          }
+
+          // Update Jupyter status
+          if (jupyter) {
+            document.getElementById('jupyter-service-status').textContent = jupyter.running ? '● Running' : '○ Stopped';
+            document.getElementById('jupyter-service-status').className = jupyter.running ? 'text-sm text-green-600' : 'text-sm text-gray-500';
+          }
+        } catch (err) {
+          console.error('Failed to load services:', err);
+        }
+      }
+
+      window.startService = async function (serviceName) {
+        try {
+          const res = await fetch(`/dashboard/api/containers/services/${serviceName}/start`, { method: 'POST' });
+          const data = await res.json();
+          if (!res.ok || !data.success) throw new Error(data.message || 'Failed');
+
+          setTimeout(loadServices, 1000);
+        } catch (err) {
+          alert('Failed to start service: ' + err.message);
+        }
+      };
+
+      window.stopService = async function (serviceName) {
+        try {
+          const res = await fetch(`/dashboard/api/containers/services/${serviceName}/stop`, { method: 'POST' });
+          const data = await res.json();
+          if (!res.ok || !data.success) throw new Error(data.message || 'Failed');
+
+          setTimeout(loadServices, 1000);
+        } catch (err) {
+          alert('Failed to stop service: ' + err.message);
+        }
+      };
+
+      window.openServiceURL = function (endpoint) {
+        const username = "<%= user.email %>".split('@')[0];
+        const url = `<%= baseUrl %>/students/${username}/${endpoint}/`;
+        window.open(url, '_blank');
+      };
+
+      async function loadRoutes() {
+        try {
+          const res = await fetch('/dashboard/api/containers/routes');
+          const data = await res.json();
+
+          if (!data.success) return;
+
+          const tbody = document.getElementById('routes-tbody');
+          tbody.innerHTML = '';
+
+          const routes = data.routes || [];
+          routes.forEach(route => {
+            const row = document.createElement('tr');
+            const isReserved = route.endpoint === 'vscode' || route.endpoint === 'jupyter';
+
+            row.innerHTML = `
+              <td class="px-3 py-2 font-mono">${route.endpoint}</td>
+              <td class="px-3 py-2">${route.port}</td>
+              <td class="px-3 py-2">
+                <a href="${route.url}" target="_blank" class="text-blue-600 underline text-xs">
+                  <i class="fas fa-external-link-alt"></i> ${route.url}
+                </a>
+              </td>
+              <td class="px-3 py-2">
+                ${isReserved
+                  ? '<span class="text-xs text-gray-500">Default</span>'
+                  : `<button onclick="deleteRoute('${route.endpoint}')" class="px-2 py-1 text-xs rounded bg-red-100 hover:bg-red-200 text-red-700">
+                      <i class="fas fa-trash"></i> Delete
+                    </button>`
+                }
+              </td>
+            `;
+            tbody.appendChild(row);
+          });
+        } catch (err) {
+          console.error('Failed to load routes:', err);
+        }
+      }
+
+      window.addRoute = async function () {
+        const endpoint = document.getElementById('new-endpoint').value.trim().toLowerCase();
+        const port = Number(document.getElementById('new-port').value);
+        const msg = document.getElementById('routing-message');
+
+        if (!endpoint || !/^[a-z0-9-]{1,40}$/.test(endpoint)) {
+          msg.innerHTML = '<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2 text-sm">Invalid endpoint name (alphanumeric and hyphens only)</p>';
+          return;
+        }
+
+        if (!port || port < 1024 || port > 65535) {
+          msg.innerHTML = '<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2 text-sm">Port must be between 1024-65535</p>';
+          return;
+        }
+
+        try {
+          msg.innerHTML = '<p class="text-gray-600 text-sm">Adding route...</p>';
+          const res = await fetch('/dashboard/api/containers/routes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ endpoint, port })
+          });
+          const data = await res.json();
+
+          if (!res.ok || !data.success) throw new Error(data.message || 'Failed');
+
+          msg.innerHTML = '<p class="text-green-700 bg-green-100 border border-green-200 rounded p-2 text-sm">Route added successfully!</p>';
+          setTimeout(() => { msg.innerHTML = ''; }, 3000);
+
+          document.getElementById('new-endpoint').value = '';
+          document.getElementById('new-port').value = '';
+
+          loadRoutes();
+        } catch (err) {
+          msg.innerHTML = `<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2 text-sm">${err.message || 'Failed to add route'}</p>`;
+        }
+      };
+
+      window.deleteRoute = async function (endpoint) {
+        if (!confirm(`Delete route "${endpoint}"?`)) return;
+
+        const msg = document.getElementById('routing-message');
+        try {
+          const res = await fetch(`/dashboard/api/containers/routes/${encodeURIComponent(endpoint)}`, { method: 'DELETE' });
+          const data = await res.json();
+
+          if (!res.ok || !data.success) throw new Error(data.message || 'Failed');
+
+          msg.innerHTML = '<p class="text-green-700 bg-green-100 border border-green-200 rounded p-2 text-sm">Route deleted!</p>';
+          setTimeout(() => { msg.innerHTML = ''; }, 3000);
+
+          loadRoutes();
+        } catch (err) {
+          msg.innerHTML = `<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2 text-sm">${err.message || 'Failed to delete route'}</p>`;
+        }
+      };
+
+      window.openLogs = function () {
         const w = window.open('', '_blank', 'width=900,height=600');
-        w.document.write('<!DOCTYPE html><html><head><title>Logs: ' + name + '</title>');
+        w.document.write('<!DOCTYPE html><html><head><title>Container Logs</title>');
         w.document.write('<style>body { margin: 0; padding: 0; background: #1a1a1a; font-family: monospace; }');
         w.document.write('#log { white-space: pre-wrap; margin: 0; padding: 12px; color: #ddd; height: 100vh; overflow: auto; font-size: 12px; line-height: 1.4; }</style></head>');
         w.document.write('<body><pre id="log"></pre>');
         w.document.write('<sc' + 'ript>');
-        w.document.write('const es = new EventSource("/dashboard/api/containers/' + encodeURIComponent(name) + '/logs/stream");');
+        w.document.write('const es = new EventSource("/dashboard/api/containers/logs/stream");');
         w.document.write('const pre = document.getElementById("log");');
         w.document.write('es.onmessage = (e) => { pre.textContent += e.data + "\\n"; pre.scrollTop = pre.scrollHeight; };');
         w.document.write('es.onerror = () => { pre.textContent += "\\n[Stream closed]\\n"; es.close(); };');
@@ -679,98 +786,15 @@
         w.document.write('</sc' + 'ript></body></html>');
       };
 
-      window.showToken = function (token) {
-        const msg = `Jupyter Token: ${token}`;
-        if (navigator.clipboard) {
-          navigator.clipboard.writeText(token).then(() => {
-            alert(msg + '\n\n✓ Copied to clipboard!');
-          }).catch(() => {
-            alert(msg);
-          });
-        } else {
-          prompt('Jupyter Token (Ctrl+C to copy):', token);
-        }
-      };
+      window.openTerminal = function () {
+        const username = "<%= user.email %>".split('@')[0];
+        const containerName = `student-${username}`;
 
-      // VS Code management functions
-      window.openVSCode = async function (project) {
-        if (!confirm(`Start VS Code for project "${project}"?\n\nThis will stop any currently running VS Code instance and mount this project.`)) return;
-
-        const msg = document.createElement('div');
-        msg.className = 'fixed top-4 right-4 bg-blue-100 border border-blue-300 rounded p-3 text-sm z-50';
-        msg.textContent = 'Starting VS Code...';
-        document.body.appendChild(msg);
-
-        try {
-          const res = await fetch('/dashboard/api/containers/start-vscode', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ project })
-          });
-          const data = await res.json();
-
-          if (!res.ok || !data.success) throw new Error(data.message || 'Failed to start VS Code');
-
-          msg.className = 'fixed top-4 right-4 bg-green-100 border border-green-300 rounded p-3 text-sm z-50';
-          msg.textContent = 'VS Code started!';
-          setTimeout(() => msg.remove(), 5000);
-
-          // Reload container list to update status
-          loadMyContainers();
-
-          // Open VS Code in new tab after a short delay
-          setTimeout(() => {
-            window.open(data.url, '_blank');
-          }, 1000);
-        } catch (err) {
-          msg.className = 'fixed top-4 right-4 bg-red-100 border border-red-300 rounded p-3 text-sm z-50';
-          msg.textContent = 'Error: ' + err.message;
-          setTimeout(() => msg.remove(), 5000);
-        }
-      };
-
-      window.stopVSCode = async function () {
-        if (!confirm('Stop the VS Code instance?')) return;
-
-        try {
-          const res = await fetch('/dashboard/api/containers/stop-vscode', { method: 'DELETE' });
-          const data = await res.json();
-
-          if (!res.ok || !data.success) throw new Error(data.message || 'Failed to stop VS Code');
-
-          loadMyContainers();
-        } catch (err) {
-          alert('Error stopping VS Code: ' + err.message);
-        }
-      };
-
-      // copyVSCodePassword removed; ForwardAuth in effect
-
-      function updateVSCodeStatus(vscodeInfo) {
-        const notRunning = document.getElementById('vscode-not-running');
-        const running = document.getElementById('vscode-running');
-        const stopBtn = document.getElementById('stop-vscode-btn');
-
-        if (vscodeInfo && vscodeInfo.state === 'running') {
-          notRunning.classList.add('hidden');
-          running.classList.remove('hidden');
-          stopBtn.classList.remove('hidden');
-
-          document.getElementById('vscode-mounted-project').textContent = vscodeInfo.mountedProject || 'Unknown';
-          document.getElementById('vscode-url').href = vscodeInfo.url || '#';
-        } else {
-          notRunning.classList.remove('hidden');
-          running.classList.add('hidden');
-          stopBtn.classList.add('hidden');
-        }
-      }
-
-      window.openTerminal = function (name) {
         const w = window.open('', '_blank', 'width=1000,height=700');
         const doc = w.document;
 
         doc.open();
-        doc.write('<!DOCTYPE html><html><head><title>Terminal: ' + name + '</title></head><body></body></html>');
+        doc.write('<!DOCTYPE html><html><head><title>Terminal: ' + containerName + '</title></head><body></body></html>');
         doc.close();
 
         // Add stylesheet
@@ -804,7 +828,7 @@
           term.writeln("Connecting to container...");
 
           const proto = location.protocol === "https:" ? "wss" : "ws";
-          const ws = new WebSocket(proto + "://" + location.host + "/dashboard/ws/containers/" + encodeURIComponent(name) + "/exec");
+          const ws = new WebSocket(proto + "://" + location.host + "/dashboard/ws/containers/" + encodeURIComponent(containerName) + "/exec");
           ws.binaryType = "arraybuffer";
           ws.onopen = function () { term.clear(); term.writeln("Connected! Type commands below:"); term.write("$ "); };
           ws.onmessage = function (ev) { term.write(new Uint8Array(ev.data)); };
@@ -814,9 +838,6 @@
         };
         doc.head.appendChild(script);
       };
-
-      document.getElementById('refresh-containers').addEventListener('click', loadMyContainers);
-      // Auto-load on tab switch handled in subtab click handler
     });
 
     // Function to check if user exists in OpenWebUI
