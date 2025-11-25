@@ -1,14 +1,24 @@
 services:
   ollama:
     volumes:
-      - ollama:/root/.ollama
+      - /models:/root/.ollama
     container_name: ollama
     pull_policy: always
     tty: true
     restart: unless-stopped
-    image: ollama/ollama
+    image: ollama/ollama:latest
     ports:
       - "11434:11434"
+    environment:
+      # GPU and Memory Optimization - Updated for 3x RTX 3090 (72GB VRAM)
+      - OLLAMA_KEEP_ALIVE=-1                  # Keep models in VRAM forever
+      - OLLAMA_FLASH_ATTENTION=1              # Enable Flash Attention (30-50% memory reduction)
+      - OLLAMA_MAX_LOADED_MODELS=6            # Allow 6 models in VRAM (~12GB each)
+      - OLLAMA_GPU_OVERHEAD=0.10              # Reserve 10% VRAM for overflow
+      - OLLAMA_NUM_PARALLEL=4                 # Handle 4 concurrent requests per model
+      - OLLAMA_NUM_GPU=3                      # Use all 3 GPUs
+      - NVIDIA_VISIBLE_DEVICES=0,1,2          # Make all 3 GPUs visible
+      - OLLAMA_HOST=0.0.0.0:11434
     deploy:
       resources:
         reservations:
@@ -19,7 +29,7 @@ services:
                 - gpu
 
   open-webui:
-    image: ghcr.io/open-webui/open-webui
+    image: ghcr.io/open-webui/open-webui:v0.6.37
     container_name: open-webui
     volumes:
       - open-webui:/app/backend/data
@@ -28,11 +38,20 @@ services:
     ports:
       - ${OPEN_WEBUI_PORT-3000}:8080 
     environment:
-      - 'OLLAMA_BASE_URL=http://ollama:11434'
-      - 'WEBUI_SECRET_KEY='
+      - "OLLAMA_BASE_URL=http://ollama:11434"
+      - "WEBUI_SECRET_KEY="
+      - CHAT_RESPONSE_STREAM_DELTA_CHUNK_SIZE=5  # Batch 5 tokens for better concurrency
     extra_hosts:
       - host.docker.internal:host-gateway
     restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 3
+              capabilities:
+                - gpu
 
   openwebui_middleman:
     build:
@@ -41,7 +60,7 @@ services:
     container_name: openwebui_middleman
     command: ["node", "openwebui_middleman/index.js"]
     env_file:
-      - ../.env # contains OPENWEBUI_API_KEY
+      - ../.env
     environment:
       - OPENWEBUI_API_PORT=7070
     volumes:
@@ -54,20 +73,29 @@ services:
 
   watchtower:
     image: containrrr/watchtower
-    container_name: watchtower
+    container_name: watchtower-openwebui
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-    # watch both services (ollama and open-webui) every 300 seconds
-    command: --interval 300 ollama open-webui
+    command: --interval 21600 open-webui ollama
     depends_on:
       - ollama
       - open-webui
 
+  hydra-saml-auth:
+    build:
+      context: /home/mikem/hydra-saml-auth
+      dockerfile: Dockerfile
+    container_name: hydra-saml-auth
+    volumes:
+      - open-webui:/app/data:rw
+    ports:
+      - "6969:6969"
+    restart: unless-stopped
+    depends_on:
+      - open-webui
+
 volumes:
-  ollama:
-    external: true
-    name: comp_ollama
   open-webui:
     external: true
     name: comp_open-webui

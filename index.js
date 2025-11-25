@@ -33,8 +33,8 @@ const JWT_AUDIENCE = process.env.JWT_AUDIENCE || 'npsites';
 const JWT_KEY_ID = process.env.JWT_KEY_ID || 'hydra-key-1';
 
 // Optional static RSA keys (PEM). If not provided, we generate an ephemeral pair on boot.
-const JWT_PRIVATE_KEY_PEM = fs.readFileSync(process.env.JWT_PRIVATE_KEY_FILE, 'utf8') || null;
-const JWT_PUBLIC_KEY_PEM = fs.readFileSync(process.env.JWT_PUBLIC_KEY_FILE, 'utf8') || null;
+const JWT_PRIVATE_KEY_PEM = process.env.JWT_PRIVATE_KEY_FILE ? fs.readFileSync(process.env.JWT_PRIVATE_KEY_FILE, 'utf8') : null;
+const JWT_PUBLIC_KEY_PEM = process.env.JWT_PUBLIC_KEY_FILE ? fs.readFileSync(process.env.JWT_PUBLIC_KEY_FILE, 'utf8') : null;
 
 if (!METADATA_URL) {
   console.error('Missing METADATA_URL (Azure federation metadata URL).');
