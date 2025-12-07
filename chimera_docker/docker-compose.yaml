@@ -84,7 +84,7 @@ services:
 
   hydra-saml-auth:
     build:
-      context: /home/mikem/hydra-saml-auth
+      context: /home/infra/hydra-saml-auth
       dockerfile: Dockerfile
     container_name: hydra-saml-auth
     volumes:
