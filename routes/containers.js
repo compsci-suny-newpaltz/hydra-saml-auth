@@ -1,6 +1,7 @@
 const express = require('express');
 const Docker = require('dockerode');
-const { getTier, isValidTier, DEFAULT_TIER, getAllTiers } = require('../config/resources');
+const { getTier, isValidTier, DEFAULT_TIER, getAllTiers, getTierRequiredMachines } = require('../config/resources');
+const { getMachine, isValidMachine, DEFAULT_MACHINE } = require('../config/machines');
 const { getTemplate, isValidTemplate, getAllTemplates } = require('../config/templates');
 
 const router = express.Router();
@@ -147,6 +148,23 @@ router.post('/init', async (req, res) => {
         }
         const tier = getTier(tierId);
 
+        // Get machine from request or use default
+        let machineId = req.body?.machine || DEFAULT_MACHINE;
+
+        // Check if tier requires specific machine (GPU tiers)
+        const requiredMachines = getTierRequiredMachines(tierId);
+        if (requiredMachines) {
+            if (!requiredMachines.includes(machineId)) {
+                // Auto-select first available GPU machine if not specified correctly
+                machineId = requiredMachines[0];
+            }
+        }
+
+        if (!isValidMachine(machineId)) {
+            return res.status(400).json({ success: false, message: `Invalid machine: ${machineId}` });
+        }
+        const machine = getMachine(machineId);
+
         // Optional: template and course
         const template = req.body?.template || 'default';
         const course = req.body?.course || null;
@@ -191,7 +209,8 @@ router.post('/init', async (req, res) => {
             'hydra.template': template,
             'hydra.expires_at': expiresAt,
             'hydra.renewal_count': '0',
-            'hydra.machine': 'hydra'
+            'hydra.machine': machineId,
+            'hydra.gpu': tier.gpu ? 'true' : 'false'
         };
 
         // Add course if specified
@@ -203,6 +222,15 @@ router.post('/init', async (req, res) => {
         defaultRoutes.forEach(route => {
             Object.assign(labels, generateTraefikLabels(username, route));
         });
+
+        // GPU configuration for container
+        const gpuConfig = tier.gpu ? {
+            DeviceRequests: [{
+                Driver: 'nvidia',
+                Count: tier.gpuCount || 1,
+                Capabilities: [['gpu']]
+            }]
+        } : {};
 
         // Check if image exists locally, if not try to pull it
         const imagePresent = await imageExists(STUDENT_IMAGE);
@@ -226,7 +254,8 @@ router.post('/init', async (req, res) => {
             Labels: labels,
             Env: [
                 `USERNAME=${username}`,
-                `HOME=/home/student`
+                `HOME=/home/student`,
+                `NVIDIA_VISIBLE_DEVICES=${tier.gpu ? 'all' : ''}`
             ],
             HostConfig: {
                 NetworkMode: MAIN_NETWORK,
@@ -238,7 +267,8 @@ router.post('/init', async (req, res) => {
                 }],
                 Memory: tier.memory,
                 NanoCpus: tier.nanoCpus,
-                Privileged: true // For Docker-in-Docker
+                Privileged: true, // For Docker-in-Docker
+                ...gpuConfig
             }
         });
 
@@ -254,6 +284,8 @@ router.post('/init', async (req, res) => {
         return res.json({
             success: true,
             name: containerName,
+            machine: machineId,
+            gpu: tier.gpu || false,
             tier: tierId,
             expiresAt,
             vscodeUrl: `${publicBase}/${username}/vscode/`,

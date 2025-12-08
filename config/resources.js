@@ -62,7 +62,38 @@ const RESOURCE_TIERS = {
         cpus: 4,
         nanoCpus: 4e9,
         storage: '40g',
-        storageBytes: 40 * 1024 * 1024 * 1024
+        storageBytes: 40 * 1024 * 1024 * 1024,
+        gpu: false
+    },
+    gpu_small: {
+        id: 'gpu_small',
+        name: 'GPU Small',
+        label: 'GPU Small (4GB RAM, 2 CPU, GPU)',
+        description: 'ML inference, CUDA development',
+        memory: 4 * 1024 * 1024 * 1024,  // 4GB in bytes
+        memoryLabel: '4GB',
+        cpus: 2,
+        nanoCpus: 2e9,
+        storage: '20g',
+        storageBytes: 20 * 1024 * 1024 * 1024,
+        gpu: true,
+        gpuCount: 1,
+        requiresMachine: ['chimera', 'cerberus']
+    },
+    gpu_large: {
+        id: 'gpu_large',
+        name: 'GPU Large',
+        label: 'GPU Large (16GB RAM, 4 CPU, GPU)',
+        description: 'ML training, large models',
+        memory: 16 * 1024 * 1024 * 1024,  // 16GB in bytes
+        memoryLabel: '16GB',
+        cpus: 4,
+        nanoCpus: 4e9,
+        storage: '50g',
+        storageBytes: 50 * 1024 * 1024 * 1024,
+        gpu: true,
+        gpuCount: 1,
+        requiresMachine: ['chimera', 'cerberus']
     }
 };
 
@@ -84,10 +115,29 @@ function getAllTiers() {
     return Object.values(RESOURCE_TIERS);
 }
 
+// Get tiers that require GPU
+function getGpuTiers() {
+    return Object.values(RESOURCE_TIERS).filter(t => t.gpu === true);
+}
+
+// Get tiers that don't require GPU
+function getNonGpuTiers() {
+    return Object.values(RESOURCE_TIERS).filter(t => t.gpu !== true);
+}
+
+// Check if tier requires a specific machine
+function getTierRequiredMachines(tierId) {
+    const tier = RESOURCE_TIERS[tierId];
+    return tier?.requiresMachine || null;
+}
+
 module.exports = {
     RESOURCE_TIERS,
     DEFAULT_TIER,
     getTier,
     isValidTier,
-    getAllTiers
+    getAllTiers,
+    getGpuTiers,
+    getNonGpuTiers,
+    getTierRequiredMachines
 };

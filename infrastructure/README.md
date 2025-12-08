@@ -97,13 +97,17 @@ ansible-playbook -i inventory/hosts.ini playbooks/00-prepare-nodes.yaml
 
 ### Resource Tiers
 
-| Tier | RAM | CPU | Use Case |
-|------|-----|-----|----------|
-| Micro | 512MB | 0.25 | Basic tasks (default) |
-| Tiny | 1GB | 0.5 | Light scripting |
-| Small | 2GB | 1 | Single project |
-| Medium | 4GB | 2 | Multi-project, databases |
-| Large | 8GB | 4 | Heavy compilation, ML |
+| Tier | RAM | CPU | GPU | Use Case |
+|------|-----|-----|-----|----------|
+| Micro | 512MB | 0.25 | No | Basic tasks (default) |
+| Tiny | 1GB | 0.5 | No | Light scripting |
+| Small | 2GB | 1 | No | Single project |
+| Medium | 4GB | 2 | No | Multi-project, databases |
+| Large | 8GB | 4 | No | Heavy compilation |
+| GPU Small | 4GB | 2 | Yes | ML inference, CUDA dev |
+| GPU Large | 16GB | 4 | Yes | ML training, large models |
+
+GPU tiers automatically run on Chimera or Cerberus (GPU-enabled machines).
 
 ### Workspace Templates
 
