@@ -1,0 +1,162 @@
+# Prometheus Alert Rules for Hydra Cluster
+
+groups:
+  - name: node-alerts
+    rules:
+      # High CPU usage
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(machine) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage on {{ $labels.machine }}"
+          description: "CPU usage is above 80% (current: {{ $value | printf \"%.1f\" }}%)"
+
+      # High memory usage
+      - alert: HighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage on {{ $labels.machine }}"
+          description: "Memory usage is above 85% (current: {{ $value | printf \"%.1f\" }}%)"
+
+      # Disk space low
+      - alert: DiskSpaceLow
+        expr: (1 - (node_filesystem_avail_bytes{fstype!="tmpfs"} / node_filesystem_size_bytes{fstype!="tmpfs"})) * 100 > 85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low disk space on {{ $labels.machine }}"
+          description: "Disk {{ $labels.mountpoint }} is {{ $value | printf \"%.1f\" }}% full"
+
+      # Node down
+      - alert: NodeDown
+        expr: up{job="node-exporter"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Node {{ $labels.machine }} is down"
+          description: "Node exporter on {{ $labels.machine }} has been unreachable for 2 minutes"
+
+  - name: container-alerts
+    rules:
+      # Container restarting
+      - alert: ContainerRestarting
+        expr: increase(container_start_time_seconds[1h]) > 3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} restarting frequently"
+          description: "Container {{ $labels.name }} on {{ $labels.machine }} has restarted {{ $value }} times in the last hour"
+
+      # Container high CPU
+      - alert: ContainerHighCPU
+        expr: sum(rate(container_cpu_usage_seconds_total{name!=""}[5m])) by (name, machine) * 100 > 80
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} high CPU"
+          description: "Container {{ $labels.name }} on {{ $labels.machine }} CPU usage: {{ $value | printf \"%.1f\" }}%"
+
+      # Container high memory
+      - alert: ContainerHighMemory
+        expr: (container_memory_usage_bytes{name!=""} / container_spec_memory_limit_bytes{name!=""}) * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} high memory"
+          description: "Container {{ $labels.name }} on {{ $labels.machine }} is using {{ $value | printf \"%.1f\" }}% of its memory limit"
+
+  - name: gpu-alerts
+    rules:
+      # GPU memory high
+      - alert: GPUMemoryHigh
+        expr: (DCGM_FI_DEV_FB_USED / DCGM_FI_DEV_FB_FREE) * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "GPU memory high on {{ $labels.machine }}"
+          description: "GPU {{ $labels.gpu }} memory usage: {{ $value | printf \"%.1f\" }}%"
+
+      # GPU temperature high
+      - alert: GPUTemperatureHigh
+        expr: DCGM_FI_DEV_GPU_TEMP > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "GPU temperature high on {{ $labels.machine }}"
+          description: "GPU {{ $labels.gpu }} temperature: {{ $value }}C"
+
+      # GPU not available
+      - alert: GPUUnavailable
+        expr: up{job="nvidia-gpu"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "GPU metrics unavailable on {{ $labels.machine }}"
+          description: "DCGM exporter on {{ $labels.machine }} is down - GPU may have lost access"
+
+  - name: service-alerts
+    rules:
+      # Ollama down
+      - alert: OllamaDown
+        expr: up{job="ollama"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Ollama service is down"
+          description: "Ollama on Chimera has been unreachable for 2 minutes"
+
+      # Traefik down
+      - alert: TraefikDown
+        expr: up{job="traefik"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Traefik is down"
+          description: "Traefik reverse proxy is unreachable - all services may be inaccessible"
+
+      # High request latency
+      - alert: HighRequestLatency
+        expr: histogram_quantile(0.95, sum(rate(traefik_service_request_duration_seconds_bucket[5m])) by (le, service)) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High latency for {{ $labels.service }}"
+          description: "95th percentile latency is {{ $value | printf \"%.2f\" }}s"
+
+  - name: student-container-alerts
+    rules:
+      # Student container expired
+      - alert: StudentContainerExpired
+        expr: (time() - container_label_hydra_expires_at) > 0
+        for: 1h
+        labels:
+          severity: info
+        annotations:
+          summary: "Student container {{ $labels.name }} has expired"
+          description: "Container should be stopped by expiration service"
+
+      # Too many student containers
+      - alert: TooManyStudentContainers
+        expr: count(container_start_time_seconds{name=~"student-.*"}) > 50
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "High number of student containers"
+          description: "There are {{ $value }} student containers running - consider cleanup"

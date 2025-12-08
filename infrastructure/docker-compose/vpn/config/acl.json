@@ -1,0 +1,68 @@
+{
+  "groups": {
+    "group:admins": ["gopeen1", "manzim1"],
+    "group:faculty": [],
+    "group:students": []
+  },
+  "tagOwners": {
+    "tag:server": ["group:admins"],
+    "tag:student-container": ["group:admins", "group:faculty"],
+    "tag:monitoring": ["group:admins"]
+  },
+  "hosts": {
+    "hydra": "100.64.0.1",
+    "chimera": "100.64.0.2",
+    "cerberus": "100.64.0.3"
+  },
+  "acls": [
+    {
+      "action": "accept",
+      "src": ["group:admins"],
+      "dst": ["*:*"]
+    },
+    {
+      "action": "accept",
+      "src": ["group:faculty"],
+      "dst": [
+        "tag:student-container:*",
+        "hydra:80,443,3000",
+        "chimera:80,443,3000,11434",
+        "cerberus:80,443"
+      ]
+    },
+    {
+      "action": "accept",
+      "src": ["group:students"],
+      "dst": [
+        "hydra:80,443",
+        "chimera:80,443,11434"
+      ]
+    },
+    {
+      "action": "accept",
+      "src": ["tag:server"],
+      "dst": ["tag:server:*"]
+    },
+    {
+      "action": "accept",
+      "src": ["tag:monitoring"],
+      "dst": [
+        "tag:server:9090,9100,8081,9400"
+      ]
+    }
+  ],
+  "ssh": [
+    {
+      "action": "accept",
+      "src": ["group:admins"],
+      "dst": ["tag:server"],
+      "users": ["autogroup:nonroot", "root", "infra"]
+    },
+    {
+      "action": "accept",
+      "src": ["group:faculty"],
+      "dst": ["tag:student-container"],
+      "users": ["autogroup:nonroot"]
+    }
+  ]
+}

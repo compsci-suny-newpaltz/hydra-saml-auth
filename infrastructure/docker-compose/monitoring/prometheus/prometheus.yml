@@ -1,0 +1,120 @@
+# Prometheus Configuration for Hydra Cluster
+# Scrapes metrics from all 3 machines: Hydra, Chimera, Cerberus
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'hydra-cluster'
+    environment: 'production'
+
+# Alerting configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+# Load alert rules
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          machine: 'hydra'
+
+  # Node Exporters - Host metrics
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter-hydra:9100']
+        labels:
+          machine: 'hydra'
+          role: 'control'
+      - targets: ['chimera:9100']
+        labels:
+          machine: 'chimera'
+          role: 'inference'
+          gpu: 'true'
+      - targets: ['cerberus:9100']
+        labels:
+          machine: 'cerberus'
+          role: 'training'
+          gpu: 'true'
+
+  # cAdvisor - Container metrics
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor-hydra:8080']
+        labels:
+          machine: 'hydra'
+      - targets: ['chimera:8081']
+        labels:
+          machine: 'chimera'
+      - targets: ['cerberus:8081']
+        labels:
+          machine: 'cerberus'
+
+  # Docker daemon metrics (if enabled)
+  - job_name: 'docker'
+    static_configs:
+      - targets: ['hydra:9323']
+        labels:
+          machine: 'hydra'
+      - targets: ['chimera:9323']
+        labels:
+          machine: 'chimera'
+      - targets: ['cerberus:9323']
+        labels:
+          machine: 'cerberus'
+
+  # NVIDIA GPU metrics (dcgm-exporter on GPU nodes)
+  - job_name: 'nvidia-gpu'
+    static_configs:
+      - targets: ['chimera:9400']
+        labels:
+          machine: 'chimera'
+          gpu_type: 'rtx3090'
+      - targets: ['cerberus:9400']
+        labels:
+          machine: 'cerberus'
+          gpu_type: 'rtx5090'
+
+  # Ollama metrics
+  - job_name: 'ollama'
+    static_configs:
+      - targets: ['chimera:11434']
+        labels:
+          machine: 'chimera'
+          service: 'ollama'
+    metrics_path: /metrics
+
+  # Traefik metrics
+  - job_name: 'traefik'
+    static_configs:
+      - targets: ['traefik:8080']
+        labels:
+          machine: 'hydra'
+          service: 'traefik'
+
+  # hydra-saml-auth app metrics (if exposed)
+  - job_name: 'hydra-saml-auth'
+    static_configs:
+      - targets: ['hydra-saml-auth:3000']
+        labels:
+          machine: 'hydra'
+          service: 'saml-auth'
+    metrics_path: /metrics
+
+  # Headscale VPN metrics
+  - job_name: 'headscale'
+    static_configs:
+      - targets: ['headscale:9090']
+        labels:
+          machine: 'hydra'
+          service: 'headscale'
+    metrics_path: /metrics

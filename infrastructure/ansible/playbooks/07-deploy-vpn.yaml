@@ -1,0 +1,99 @@
+---
+# 07-deploy-vpn.yaml - Deploy Headscale VPN on Hydra
+
+- name: Deploy Headscale VPN
+  hosts: control
+  become: yes
+  tasks:
+    - name: Create VPN directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: infra
+        group: infra
+        mode: '0755'
+      loop:
+        - /home/infra/vpn
+        - /home/infra/vpn/config
+
+    - name: Copy VPN compose file
+      copy:
+        src: ../docker-compose/vpn/docker-compose.yml
+        dest: /home/infra/vpn/docker-compose.yml
+        owner: infra
+        group: infra
+        mode: '0644'
+
+    - name: Copy Headscale config
+      copy:
+        src: ../docker-compose/vpn/config/config.yaml
+        dest: /home/infra/vpn/config/config.yaml
+        owner: infra
+        group: infra
+        mode: '0644'
+
+    - name: Copy Headscale ACL
+      copy:
+        src: ../docker-compose/vpn/config/acl.json
+        dest: /home/infra/vpn/config/acl.json
+        owner: infra
+        group: infra
+        mode: '0644'
+
+    - name: Start Headscale VPN
+      shell: |
+        cd /home/infra/vpn
+        docker compose up -d
+      become_user: infra
+
+    - name: Wait for Headscale to start
+      pause:
+        seconds: 10
+
+    - name: Verify Headscale is running
+      uri:
+        url: http://localhost:8080/health
+        status_code: 200
+      register: headscale_health
+      retries: 3
+      delay: 5
+      ignore_errors: yes
+
+    - name: Print VPN URLs
+      debug:
+        msg: |
+          Headscale VPN deployed!
+          - Headscale API: http://hydra:8080
+          - Headscale UI: http://hydra:8080 (via Traefik)
+
+          To register nodes, create an auth key:
+            docker exec headscale headscale preauthkeys create --user default --expiration 24h
+
+- name: Install Tailscale on all nodes
+  hosts: all_nodes
+  become: yes
+  tasks:
+    - name: Add Tailscale GPG key
+      shell: |
+        curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/jammy.noarmor.gpg | \
+        tee /usr/share/keyrings/tailscale-archive-keyring.gpg >/dev/null
+      args:
+        creates: /usr/share/keyrings/tailscale-archive-keyring.gpg
+
+    - name: Add Tailscale repository
+      lineinfile:
+        path: /etc/apt/sources.list.d/tailscale.list
+        line: "deb [signed-by=/usr/share/keyrings/tailscale-archive-keyring.gpg] https://pkgs.tailscale.com/stable/ubuntu jammy main"
+        create: yes
+
+    - name: Install Tailscale
+      apt:
+        name: tailscale
+        state: present
+        update_cache: yes
+
+    - name: Print Tailscale registration command
+      debug:
+        msg: |
+          Tailscale installed. To connect to Headscale:
+            sudo tailscale up --login-server=https://vpn.newpaltz.edu --authkey=<AUTH_KEY>

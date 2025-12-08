@@ -66,6 +66,8 @@ infrastructure/
 | 03-deploy-hydra.yaml | Deploy Hydra services |
 | 04-deploy-chimera.yaml | Deploy Chimera services |
 | 05-deploy-cerberus.yaml | Deploy Cerberus services |
+| 06-deploy-monitoring.yaml | Deploy Prometheus, Grafana, cAdvisor |
+| 07-deploy-vpn.yaml | Deploy Headscale VPN |
 | 99-verify.yaml | Health checks |
 
 ## Terraform (VM Provisioning)
@@ -160,3 +162,91 @@ node services/expiration.js
 ```
 
 This stops expired containers and identifies those needing warning emails.
+
+## Monitoring Stack
+
+### Deploy Monitoring
+```bash
+ansible-playbook -i inventory/hosts.ini playbooks/06-deploy-monitoring.yaml
+```
+
+### Access URLs
+| Service | URL | Default Credentials |
+|---------|-----|---------------------|
+| Grafana | http://hydra:3001 | admin / changeme |
+| Prometheus | http://hydra:9090 | N/A |
+| Alertmanager | http://hydra:9093 | N/A |
+
+### Metrics Collected
+- **Node metrics**: CPU, memory, disk from all 3 machines
+- **Container metrics**: Resource usage via cAdvisor
+- **GPU metrics**: NVIDIA DCGM exporter on Chimera/Cerberus
+- **Service metrics**: Traefik, Ollama, Headscale
+
+## Headscale VPN
+
+### Deploy VPN
+```bash
+ansible-playbook -i inventory/hosts.ini playbooks/07-deploy-vpn.yaml
+```
+
+### Create Auth Key
+```bash
+docker exec headscale headscale preauthkeys create --user default --expiration 24h
+```
+
+### Connect a Node
+```bash
+sudo tailscale up --login-server=https://vpn.newpaltz.edu --authkey=<AUTH_KEY>
+```
+
+### ACL Configuration
+ACL rules are defined in `docker-compose/vpn/config/acl.json`:
+- **Admins**: Full access to all machines and ports
+- **Faculty**: Access to student containers and specific services
+- **Students**: Access to web services only
+
+## Admin & Faculty Features
+
+### Admin Dashboard
+Access at `/admin` - requires admin whitelist membership.
+
+Features:
+- Retro terminal-style interface with ASCII art
+- Live cluster stats (CPU, memory, GPU, containers)
+- View/manage all student containers
+- System logs viewer
+- User management
+
+### Faculty Portal
+Access at `/faculty` - requires faculty or admin whitelist.
+
+Features:
+- Create and manage courses
+- View enrolled students and their containers
+- Access student containers for assistance
+- Extend container expiration
+- Send expiration reminders
+
+### Whitelist Configuration
+Edit `config/whitelist.js` or set environment variables:
+```bash
+ADMIN_WHITELIST=admin1@newpaltz.edu,admin2@newpaltz.edu
+FACULTY_WHITELIST=prof1@newpaltz.edu,prof2@newpaltz.edu
+```
+
+## SSH Key Management
+
+SSH keys are deployed via Ansible during `00-prepare-nodes.yaml`.
+
+### Add Keys via Variable
+```bash
+ansible-playbook -i inventory/hosts.ini playbooks/00-prepare-nodes.yaml \
+  -e 'ssh_authorized_keys=["ssh-ed25519 AAAA... user@example.com"]'
+```
+
+### Add Keys from File
+```bash
+ansible-playbook -i inventory/hosts.ini playbooks/00-prepare-nodes.yaml \
+  -e 'ssh_keys_file=/path/to/authorized_keys'
+```

@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HYDRA // FACULTY PORTAL</title>
+  <link href="https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --green: #33ff33;
+      --green-dim: #1a8a1a;
+      --amber: #ffb000;
+      --red: #ff3333;
+      --cyan: #00ffff;
+      --magenta: #ff00ff;
+      --bg: #0a0a0a;
+      --bg-lighter: #1a1a1a;
+      --scanline: rgba(0, 255, 0, 0.03);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Share Tech Mono', 'VT323', monospace;
+      background: var(--bg);
+      color: var(--green);
+      min-height: 100vh;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: repeating-linear-gradient(0deg, transparent, transparent 2px, var(--scanline) 2px, var(--scanline) 4px);
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    .header {
+      border-bottom: 2px solid var(--cyan);
+      padding: 1rem 2rem;
+      background: var(--bg-lighter);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .header h1 {
+      color: var(--cyan);
+      text-shadow: 0 0 10px var(--cyan);
+    }
+
+    .header-info {
+      color: var(--amber);
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    .section-title {
+      font-size: 1.5rem;
+      color: var(--cyan);
+      text-shadow: 0 0 10px var(--cyan);
+      margin-bottom: 1rem;
+      border-bottom: 1px dashed var(--green-dim);
+      padding-bottom: 0.5rem;
+    }
+
+    .section-title::before {
+      content: '// ';
+      color: var(--green-dim);
+    }
+
+    .course-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .course-card {
+      border: 2px solid var(--amber);
+      padding: 1.5rem;
+      background: rgba(255, 176, 0, 0.05);
+    }
+
+    .course-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      border-bottom: 1px solid var(--amber);
+      padding-bottom: 0.5rem;
+    }
+
+    .course-code {
+      font-size: 1.5rem;
+      color: var(--amber);
+      text-shadow: 0 0 5px var(--amber);
+    }
+
+    .course-name {
+      color: var(--green);
+      margin-bottom: 0.5rem;
+    }
+
+    .course-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin: 1rem 0;
+    }
+
+    .stat-box {
+      text-align: center;
+      padding: 0.5rem;
+      border: 1px solid var(--green-dim);
+    }
+
+    .stat-value {
+      font-size: 1.5rem;
+      color: var(--cyan);
+    }
+
+    .stat-label {
+      font-size: 0.8rem;
+      color: var(--green-dim);
+    }
+
+    .student-list {
+      max-height: 300px;
+      overflow-y: auto;
+      border: 1px solid var(--green-dim);
+      margin-top: 1rem;
+    }
+
+    .student-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.75rem 1rem;
+      border-bottom: 1px dotted var(--green-dim);
+      transition: background 0.1s;
+    }
+
+    .student-row:hover {
+      background: rgba(51, 255, 51, 0.1);
+    }
+
+    .student-name {
+      color: var(--green);
+    }
+
+    .student-status {
+      font-size: 0.9rem;
+    }
+
+    .status-running { color: var(--green); }
+    .status-running::before { content: '● '; }
+    .status-stopped { color: var(--red); }
+    .status-stopped::before { content: '○ '; }
+    .status-expiring { color: var(--amber); }
+    .status-expiring::before { content: '◐ '; }
+
+    .btn {
+      font-family: inherit;
+      background: transparent;
+      border: 1px solid var(--green);
+      color: var(--green);
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+      transition: all 0.1s;
+      font-size: 0.85rem;
+      margin: 0.25rem;
+    }
+
+    .btn:hover {
+      background: var(--green);
+      color: var(--bg);
+    }
+
+    .btn-small {
+      padding: 0.25rem 0.5rem;
+      font-size: 0.75rem;
+    }
+
+    .btn-amber {
+      border-color: var(--amber);
+      color: var(--amber);
+    }
+
+    .btn-amber:hover {
+      background: var(--amber);
+      color: var(--bg);
+    }
+
+    .btn-cyan {
+      border-color: var(--cyan);
+      color: var(--cyan);
+    }
+
+    .btn-cyan:hover {
+      background: var(--cyan);
+      color: var(--bg);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 3rem;
+      border: 2px dashed var(--green-dim);
+      color: var(--green-dim);
+    }
+
+    .empty-state h3 {
+      color: var(--amber);
+      margin-bottom: 1rem;
+    }
+
+    /* Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .modal-overlay.active { display: flex; }
+
+    .modal {
+      background: var(--bg-lighter);
+      border: 2px solid var(--cyan);
+      padding: 2rem;
+      max-width: 500px;
+      width: 90%;
+    }
+
+    .modal-title {
+      color: var(--cyan);
+      margin-bottom: 1rem;
+      font-size: 1.2rem;
+    }
+
+    .form-group {
+      margin-bottom: 1rem;
+    }
+
+    .form-label {
+      display: block;
+      color: var(--green-dim);
+      margin-bottom: 0.25rem;
+    }
+
+    .form-input {
+      width: 100%;
+      padding: 0.5rem 1rem;
+      background: var(--bg);
+      border: 1px solid var(--green-dim);
+      color: var(--green);
+      font-family: inherit;
+    }
+
+    .form-input:focus {
+      outline: none;
+      border-color: var(--cyan);
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 1rem;
+    }
+
+    .nav-links a {
+      color: var(--green);
+      text-decoration: none;
+      padding: 0.5rem 1rem;
+      border: 1px solid var(--green-dim);
+    }
+
+    .nav-links a:hover {
+      border-color: var(--green);
+      background: rgba(51, 255, 51, 0.1);
+    }
+
+    @media (max-width: 768px) {
+      .course-grid { grid-template-columns: 1fr; }
+      .course-stats { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <h1>HYDRA // FACULTY PORTAL</h1>
+    <div class="nav-links">
+      <a href="/dashboard">← STUDENT VIEW</a>
+      <% if (isAdmin) { %><a href="/admin">ADMIN PANEL</a><% } %>
+      <a href="/logout">LOGOUT</a>
+    </div>
+  </header>
+
+  <div class="container">
+    <div style="margin-bottom: 2rem;">
+      <span class="header-info">FACULTY: <%= user.email %></span>
+    </div>
+
+    <div style="margin-bottom: 2rem;">
+      <button class="btn btn-cyan" onclick="showCreateCourseModal()">+ CREATE NEW COURSE</button>
+      <button class="btn" onclick="refreshData()">↻ REFRESH</button>
+    </div>
+
+    <h2 class="section-title">YOUR COURSES</h2>
+
+    <div class="course-grid" id="courses-container">
+      <div class="empty-state">
+        <h3>NO COURSES YET</h3>
+        <p>Create your first course to get started.</p>
+        <p>Students can join with the course code.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create Course Modal -->
+  <div class="modal-overlay" id="create-course-modal">
+    <div class="modal">
+      <h3 class="modal-title">CREATE NEW COURSE</h3>
+      <form id="create-course-form">
+        <div class="form-group">
+          <label class="form-label">COURSE CODE *</label>
+          <input type="text" name="code" class="form-input" placeholder="CS101-F24" required pattern="[A-Za-z0-9\-]+" title="Letters, numbers, and hyphens only">
+        </div>
+        <div class="form-group">
+          <label class="form-label">COURSE NAME *</label>
+          <input type="text" name="name" class="form-input" placeholder="Introduction to Programming" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">DEFAULT RESOURCE TIER</label>
+          <select name="defaultTier" class="form-input">
+            <option value="micro">Micro (512MB RAM, 0.25 CPU)</option>
+            <option value="tiny">Tiny (1GB RAM, 0.5 CPU)</option>
+            <option value="small" selected>Small (2GB RAM, 1 CPU)</option>
+            <option value="medium">Medium (4GB RAM, 2 CPU)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">DEFAULT TEMPLATE</label>
+          <select name="defaultTemplate" class="form-input">
+            <option value="default">Default (Base)</option>
+            <option value="java">Java Development</option>
+            <option value="python">Python Development</option>
+            <option value="webdev">Web Development</option>
+            <option value="devops">DevOps</option>
+            <option value="datascience">Data Science</option>
+          </select>
+        </div>
+        <div style="margin-top: 1.5rem; display: flex; gap: 1rem;">
+          <button type="submit" class="btn btn-cyan">CREATE COURSE</button>
+          <button type="button" class="btn" onclick="closeModal('create-course-modal')">CANCEL</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Student Container Modal -->
+  <div class="modal-overlay" id="student-modal">
+    <div class="modal">
+      <h3 class="modal-title" id="student-modal-title">STUDENT CONTAINER</h3>
+      <div id="student-modal-content"></div>
+      <div style="margin-top: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
+        <button class="btn btn-cyan" id="btn-access" onclick="accessStudentContainer()">ACCESS CONTAINER</button>
+        <button class="btn btn-amber" id="btn-extend" onclick="extendStudentContainer()">EXTEND 30 DAYS</button>
+        <button class="btn" onclick="closeModal('student-modal')">CLOSE</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentStudent = null;
+    let courses = [];
+
+    async function fetchCourses() {
+      try {
+        const res = await fetch('/api/courses');
+        const data = await res.json();
+        courses = data.courses || [];
+        renderCourses();
+      } catch (err) {
+        console.error('Failed to fetch courses:', err);
+      }
+    }
+
+    function renderCourses() {
+      const container = document.getElementById('courses-container');
+
+      if (courses.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <h3>NO COURSES YET</h3>
+            <p>Create your first course to get started.</p>
+            <p>Students can join with the course code.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = courses.map(course => `
+        <div class="course-card">
+          <div class="course-header">
+            <span class="course-code">${course.code}</span>
+            <span style="color: var(--green-dim);">${course.studentCount || 0} students</span>
+          </div>
+          <div class="course-name">${course.name}</div>
+          <div style="color: var(--green-dim); font-size: 0.85rem;">
+            Default: ${course.defaultTier || 'small'} | Template: ${course.defaultTemplate || 'default'}
+          </div>
+
+          <div class="course-stats">
+            <div class="stat-box">
+              <div class="stat-value">${course.runningContainers || 0}</div>
+              <div class="stat-label">RUNNING</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-value">${course.stoppedContainers || 0}</div>
+              <div class="stat-label">STOPPED</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-value" style="color: ${(course.expiringContainers || 0) > 0 ? 'var(--amber)' : 'var(--cyan)'};">${course.expiringContainers || 0}</div>
+              <div class="stat-label">EXPIRING</div>
+            </div>
+          </div>
+
+          <div style="margin: 1rem 0; padding: 0.5rem; background: var(--bg); border: 1px dashed var(--green-dim);">
+            <span style="color: var(--green-dim);">JOIN CODE:</span>
+            <span style="color: var(--cyan); font-size: 1.2rem;">${course.code}</span>
+            <button class="btn btn-small" onclick="copyCode('${course.code}')" style="float: right;">COPY</button>
+          </div>
+
+          <div class="student-list" id="students-${course.code}">
+            ${renderStudentList(course.students || [])}
+          </div>
+
+          <div style="margin-top: 1rem;">
+            <button class="btn btn-small" onclick="viewAllContainers('${course.code}')">VIEW ALL</button>
+            <button class="btn btn-small btn-amber" onclick="notifyExpiring('${course.code}')">NOTIFY EXPIRING</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderStudentList(students) {
+      if (!students || students.length === 0) {
+        return '<div style="padding: 1rem; color: var(--green-dim); text-align: center;">No students enrolled yet</div>';
+      }
+
+      return students.map(s => {
+        let statusClass = 'status-running';
+        if (s.containerState !== 'running') statusClass = 'status-stopped';
+        else if (s.expiringIn && s.expiringIn <= 7) statusClass = 'status-expiring';
+
+        return `
+          <div class="student-row">
+            <span class="student-name">${s.name || s.username}</span>
+            <span>
+              <span class="student-status ${statusClass}">${s.containerState?.toUpperCase() || 'NONE'}</span>
+              <button class="btn btn-small" onclick="showStudentModal('${s.username}', '${s.containerName}')">DETAILS</button>
+            </span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function showCreateCourseModal() {
+      document.getElementById('create-course-modal').classList.add('active');
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.remove('active');
+    }
+
+    document.getElementById('create-course-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      const data = Object.fromEntries(formData);
+
+      try {
+        const res = await fetch('/api/courses', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+
+        if (res.ok) {
+          closeModal('create-course-modal');
+          e.target.reset();
+          fetchCourses();
+        } else {
+          const err = await res.json();
+          alert('Error: ' + (err.error || 'Failed to create course'));
+        }
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
+    });
+
+    function showStudentModal(username, containerName) {
+      currentStudent = { username, containerName };
+      document.getElementById('student-modal-title').textContent = 'STUDENT: ' + username;
+      document.getElementById('student-modal-content').innerHTML = '<p style="color: var(--green-dim);">Loading...</p>';
+      document.getElementById('student-modal').classList.add('active');
+
+      if (containerName) {
+        fetch('/api/faculty/container/' + containerName)
+          .then(res => res.json())
+          .then(data => {
+            document.getElementById('student-modal-content').innerHTML = `
+              <div style="border: 1px solid var(--green-dim); padding: 1rem; margin-top: 1rem;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                  <span style="color: var(--green-dim);">CONTAINER</span>
+                  <span>${data.name}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                  <span style="color: var(--green-dim);">STATUS</span>
+                  <span class="${data.state === 'running' ? 'status-running' : 'status-stopped'}">${data.state?.toUpperCase()}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                  <span style="color: var(--green-dim);">MACHINE</span>
+                  <span>${data.machine || 'hydra'}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                  <span style="color: var(--green-dim);">TIER</span>
+                  <span>${data.tier}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                  <span style="color: var(--green-dim);">TEMPLATE</span>
+                  <span>${data.template || 'default'}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                  <span style="color: var(--green-dim);">EXPIRES</span>
+                  <span>${data.expiresAt ? new Date(data.expiresAt).toLocaleDateString() : 'N/A'}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                  <span style="color: var(--green-dim);">LAST LOGIN</span>
+                  <span>${data.lastLogin || 'NEVER'}</span>
+                </div>
+              </div>
+            `;
+          })
+          .catch(err => {
+            document.getElementById('student-modal-content').innerHTML = '<p style="color: var(--red);">Error loading container details</p>';
+          });
+      } else {
+        document.getElementById('student-modal-content').innerHTML = '<p style="color: var(--amber);">Student has not created a container yet.</p>';
+        document.getElementById('btn-access').style.display = 'none';
+        document.getElementById('btn-extend').style.display = 'none';
+      }
+    }
+
+    function accessStudentContainer() {
+      if (currentStudent?.containerName) {
+        window.open('/faculty/container/' + currentStudent.containerName, '_blank');
+      }
+    }
+
+    function extendStudentContainer() {
+      if (currentStudent?.containerName) {
+        fetch('/api/faculty/container/' + currentStudent.containerName + '/extend', { method: 'POST' })
+          .then(res => res.json())
+          .then(data => {
+            alert('Container extended by 30 days');
+            closeModal('student-modal');
+            fetchCourses();
+          })
+          .catch(err => alert('Error: ' + err.message));
+      }
+    }
+
+    function copyCode(code) {
+      navigator.clipboard.writeText(code);
+      alert('Course code copied: ' + code);
+    }
+
+    function viewAllContainers(courseCode) {
+      window.location.href = '/faculty/course/' + courseCode + '/containers';
+    }
+
+    function notifyExpiring(courseCode) {
+      if (confirm('Send reminder emails to students with expiring containers?')) {
+        fetch('/api/courses/' + courseCode + '/notify-expiring', { method: 'POST' })
+          .then(res => res.json())
+          .then(data => alert(data.message || 'Notifications sent'))
+          .catch(err => alert('Error: ' + err.message));
+      }
+    }
+
+    function refreshData() {
+      fetchCourses();
+    }
+
+    // Initial load
+    fetchCourses();
+  </script>
+</body>
+</html>

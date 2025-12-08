@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HYDRA // ADMIN TERMINAL</title>
+  <link href="https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --green: #33ff33;
+      --green-dim: #1a8a1a;
+      --amber: #ffb000;
+      --red: #ff3333;
+      --cyan: #00ffff;
+      --magenta: #ff00ff;
+      --bg: #0a0a0a;
+      --bg-lighter: #1a1a1a;
+      --scanline: rgba(0, 255, 0, 0.03);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Share Tech Mono', 'VT323', monospace;
+      background: var(--bg);
+      color: var(--green);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* CRT scanline effect */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        var(--scanline) 2px,
+        var(--scanline) 4px
+      );
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    /* CRT flicker */
+    @keyframes flicker {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.98; }
+    }
+
+    .terminal {
+      animation: flicker 0.15s infinite;
+    }
+
+    .header {
+      border-bottom: 2px solid var(--green);
+      padding: 1rem 2rem;
+      background: var(--bg-lighter);
+    }
+
+    .ascii-header {
+      font-family: 'VT323', monospace;
+      font-size: 0.7rem;
+      line-height: 1;
+      white-space: pre;
+      color: var(--cyan);
+      text-shadow: 0 0 10px var(--cyan);
+    }
+
+    .header-info {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 0.5rem;
+      font-size: 0.9rem;
+    }
+
+    .header-info .user {
+      color: var(--amber);
+    }
+
+    .header-info .time {
+      color: var(--green-dim);
+    }
+
+    .container {
+      display: flex;
+      min-height: calc(100vh - 120px);
+    }
+
+    .sidebar {
+      width: 250px;
+      border-right: 1px solid var(--green-dim);
+      padding: 1rem;
+      background: var(--bg-lighter);
+    }
+
+    .sidebar-item {
+      padding: 0.75rem 1rem;
+      margin: 0.25rem 0;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.1s;
+    }
+
+    .sidebar-item:hover {
+      border-color: var(--green);
+      background: rgba(51, 255, 51, 0.1);
+    }
+
+    .sidebar-item.active {
+      border-color: var(--cyan);
+      background: rgba(0, 255, 255, 0.1);
+      color: var(--cyan);
+    }
+
+    .sidebar-item::before {
+      content: '> ';
+      color: var(--green-dim);
+    }
+
+    .sidebar-item.active::before {
+      content: '█ ';
+      color: var(--cyan);
+    }
+
+    .main-content {
+      flex: 1;
+      padding: 1.5rem;
+      overflow-y: auto;
+    }
+
+    .panel {
+      display: none;
+    }
+
+    .panel.active {
+      display: block;
+    }
+
+    .section-title {
+      font-size: 1.5rem;
+      color: var(--cyan);
+      text-shadow: 0 0 10px var(--cyan);
+      margin-bottom: 1rem;
+      border-bottom: 1px dashed var(--green-dim);
+      padding-bottom: 0.5rem;
+    }
+
+    .section-title::before {
+      content: '// ';
+      color: var(--green-dim);
+    }
+
+    /* Server Stats Grid */
+    .server-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .server-card {
+      border: 1px solid var(--green-dim);
+      padding: 1rem;
+      background: var(--bg-lighter);
+    }
+
+    .server-card.offline {
+      border-color: var(--red);
+      opacity: 0.6;
+    }
+
+    .server-name {
+      font-size: 1.2rem;
+      color: var(--amber);
+      margin-bottom: 0.5rem;
+    }
+
+    .server-ascii {
+      font-family: 'VT323', monospace;
+      font-size: 0.6rem;
+      line-height: 1;
+      white-space: pre;
+      color: var(--green-dim);
+      margin-bottom: 0.5rem;
+    }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.25rem 0;
+      border-bottom: 1px dotted var(--green-dim);
+    }
+
+    .stat-label {
+      color: var(--green-dim);
+    }
+
+    .stat-value {
+      color: var(--green);
+    }
+
+    .stat-value.warning {
+      color: var(--amber);
+    }
+
+    .stat-value.critical {
+      color: var(--red);
+    }
+
+    /* Progress bars */
+    .progress-bar {
+      width: 100%;
+      height: 12px;
+      background: var(--bg);
+      border: 1px solid var(--green-dim);
+      margin: 0.25rem 0;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: var(--green);
+      transition: width 0.3s;
+    }
+
+    .progress-fill.warning {
+      background: var(--amber);
+    }
+
+    .progress-fill.critical {
+      background: var(--red);
+    }
+
+    /* GPU Stats */
+    .gpu-card {
+      border: 1px solid var(--magenta);
+      padding: 0.75rem;
+      margin: 0.5rem 0;
+      background: rgba(255, 0, 255, 0.05);
+    }
+
+    .gpu-name {
+      color: var(--magenta);
+      font-size: 0.9rem;
+    }
+
+    /* Container Table */
+    .table-container {
+      overflow-x: auto;
+      margin-top: 1rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+
+    th, td {
+      padding: 0.5rem;
+      text-align: left;
+      border-bottom: 1px solid var(--green-dim);
+    }
+
+    th {
+      color: var(--cyan);
+      background: var(--bg-lighter);
+    }
+
+    tr:hover td {
+      background: rgba(51, 255, 51, 0.1);
+    }
+
+    .status-running {
+      color: var(--green);
+    }
+
+    .status-running::before {
+      content: '● ';
+    }
+
+    .status-stopped {
+      color: var(--red);
+    }
+
+    .status-stopped::before {
+      content: '○ ';
+    }
+
+    .status-expiring {
+      color: var(--amber);
+    }
+
+    .status-expiring::before {
+      content: '◐ ';
+    }
+
+    /* Logs */
+    .log-viewer {
+      background: var(--bg);
+      border: 1px solid var(--green-dim);
+      height: 300px;
+      overflow-y: auto;
+      padding: 1rem;
+      font-size: 0.8rem;
+    }
+
+    .log-entry {
+      margin: 0.25rem 0;
+    }
+
+    .log-timestamp {
+      color: var(--green-dim);
+    }
+
+    .log-info {
+      color: var(--cyan);
+    }
+
+    .log-warn {
+      color: var(--amber);
+    }
+
+    .log-error {
+      color: var(--red);
+    }
+
+    /* Buttons */
+    .btn {
+      font-family: inherit;
+      background: transparent;
+      border: 1px solid var(--green);
+      color: var(--green);
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+      transition: all 0.1s;
+      font-size: 0.9rem;
+    }
+
+    .btn:hover {
+      background: var(--green);
+      color: var(--bg);
+    }
+
+    .btn-danger {
+      border-color: var(--red);
+      color: var(--red);
+    }
+
+    .btn-danger:hover {
+      background: var(--red);
+      color: var(--bg);
+    }
+
+    .btn-warn {
+      border-color: var(--amber);
+      color: var(--amber);
+    }
+
+    .btn-warn:hover {
+      background: var(--amber);
+      color: var(--bg);
+    }
+
+    /* Course View */
+    .course-card {
+      border: 1px solid var(--amber);
+      padding: 1rem;
+      margin: 1rem 0;
+      background: rgba(255, 176, 0, 0.05);
+    }
+
+    .course-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+
+    .course-code {
+      font-size: 1.2rem;
+      color: var(--amber);
+    }
+
+    .course-stats {
+      color: var(--green-dim);
+    }
+
+    /* Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal {
+      background: var(--bg-lighter);
+      border: 2px solid var(--cyan);
+      padding: 2rem;
+      max-width: 600px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+
+    .modal-title {
+      color: var(--cyan);
+      margin-bottom: 1rem;
+      font-size: 1.2rem;
+    }
+
+    /* Filter/Search */
+    .search-box {
+      background: var(--bg);
+      border: 1px solid var(--green-dim);
+      color: var(--green);
+      padding: 0.5rem 1rem;
+      font-family: inherit;
+      width: 300px;
+      margin-bottom: 1rem;
+    }
+
+    .search-box::placeholder {
+      color: var(--green-dim);
+    }
+
+    .search-box:focus {
+      outline: none;
+      border-color: var(--cyan);
+    }
+
+    /* Blinking cursor */
+    @keyframes blink {
+      0%, 50% { opacity: 1; }
+      51%, 100% { opacity: 0; }
+    }
+
+    .cursor {
+      animation: blink 1s infinite;
+    }
+
+    /* Loading */
+    .loading {
+      color: var(--green-dim);
+    }
+
+    .loading::after {
+      content: '...';
+      animation: dots 1.5s infinite;
+    }
+
+    @keyframes dots {
+      0%, 20% { content: '.'; }
+      40% { content: '..'; }
+      60%, 100% { content: '...'; }
+    }
+
+    /* Responsive */
+    @media (max-width: 1024px) {
+      .server-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        flex-direction: column;
+      }
+
+      .sidebar {
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid var(--green-dim);
+      }
+
+      .server-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .ascii-header {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body class="terminal">
+  <header class="header">
+    <pre class="ascii-header">
+██╗  ██╗██╗   ██╗██████╗ ██████╗  █████╗     ████████╗███████╗██████╗ ███╗   ███╗██╗███╗   ██╗ █████╗ ██╗
+██║  ██║╚██╗ ██╔╝██╔══██╗██╔══██╗██╔══██╗    ╚══██╔══╝██╔════╝██╔══██╗████╗ ████║██║████╗  ██║██╔══██╗██║
+███████║ ╚████╔╝ ██║  ██║██████╔╝███████║       ██║   █████╗  ██████╔╝██╔████╔██║██║██╔██╗ ██║███████║██║
+██╔══██║  ╚██╔╝  ██║  ██║██╔══██╗██╔══██║       ██║   ██╔══╝  ██╔══██╗██║╚██╔╝██║██║██║╚██╗██║██╔══██║██║
+██║  ██║   ██║   ██████╔╝██║  ██║██║  ██║       ██║   ███████╗██║  ██║██║ ╚═╝ ██║██║██║ ╚████║██║  ██║███████╗
+╚═╝  ╚═╝   ╚═╝   ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝       ╚═╝   ╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝╚══════╝
+    </pre>
+    <div class="header-info">
+      <span class="user">USER: <%= user.email %> | ROLE: <%= role.toUpperCase() %></span>
+      <span class="time" id="clock">--:--:--</span>
+    </div>
+  </header>
+
+  <div class="container">
+    <nav class="sidebar">
+      <div class="sidebar-item active" data-panel="overview">SYSTEM OVERVIEW</div>
+      <div class="sidebar-item" data-panel="containers">ALL CONTAINERS</div>
+      <div class="sidebar-item" data-panel="courses">COURSES</div>
+      <div class="sidebar-item" data-panel="logs">SYSTEM LOGS</div>
+      <div class="sidebar-item" data-panel="users">USER MANAGEMENT</div>
+      <hr style="border-color: var(--green-dim); margin: 1rem 0;">
+      <div class="sidebar-item" onclick="window.location.href='/dashboard'">← STUDENT VIEW</div>
+      <div class="sidebar-item" onclick="window.location.href='/logout'">LOGOUT</div>
+    </nav>
+
+    <main class="main-content">
+      <!-- OVERVIEW PANEL -->
+      <section id="panel-overview" class="panel active">
+        <h2 class="section-title">CLUSTER STATUS</h2>
+
+        <div class="server-grid" id="server-grid">
+          <!-- Hydra -->
+          <div class="server-card" id="server-hydra">
+            <pre class="server-ascii">
+    /\
+   /  \
+  /    \
+ /______\
+|  CTRL  |
+            </pre>
+            <div class="server-name">HYDRA [CONTROL]</div>
+            <div class="stat-row">
+              <span class="stat-label">STATUS</span>
+              <span class="stat-value status-running" id="hydra-status">ONLINE</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">CPU</span>
+              <span class="stat-value" id="hydra-cpu">--</span>
+            </div>
+            <div class="progress-bar"><div class="progress-fill" id="hydra-cpu-bar" style="width: 0%"></div></div>
+            <div class="stat-row">
+              <span class="stat-label">MEM</span>
+              <span class="stat-value" id="hydra-mem">--</span>
+            </div>
+            <div class="progress-bar"><div class="progress-fill" id="hydra-mem-bar" style="width: 0%"></div></div>
+            <div class="stat-row">
+              <span class="stat-label">DISK</span>
+              <span class="stat-value" id="hydra-disk">--</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">CONTAINERS</span>
+              <span class="stat-value" id="hydra-containers">--</span>
+            </div>
+          </div>
+
+          <!-- Chimera -->
+          <div class="server-card" id="server-chimera">
+            <pre class="server-ascii">
+   ___
+  /GPU\
+ /3x   \
+/3090   \
+|_______|
+            </pre>
+            <div class="server-name">CHIMERA [INFERENCE]</div>
+            <div class="stat-row">
+              <span class="stat-label">STATUS</span>
+              <span class="stat-value status-running" id="chimera-status">ONLINE</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">CPU</span>
+              <span class="stat-value" id="chimera-cpu">--</span>
+            </div>
+            <div class="progress-bar"><div class="progress-fill" id="chimera-cpu-bar" style="width: 0%"></div></div>
+            <div class="stat-row">
+              <span class="stat-label">MEM</span>
+              <span class="stat-value" id="chimera-mem">--</span>
+            </div>
+            <div class="progress-bar"><div class="progress-fill" id="chimera-mem-bar" style="width: 0%"></div></div>
+            <div class="gpu-card" id="chimera-gpu-0">
+              <div class="gpu-name">GPU 0: RTX 3090</div>
+              <div class="stat-row">
+                <span class="stat-label">VRAM</span>
+                <span class="stat-value" id="chimera-gpu-0-mem">--</span>
+              </div>
+              <div class="stat-row">
+                <span class="stat-label">TEMP</span>
+                <span class="stat-value" id="chimera-gpu-0-temp">--</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Cerberus -->
+          <div class="server-card" id="server-cerberus">
+            <pre class="server-ascii">
+   ___
+  /GPU\
+ /2x   \
+/5090   \
+|_______|
+            </pre>
+            <div class="server-name">CERBERUS [TRAINING]</div>
+            <div class="stat-row">
+              <span class="stat-label">STATUS</span>
+              <span class="stat-value status-running" id="cerberus-status">ONLINE</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">CPU</span>
+              <span class="stat-value" id="cerberus-cpu">--</span>
+            </div>
+            <div class="progress-bar"><div class="progress-fill" id="cerberus-cpu-bar" style="width: 0%"></div></div>
+            <div class="stat-row">
+              <span class="stat-label">MEM</span>
+              <span class="stat-value" id="cerberus-mem">--</span>
+            </div>
+            <div class="progress-bar"><div class="progress-fill" id="cerberus-mem-bar" style="width: 0%"></div></div>
+            <div class="gpu-card" id="cerberus-gpu-0">
+              <div class="gpu-name">GPU 0: RTX 5090</div>
+              <div class="stat-row">
+                <span class="stat-label">VRAM</span>
+                <span class="stat-value" id="cerberus-gpu-0-mem">--</span>
+              </div>
+              <div class="stat-row">
+                <span class="stat-label">TEMP</span>
+                <span class="stat-value" id="cerberus-gpu-0-temp">--</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <h2 class="section-title">QUICK STATS</h2>
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem;">
+          <div class="server-card">
+            <div class="stat-label">TOTAL CONTAINERS</div>
+            <div class="stat-value" style="font-size: 2rem;" id="total-containers">--</div>
+          </div>
+          <div class="server-card">
+            <div class="stat-label">ACTIVE STUDENTS</div>
+            <div class="stat-value" style="font-size: 2rem;" id="active-students">--</div>
+          </div>
+          <div class="server-card">
+            <div class="stat-label">ACTIVE COURSES</div>
+            <div class="stat-value" style="font-size: 2rem;" id="active-courses">--</div>
+          </div>
+          <div class="server-card">
+            <div class="stat-label">EXPIRING SOON</div>
+            <div class="stat-value warning" style="font-size: 2rem;" id="expiring-soon">--</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- CONTAINERS PANEL -->
+      <section id="panel-containers" class="panel">
+        <h2 class="section-title">ALL CONTAINERS</h2>
+        <input type="text" class="search-box" id="container-search" placeholder="SEARCH: student name, course, status...">
+        <div class="table-container">
+          <table id="containers-table">
+            <thead>
+              <tr>
+                <th>CONTAINER</th>
+                <th>OWNER</th>
+                <th>MACHINE</th>
+                <th>TIER</th>
+                <th>COURSE</th>
+                <th>STATUS</th>
+                <th>EXPIRES</th>
+                <th>ACTIONS</th>
+              </tr>
+            </thead>
+            <tbody id="containers-tbody">
+              <tr><td colspan="8" class="loading">LOADING CONTAINERS</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- COURSES PANEL -->
+      <section id="panel-courses" class="panel">
+        <h2 class="section-title">COURSE MANAGEMENT</h2>
+        <button class="btn" onclick="showCreateCourseModal()">+ CREATE COURSE</button>
+        <div id="courses-list">
+          <p class="loading">LOADING COURSES</p>
+        </div>
+      </section>
+
+      <!-- LOGS PANEL -->
+      <section id="panel-logs" class="panel">
+        <h2 class="section-title">SYSTEM LOGS</h2>
+        <div style="margin-bottom: 1rem;">
+          <select id="log-filter" class="search-box" style="width: 200px;">
+            <option value="all">ALL LOGS</option>
+            <option value="info">INFO</option>
+            <option value="warn">WARNINGS</option>
+            <option value="error">ERRORS</option>
+          </select>
+          <button class="btn" onclick="refreshLogs()">REFRESH</button>
+        </div>
+        <div class="log-viewer" id="log-viewer">
+          <div class="log-entry"><span class="log-timestamp">[--:--:--]</span> <span class="log-info">AWAITING LOG DATA...</span></div>
+        </div>
+      </section>
+
+      <!-- USERS PANEL -->
+      <section id="panel-users" class="panel">
+        <h2 class="section-title">USER MANAGEMENT</h2>
+        <h3 style="color: var(--amber); margin: 1rem 0;">ADMIN WHITELIST</h3>
+        <div id="admin-list">
+          <% if (typeof admins !== 'undefined') { %>
+            <% admins.forEach(admin => { %>
+              <div style="padding: 0.5rem; border-bottom: 1px dotted var(--green-dim);">
+                <%= admin %>
+              </div>
+            <% }); %>
+          <% } %>
+        </div>
+        <h3 style="color: var(--cyan); margin: 1rem 0;">FACULTY WHITELIST</h3>
+        <div id="faculty-list">
+          <% if (typeof faculty !== 'undefined') { %>
+            <% faculty.forEach(f => { %>
+              <div style="padding: 0.5rem; border-bottom: 1px dotted var(--green-dim);">
+                <%= f %>
+              </div>
+            <% }); %>
+          <% } %>
+        </div>
+        <p style="color: var(--green-dim); margin-top: 1rem; font-size: 0.8rem;">
+          NOTE: Whitelist is managed via config/whitelist.js or ADMIN_WHITELIST / FACULTY_WHITELIST env vars
+        </p>
+      </section>
+    </main>
+  </div>
+
+  <!-- Modal for container details -->
+  <div class="modal-overlay" id="container-modal">
+    <div class="modal">
+      <h3 class="modal-title" id="modal-container-name">CONTAINER DETAILS</h3>
+      <div id="modal-content"></div>
+      <div style="margin-top: 1rem; display: flex; gap: 1rem;">
+        <button class="btn" onclick="accessContainer()">ACCESS CONTAINER</button>
+        <button class="btn btn-warn" onclick="restartContainer()">RESTART</button>
+        <button class="btn btn-danger" onclick="stopContainer()">STOP</button>
+        <button class="btn" onclick="closeModal()">CLOSE</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create Course Modal -->
+  <div class="modal-overlay" id="course-modal">
+    <div class="modal">
+      <h3 class="modal-title">CREATE NEW COURSE</h3>
+      <form id="create-course-form">
+        <div style="margin-bottom: 1rem;">
+          <label style="display: block; color: var(--green-dim); margin-bottom: 0.25rem;">COURSE CODE</label>
+          <input type="text" name="code" class="search-box" style="width: 100%;" placeholder="CS101-F24" required>
+        </div>
+        <div style="margin-bottom: 1rem;">
+          <label style="display: block; color: var(--green-dim); margin-bottom: 0.25rem;">COURSE NAME</label>
+          <input type="text" name="name" class="search-box" style="width: 100%;" placeholder="Intro to Programming" required>
+        </div>
+        <div style="margin-bottom: 1rem;">
+          <label style="display: block; color: var(--green-dim); margin-bottom: 0.25rem;">DEFAULT TIER</label>
+          <select name="defaultTier" class="search-box" style="width: 100%;">
+            <option value="micro">Micro (512MB)</option>
+            <option value="tiny">Tiny (1GB)</option>
+            <option value="small" selected>Small (2GB)</option>
+            <option value="medium">Medium (4GB)</option>
+          </select>
+        </div>
+        <div style="display: flex; gap: 1rem;">
+          <button type="submit" class="btn">CREATE</button>
+          <button type="button" class="btn" onclick="closeCourseModal()">CANCEL</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // Clock
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('clock').textContent = now.toLocaleTimeString('en-US', { hour12: false });
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Panel navigation
+    document.querySelectorAll('.sidebar-item[data-panel]').forEach(item => {
+      item.addEventListener('click', () => {
+        // Update sidebar
+        document.querySelectorAll('.sidebar-item').forEach(i => i.classList.remove('active'));
+        item.classList.add('active');
+
+        // Update panels
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+        document.getElementById('panel-' + item.dataset.panel).classList.add('active');
+      });
+    });
+
+    // Fetch server stats
+    async function fetchServerStats() {
+      try {
+        const res = await fetch('/api/machines/stats');
+        const data = await res.json();
+
+        if (data.machines) {
+          let totalContainers = 0;
+
+          data.machines.forEach(machine => {
+            const prefix = machine.name.toLowerCase();
+            const statusEl = document.getElementById(prefix + '-status');
+            const cpuEl = document.getElementById(prefix + '-cpu');
+            const cpuBar = document.getElementById(prefix + '-cpu-bar');
+            const memEl = document.getElementById(prefix + '-mem');
+            const memBar = document.getElementById(prefix + '-mem-bar');
+            const containersEl = document.getElementById(prefix + '-containers');
+
+            if (machine.online) {
+              if (statusEl) statusEl.textContent = 'ONLINE';
+              if (statusEl) statusEl.className = 'stat-value status-running';
+
+              const cpuPercent = machine.cpu?.percent || 0;
+              if (cpuEl) cpuEl.textContent = cpuPercent.toFixed(1) + '%';
+              if (cpuBar) {
+                cpuBar.style.width = cpuPercent + '%';
+                cpuBar.className = 'progress-fill' + (cpuPercent > 80 ? ' critical' : cpuPercent > 60 ? ' warning' : '');
+              }
+
+              const memPercent = machine.memory?.percent || 0;
+              if (memEl) memEl.textContent = memPercent.toFixed(1) + '%';
+              if (memBar) {
+                memBar.style.width = memPercent + '%';
+                memBar.className = 'progress-fill' + (memPercent > 85 ? ' critical' : memPercent > 70 ? ' warning' : '');
+              }
+
+              if (containersEl) containersEl.textContent = machine.containers || 0;
+              totalContainers += machine.containers || 0;
+
+              // GPU stats
+              if (machine.gpu && machine.gpu.length > 0) {
+                machine.gpu.forEach((gpu, idx) => {
+                  const gpuMemEl = document.getElementById(prefix + '-gpu-' + idx + '-mem');
+                  const gpuTempEl = document.getElementById(prefix + '-gpu-' + idx + '-temp');
+                  if (gpuMemEl) gpuMemEl.textContent = gpu.memoryUsed + ' / ' + gpu.memoryTotal;
+                  if (gpuTempEl) {
+                    gpuTempEl.textContent = gpu.temperature + '°C';
+                    gpuTempEl.className = 'stat-value' + (gpu.temperature > 80 ? ' critical' : gpu.temperature > 70 ? ' warning' : '');
+                  }
+                });
+              }
+            } else {
+              if (statusEl) {
+                statusEl.textContent = 'OFFLINE';
+                statusEl.className = 'stat-value status-stopped';
+              }
+              document.getElementById('server-' + prefix)?.classList.add('offline');
+            }
+          });
+
+          document.getElementById('total-containers').textContent = totalContainers;
+        }
+      } catch (err) {
+        console.error('Failed to fetch stats:', err);
+      }
+    }
+
+    // Fetch containers
+    async function fetchContainers() {
+      try {
+        const res = await fetch('/api/admin/containers');
+        const data = await res.json();
+
+        const tbody = document.getElementById('containers-tbody');
+        tbody.innerHTML = '';
+
+        let studentCount = 0;
+        let expiringCount = 0;
+
+        if (data.containers && data.containers.length > 0) {
+          data.containers.forEach(c => {
+            const now = new Date();
+            const expires = new Date(c.expiresAt);
+            const daysLeft = Math.ceil((expires - now) / (1000 * 60 * 60 * 24));
+
+            let statusClass = 'status-running';
+            if (c.state !== 'running') statusClass = 'status-stopped';
+            else if (daysLeft <= 7) {
+              statusClass = 'status-expiring';
+              expiringCount++;
+            }
+
+            if (c.state === 'running') studentCount++;
+
+            const row = document.createElement('tr');
+            row.innerHTML = `
+              <td>${c.name}</td>
+              <td>${c.owner || '--'}</td>
+              <td>${c.machine || 'hydra'}</td>
+              <td>${c.tier || 'micro'}</td>
+              <td>${c.course || '--'}</td>
+              <td class="${statusClass}">${c.state.toUpperCase()}</td>
+              <td>${daysLeft > 0 ? daysLeft + 'd' : 'EXPIRED'}</td>
+              <td>
+                <button class="btn" onclick="showContainerDetails('${c.name}')">DETAILS</button>
+              </td>
+            `;
+            tbody.appendChild(row);
+          });
+
+          document.getElementById('active-students').textContent = studentCount;
+          document.getElementById('expiring-soon').textContent = expiringCount;
+        } else {
+          tbody.innerHTML = '<tr><td colspan="8">NO CONTAINERS FOUND</td></tr>';
+        }
+      } catch (err) {
+        console.error('Failed to fetch containers:', err);
+        document.getElementById('containers-tbody').innerHTML = '<tr><td colspan="8" class="log-error">ERROR FETCHING CONTAINERS</td></tr>';
+      }
+    }
+
+    // Fetch courses
+    async function fetchCourses() {
+      try {
+        const res = await fetch('/api/courses');
+        const data = await res.json();
+
+        const list = document.getElementById('courses-list');
+
+        if (data.courses && data.courses.length > 0) {
+          list.innerHTML = '';
+          document.getElementById('active-courses').textContent = data.courses.length;
+
+          data.courses.forEach(course => {
+            const card = document.createElement('div');
+            card.className = 'course-card';
+            card.innerHTML = `
+              <div class="course-header">
+                <span class="course-code">${course.code}</span>
+                <span class="course-stats">${course.studentCount || 0} students</span>
+              </div>
+              <div style="color: var(--green);">${course.name}</div>
+              <div style="color: var(--green-dim); font-size: 0.8rem; margin-top: 0.5rem;">
+                Instructor: ${course.instructor} | Default Tier: ${course.defaultTier || 'small'}
+              </div>
+              <div style="margin-top: 0.5rem;">
+                <button class="btn" onclick="viewCourseContainers('${course.code}')">VIEW CONTAINERS</button>
+              </div>
+            `;
+            list.appendChild(card);
+          });
+        } else {
+          list.innerHTML = '<p style="color: var(--green-dim);">NO COURSES FOUND. CREATE ONE TO GET STARTED.</p>';
+          document.getElementById('active-courses').textContent = '0';
+        }
+      } catch (err) {
+        console.error('Failed to fetch courses:', err);
+      }
+    }
+
+    // Container search filter
+    document.getElementById('container-search')?.addEventListener('input', (e) => {
+      const search = e.target.value.toLowerCase();
+      document.querySelectorAll('#containers-tbody tr').forEach(row => {
+        const text = row.textContent.toLowerCase();
+        row.style.display = text.includes(search) ? '' : 'none';
+      });
+    });
+
+    // Modal functions
+    let currentContainer = null;
+
+    function showContainerDetails(name) {
+      currentContainer = name;
+      document.getElementById('modal-container-name').textContent = 'CONTAINER: ' + name;
+      document.getElementById('modal-content').innerHTML = '<p class="loading">LOADING DETAILS</p>';
+      document.getElementById('container-modal').classList.add('active');
+
+      // Fetch details
+      fetch('/api/admin/containers/' + name)
+        .then(res => res.json())
+        .then(data => {
+          document.getElementById('modal-content').innerHTML = `
+            <div class="stat-row"><span class="stat-label">OWNER</span><span class="stat-value">${data.owner || '--'}</span></div>
+            <div class="stat-row"><span class="stat-label">STATE</span><span class="stat-value">${data.state}</span></div>
+            <div class="stat-row"><span class="stat-label">MACHINE</span><span class="stat-value">${data.machine || 'hydra'}</span></div>
+            <div class="stat-row"><span class="stat-label">TIER</span><span class="stat-value">${data.tier}</span></div>
+            <div class="stat-row"><span class="stat-label">TEMPLATE</span><span class="stat-value">${data.template || 'default'}</span></div>
+            <div class="stat-row"><span class="stat-label">CREATED</span><span class="stat-value">${data.createdAt}</span></div>
+            <div class="stat-row"><span class="stat-label">EXPIRES</span><span class="stat-value">${data.expiresAt}</span></div>
+            <div class="stat-row"><span class="stat-label">LAST LOGIN</span><span class="stat-value">${data.lastLogin || 'NEVER'}</span></div>
+          `;
+        })
+        .catch(err => {
+          document.getElementById('modal-content').innerHTML = '<p class="log-error">ERROR LOADING DETAILS</p>';
+        });
+    }
+
+    function closeModal() {
+      document.getElementById('container-modal').classList.remove('active');
+      currentContainer = null;
+    }
+
+    function accessContainer() {
+      if (currentContainer) {
+        window.open('/admin/container/' + currentContainer, '_blank');
+      }
+    }
+
+    function restartContainer() {
+      if (currentContainer && confirm('RESTART CONTAINER: ' + currentContainer + '?')) {
+        fetch('/api/admin/containers/' + currentContainer + '/restart', { method: 'POST' })
+          .then(() => {
+            alert('RESTART INITIATED');
+            fetchContainers();
+          })
+          .catch(err => alert('ERROR: ' + err.message));
+      }
+    }
+
+    function stopContainer() {
+      if (currentContainer && confirm('STOP CONTAINER: ' + currentContainer + '?')) {
+        fetch('/api/admin/containers/' + currentContainer + '/stop', { method: 'POST' })
+          .then(() => {
+            alert('CONTAINER STOPPED');
+            fetchContainers();
+          })
+          .catch(err => alert('ERROR: ' + err.message));
+      }
+    }
+
+    // Course modal
+    function showCreateCourseModal() {
+      document.getElementById('course-modal').classList.add('active');
+    }
+
+    function closeCourseModal() {
+      document.getElementById('course-modal').classList.remove('active');
+    }
+
+    document.getElementById('create-course-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      const data = Object.fromEntries(formData);
+
+      try {
+        const res = await fetch('/api/courses', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+
+        if (res.ok) {
+          closeCourseModal();
+          fetchCourses();
+        } else {
+          alert('ERROR CREATING COURSE');
+        }
+      } catch (err) {
+        alert('ERROR: ' + err.message);
+      }
+    });
+
+    function viewCourseContainers(code) {
+      document.querySelector('[data-panel="containers"]').click();
+      document.getElementById('container-search').value = code;
+      document.getElementById('container-search').dispatchEvent(new Event('input'));
+    }
+
+    // Logs
+    async function refreshLogs() {
+      try {
+        const filter = document.getElementById('log-filter').value;
+        const res = await fetch('/api/admin/logs?filter=' + filter);
+        const data = await res.json();
+
+        const viewer = document.getElementById('log-viewer');
+        viewer.innerHTML = '';
+
+        if (data.logs && data.logs.length > 0) {
+          data.logs.forEach(log => {
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `<span class="log-timestamp">[${log.timestamp}]</span> <span class="log-${log.level}">${log.message}</span>`;
+            viewer.appendChild(entry);
+          });
+        } else {
+          viewer.innerHTML = '<div class="log-entry"><span class="log-info">NO LOGS AVAILABLE</span></div>';
+        }
+      } catch (err) {
+        console.error('Failed to fetch logs:', err);
+      }
+    }
+
+    // Initial load
+    fetchServerStats();
+    fetchContainers();
+    fetchCourses();
+
+    // Auto-refresh stats
+    setInterval(fetchServerStats, 30000);
+  </script>
+</body>
+</html>

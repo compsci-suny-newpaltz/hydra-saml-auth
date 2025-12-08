@@ -65,11 +65,38 @@ function getGpuMachines() {
     return Object.values(MACHINES).filter(m => m.hasGpu);
 }
 
+// Docker client cache
+const dockerClients = {};
+
+// Get Docker client for a machine
+function getDocker(machineId) {
+    const Docker = require('dockerode');
+    const machine = MACHINES[machineId] || MACHINES[DEFAULT_MACHINE];
+
+    if (!dockerClients[machineId]) {
+        if (machine.isLocal) {
+            dockerClients[machineId] = new Docker({ socketPath: '/var/run/docker.sock' });
+        } else {
+            const host = machine.dockerHost;
+            if (host.startsWith('tcp://')) {
+                const [, hostPort] = host.replace('tcp://', '').split(':');
+                const [hostname, port] = hostPort ? [host.replace('tcp://', '').split(':')[0], parseInt(hostPort.split(':')[1] || '2375')] : [host.replace('tcp://', ''), 2375];
+                dockerClients[machineId] = new Docker({ host: hostname.split(':')[0], port: parseInt(hostname.split(':')[1]) || 2375 });
+            } else {
+                dockerClients[machineId] = new Docker({ socketPath: host });
+            }
+        }
+    }
+
+    return dockerClients[machineId];
+}
+
 module.exports = {
     MACHINES,
     DEFAULT_MACHINE,
     getMachine,
     isValidMachine,
     getAllMachines,
-    getGpuMachines
+    getGpuMachines,
+    getDocker
 };

@@ -1,0 +1,93 @@
+# Headscale Configuration
+# https://github.com/juanfont/headscale/blob/main/config-example.yaml
+
+server_url: https://vpn.newpaltz.edu
+listen_addr: 0.0.0.0:8080
+metrics_listen_addr: 0.0.0.0:9090
+
+# gRPC settings
+grpc_listen_addr: 0.0.0.0:50443
+grpc_allow_insecure: false
+
+# Private key for the Tailscale control protocol
+private_key_path: /var/lib/headscale/private.key
+
+# Noise protocol keys
+noise:
+  private_key_path: /var/lib/headscale/noise_private.key
+
+# IP prefixes for the Tailscale network
+prefixes:
+  v4: 100.64.0.0/10
+  v6: fd7a:115c:a1e0::/48
+
+# DERP (relay) configuration
+derp:
+  server:
+    enabled: true
+    region_id: 999
+    region_code: "hydra"
+    region_name: "Hydra Cluster"
+    stun_listen_addr: 0.0.0.0:3478
+  urls: []
+  paths: []
+  auto_update_enabled: true
+  update_frequency: 24h
+
+# Database
+database:
+  type: sqlite
+  sqlite:
+    path: /var/lib/headscale/db.sqlite
+
+# Ephemeral node cleanup
+ephemeral_node_inactivity_timeout: 30m
+
+# DNS configuration
+dns:
+  magic_dns: true
+  base_domain: hydra.internal
+  nameservers:
+    global:
+      - 8.8.8.8
+      - 8.8.4.4
+  search_domains: []
+  extra_records: []
+
+# Disable default route by default (users opt-in)
+disable_check_updates: false
+
+# Log settings
+log:
+  format: text
+  level: info
+
+# ACL policy file
+policy:
+  mode: file
+  path: /etc/headscale/acl.json
+
+# OIDC authentication (Azure AD)
+oidc:
+  only_start_if_oidc_is_available: false
+  issuer: "https://login.microsoftonline.com/{tenant-id}/v2.0"
+  client_id: ""
+  client_secret_path: ""
+  scope:
+    - openid
+    - profile
+    - email
+  # Map OIDC claims to headscale user
+  strip_email_domain: true
+  # Allowed domains
+  allowed_domains:
+    - newpaltz.edu
+  # Allowed users (empty = all authenticated users)
+  allowed_users: []
+  # Allowed groups (Azure AD groups)
+  allowed_groups: []
+
+# CLI settings
+cli:
+  timeout: 5s
+  insecure: false

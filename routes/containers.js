@@ -119,8 +119,16 @@ router.get('/templates', (req, res) => {
     return res.json({ success: true, templates: getAllTemplates() });
 });
 
-// Calculate expiration date (30 days from now)
+// Calculate expiration date (30 days from last login)
+// This gets called on container init, which happens after SSO login
 function calculateExpiration() {
+    const expDate = new Date();
+    expDate.setDate(expDate.getDate() + 30);
+    return expDate.toISOString();
+}
+
+// Update expiration on login (called when user accesses dashboard)
+function refreshExpirationOnLogin() {
     const expDate = new Date();
     expDate.setDate(expDate.getDate() + 30);
     return expDate.toISOString();
@@ -950,6 +958,77 @@ router.post('/renew', async (req, res) => {
     } catch (err) {
         console.error('[containers] renew error:', err);
         return res.status(500).json({ success: false, message: 'Failed to renew container' });
+    }
+});
+
+// Refresh expiration on login (auto-extend 30 days from last SSO login)
+// POST /dashboard/api/containers/refresh-expiration
+router.post('/refresh-expiration', async (req, res) => {
+    try {
+        if (!req.isAuthenticated?.() || !req.user?.email) {
+            return res.status(401).json({ success: false, message: 'Not authenticated' });
+        }
+
+        const username = String(req.user.email).split('@')[0];
+        const containerName = `student-${username}`;
+        const result = await getStudentContainer(username);
+
+        if (!result) {
+            // No container yet, nothing to refresh
+            return res.json({ success: true, message: 'No container to refresh' });
+        }
+
+        const { container, info } = result;
+        const oldLabels = info.Config.Labels || {};
+
+        // Calculate new expiration (30 days from now/login)
+        const newExpiresAt = refreshExpirationOnLogin();
+        const lastLogin = new Date().toISOString();
+
+        // Update labels without recreating container (just update expiration)
+        const newLabels = { ...oldLabels };
+        newLabels['hydra.expires_at'] = newExpiresAt;
+        newLabels['hydra.last_login'] = lastLogin;
+
+        // Recreate container with updated expiration
+        const wasRunning = info.State.Running;
+
+        if (wasRunning) {
+            await container.stop({ t: 10 });
+        }
+        await container.remove({ force: true });
+
+        const newContainer = await docker.createContainer({
+            name: containerName,
+            Hostname: containerName,
+            Image: info.Config.Image,
+            Labels: newLabels,
+            Env: info.Config.Env,
+            Cmd: info.Config.Cmd,
+            HostConfig: info.HostConfig
+        });
+
+        if (wasRunning) {
+            await newContainer.start();
+
+            const studentNetworkName = `hydra-student-${username}`;
+            try {
+                const studentNet = docker.getNetwork(studentNetworkName);
+                await studentNet.connect({ Container: containerName });
+            } catch (e) {
+                console.error('[containers] Failed to reconnect to student network:', e);
+            }
+        }
+
+        return res.json({
+            success: true,
+            expiresAt: newExpiresAt,
+            lastLogin,
+            message: 'Expiration refreshed (30 days from login)'
+        });
+    } catch (err) {
+        console.error('[containers] refresh-expiration error:', err);
+        return res.status(500).json({ success: false, message: 'Failed to refresh expiration' });
     }
 });
 

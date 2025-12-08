@@ -1,0 +1,75 @@
+# Alertmanager Configuration
+
+global:
+  resolve_timeout: 5m
+  # SMTP settings for email alerts
+  smtp_smarthost: 'smtp.newpaltz.edu:587'
+  smtp_from: 'hydra-alerts@newpaltz.edu'
+  smtp_auth_username: '${SMTP_USERNAME}'
+  smtp_auth_password: '${SMTP_PASSWORD}'
+  smtp_require_tls: true
+
+# Route tree
+route:
+  group_by: ['alertname', 'machine', 'severity']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: 'default-receiver'
+  routes:
+    # Critical alerts - immediate notification
+    - match:
+        severity: critical
+      receiver: 'critical-receiver'
+      group_wait: 10s
+      repeat_interval: 1h
+
+    # GPU alerts - special handling
+    - match:
+        job: nvidia-gpu
+      receiver: 'gpu-receiver'
+      group_wait: 1m
+
+    # Student container alerts - lower priority
+    - match_re:
+        alertname: 'StudentContainer.*'
+      receiver: 'student-receiver'
+      group_wait: 1h
+      repeat_interval: 24h
+
+# Receivers
+receivers:
+  - name: 'default-receiver'
+    email_configs:
+      - to: 'gopeen1@newpaltz.edu,manzim1@newpaltz.edu'
+        send_resolved: true
+
+  - name: 'critical-receiver'
+    email_configs:
+      - to: 'gopeen1@newpaltz.edu,manzim1@newpaltz.edu'
+        send_resolved: true
+        headers:
+          Subject: '[CRITICAL] Hydra Cluster Alert: {{ .GroupLabels.alertname }}'
+
+  - name: 'gpu-receiver'
+    email_configs:
+      - to: 'gopeen1@newpaltz.edu,manzim1@newpaltz.edu'
+        send_resolved: true
+        headers:
+          Subject: '[GPU] Hydra Cluster Alert: {{ .GroupLabels.alertname }}'
+
+  - name: 'student-receiver'
+    email_configs:
+      - to: 'gopeen1@newpaltz.edu'
+        send_resolved: false
+        headers:
+          Subject: '[Info] Student Container Alert'
+
+# Inhibition rules
+inhibit_rules:
+  # If node is down, suppress all other alerts from that node
+  - source_match:
+      alertname: 'NodeDown'
+    target_match_re:
+      alertname: '.*'
+    equal: ['machine']

@@ -43,3 +43,26 @@
         create: yes
         mode: '0440'
         validate: '/usr/sbin/visudo -cf %s'
+
+    - name: Create .ssh directory for infra
+      file:
+        path: /home/infra/.ssh
+        state: directory
+        owner: infra
+        group: infra
+        mode: '0700'
+
+    - name: Deploy authorized SSH keys
+      authorized_key:
+        user: infra
+        state: present
+        key: "{{ item }}"
+      loop: "{{ ssh_authorized_keys }}"
+      when: ssh_authorized_keys is defined
+
+    - name: Deploy authorized SSH keys from file
+      authorized_key:
+        user: infra
+        state: present
+        key: "{{ lookup('file', ssh_keys_file) }}"
+      when: ssh_keys_file is defined and ssh_keys_file | length > 0

@@ -1,0 +1,159 @@
+---
+# 06-deploy-monitoring.yaml - Deploy monitoring stack
+# Prometheus, Grafana, cAdvisor on Hydra
+# Node exporters on all nodes
+
+- name: Deploy monitoring exporters on all nodes
+  hosts: all_nodes
+  become: yes
+  tasks:
+    - name: Create monitoring directory
+      file:
+        path: /home/infra/monitoring
+        state: directory
+        owner: infra
+        group: infra
+        mode: '0755'
+
+    - name: Copy remote exporters compose file
+      copy:
+        src: ../docker-compose/monitoring/remote-exporters.yml
+        dest: /home/infra/monitoring/docker-compose.yml
+        owner: infra
+        group: infra
+        mode: '0644'
+      when: inventory_hostname != 'hydra'
+
+    - name: Start remote exporters (Chimera/Cerberus)
+      shell: |
+        cd /home/infra/monitoring
+        docker compose up -d node-exporter cadvisor
+      when: inventory_hostname != 'hydra'
+      become_user: infra
+
+    - name: Start DCGM exporter on GPU nodes
+      shell: |
+        cd /home/infra/monitoring
+        docker compose up -d dcgm-exporter
+      when: inventory_hostname in groups['gpu']
+      become_user: infra
+
+- name: Deploy full monitoring stack on Hydra
+  hosts: control
+  become: yes
+  tasks:
+    - name: Create monitoring directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: infra
+        group: infra
+        mode: '0755'
+      loop:
+        - /home/infra/monitoring
+        - /home/infra/monitoring/prometheus
+        - /home/infra/monitoring/alertmanager
+        - /home/infra/monitoring/grafana
+        - /home/infra/monitoring/grafana/provisioning
+        - /home/infra/monitoring/grafana/provisioning/datasources
+        - /home/infra/monitoring/grafana/provisioning/dashboards
+        - /home/infra/monitoring/grafana/dashboards
+
+    - name: Copy monitoring stack compose file
+      copy:
+        src: ../docker-compose/monitoring/docker-compose.yml
+        dest: /home/infra/monitoring/docker-compose.yml
+        owner: infra
+        group: infra
+        mode: '0644'
+
+    - name: Copy Prometheus config
+      copy:
+        src: ../docker-compose/monitoring/prometheus/prometheus.yml
+        dest: /home/infra/monitoring/prometheus/prometheus.yml
+        owner: infra
+        group: infra
+        mode: '0644'
+
+    - name: Copy Prometheus alerts
+      copy:
+        src: ../docker-compose/monitoring/prometheus/alerts.yml
+        dest: /home/infra/monitoring/prometheus/alerts.yml
+        owner: infra
+        group: infra
+        mode: '0644'
+
+    - name: Copy Alertmanager config
+      copy:
+        src: ../docker-compose/monitoring/alertmanager/alertmanager.yml
+        dest: /home/infra/monitoring/alertmanager/alertmanager.yml
+        owner: infra
+        group: infra
+        mode: '0644'
+
+    - name: Copy Grafana datasources
+      copy:
+        src: ../docker-compose/monitoring/grafana/provisioning/datasources/datasources.yml
+        dest: /home/infra/monitoring/grafana/provisioning/datasources/datasources.yml
+        owner: infra
+        group: infra
+        mode: '0644'
+
+    - name: Copy Grafana dashboard config
+      copy:
+        src: ../docker-compose/monitoring/grafana/provisioning/dashboards/dashboards.yml
+        dest: /home/infra/monitoring/grafana/provisioning/dashboards/dashboards.yml
+        owner: infra
+        group: infra
+        mode: '0644'
+
+    - name: Copy Grafana dashboards
+      copy:
+        src: ../docker-compose/monitoring/grafana/dashboards/
+        dest: /home/infra/monitoring/grafana/dashboards/
+        owner: infra
+        group: infra
+        mode: '0644'
+
+    - name: Copy environment file
+      copy:
+        src: ../docker-compose/monitoring/.env.example
+        dest: /home/infra/monitoring/.env
+        owner: infra
+        group: infra
+        mode: '0600'
+        force: no  # Don't overwrite if exists
+
+    - name: Start monitoring stack
+      shell: |
+        cd /home/infra/monitoring
+        docker compose up -d
+      become_user: infra
+
+    - name: Wait for services to start
+      pause:
+        seconds: 10
+
+    - name: Verify Prometheus is running
+      uri:
+        url: http://localhost:9090/-/healthy
+        status_code: 200
+      register: prom_health
+      retries: 3
+      delay: 5
+
+    - name: Verify Grafana is running
+      uri:
+        url: http://localhost:3001/api/health
+        status_code: 200
+      register: grafana_health
+      retries: 3
+      delay: 5
+
+    - name: Print monitoring URLs
+      debug:
+        msg: |
+          Monitoring stack deployed!
+          - Prometheus: http://hydra:9090
+          - Grafana: http://hydra:3001 (default: admin/changeme)
+          - Alertmanager: http://hydra:9093

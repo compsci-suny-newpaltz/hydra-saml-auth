@@ -1,0 +1,56 @@
+# Headscale VPN - Self-hosted Tailscale control server
+# Deploy on Hydra (control plane)
+
+version: '3.8'
+
+services:
+  headscale:
+    image: headscale/headscale:latest
+    container_name: headscale
+    restart: unless-stopped
+    ports:
+      - "8080:8080"    # HTTP API
+      - "9090:9090"    # Metrics
+      - "50443:443"    # DERP over HTTPS
+    volumes:
+      - ./config:/etc/headscale
+      - headscale_data:/var/lib/headscale
+    command: serve
+    environment:
+      - TZ=America/New_York
+    networks:
+      - vpn
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.headscale.rule=Host(`vpn.${DOMAIN}`)"
+      - "traefik.http.routers.headscale.entrypoints=websecure"
+      - "traefik.http.routers.headscale.tls=true"
+      - "traefik.http.services.headscale.loadbalancer.server.port=8080"
+      # DERP route
+      - "traefik.http.routers.headscale-derp.rule=Host(`vpn.${DOMAIN}`) && PathPrefix(`/derp`)"
+      - "traefik.http.routers.headscale-derp.entrypoints=websecure"
+      - "traefik.http.routers.headscale-derp.tls=true"
+
+  # Headscale Web UI (optional admin interface)
+  headscale-ui:
+    image: ghcr.io/gurucomputing/headscale-ui:latest
+    container_name: headscale-ui
+    restart: unless-stopped
+    environment:
+      - HEADSCALE_URL=https://vpn.${DOMAIN}
+    networks:
+      - vpn
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.headscale-ui.rule=Host(`vpn-admin.${DOMAIN}`)"
+      - "traefik.http.routers.headscale-ui.entrypoints=websecure"
+      - "traefik.http.routers.headscale-ui.tls=true"
+      - "traefik.http.routers.headscale-ui.middlewares=auth-admin@file"
+      - "traefik.http.services.headscale-ui.loadbalancer.server.port=80"
+
+networks:
+  vpn:
+    driver: bridge
+
+volumes:
+  headscale_data:
