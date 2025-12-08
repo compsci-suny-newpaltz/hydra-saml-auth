@@ -4,6 +4,18 @@
  */
 
 const RESOURCE_TIERS = {
+    micro: {
+        id: 'micro',
+        name: 'Micro',
+        label: 'Micro (512MB RAM, 0.25 CPU)',
+        description: 'Minimal environment for basic tasks',
+        memory: 512 * 1024 * 1024,  // 512MB in bytes
+        memoryLabel: '512MB',
+        cpus: 0.25,
+        nanoCpus: 0.25e9,
+        storage: '2g',
+        storageBytes: 2 * 1024 * 1024 * 1024
+    },
     tiny: {
         id: 'tiny',
         name: 'Tiny',
@@ -55,7 +67,7 @@ const RESOURCE_TIERS = {
 };
 
 // Default tier for new containers
-const DEFAULT_TIER = 'small';
+const DEFAULT_TIER = 'micro';
 
 // Get tier by ID, returns default if not found
 function getTier(tierId) {

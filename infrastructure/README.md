@@ -99,6 +99,7 @@ ansible-playbook -i inventory/hosts.ini playbooks/00-prepare-nodes.yaml
 
 | Tier | RAM | CPU | Use Case |
 |------|-----|-----|----------|
+| Micro | 512MB | 0.25 | Basic tasks (default) |
 | Tiny | 1GB | 0.5 | Light scripting |
 | Small | 2GB | 1 | Single project |
 | Medium | 4GB | 2 | Multi-project, databases |
