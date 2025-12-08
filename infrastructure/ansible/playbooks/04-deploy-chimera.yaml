@@ -1,0 +1,56 @@
+---
+# 04-deploy-chimera.yaml - Deploy Chimera services (Ollama, OpenWebUI)
+- name: Deploy Chimera services
+  hosts: inference
+  become: yes
+  vars:
+    repo_path: /home/infra/hydra-saml-auth
+    repo_url: https://github.com/compsci-suny-newpaltz/hydra-saml-auth.git
+  tasks:
+    - name: Clone hydra-saml-auth repository
+      git:
+        repo: "{{ repo_url }}"
+        dest: "{{ repo_path }}"
+        update: yes
+        force: yes
+      become_user: infra
+
+    - name: Check if .env file exists
+      stat:
+        path: "{{ repo_path }}/.env"
+      register: env_file
+
+    - name: Warn if .env file missing
+      debug:
+        msg: "WARNING: .env file not found - you need to create {{ repo_path }}/.env"
+      when: not env_file.stat.exists
+
+    - name: Create external Docker volume for OpenWebUI
+      command: docker volume create comp_open-webui
+      ignore_errors: yes
+
+    - name: Create models directory
+      file:
+        path: /models
+        state: directory
+        mode: '0755'
+      become: yes
+
+    - name: Deploy Chimera services
+      shell: |
+        cd {{ repo_path }}/chimera_docker
+        docker compose up -d
+      become: yes
+
+    - name: Wait for Ollama to start
+      pause:
+        seconds: 10
+
+    - name: Verify GPU access in Ollama
+      command: docker exec ollama nvidia-smi
+      register: gpu_check
+      failed_when: "'NVIDIA-SMI' not in gpu_check.stdout"
+
+    - name: Display GPU status
+      debug:
+        msg: "GPU access verified - {{ gpu_count }} GPUs available"

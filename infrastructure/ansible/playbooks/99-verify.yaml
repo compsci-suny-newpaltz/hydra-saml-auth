@@ -1,0 +1,80 @@
+---
+# 99-verify.yaml - Verify all services are running correctly
+- name: Verify cluster health
+  hosts: all_nodes
+  become: yes
+  tasks:
+    - name: Check Docker is running
+      systemd:
+        name: docker
+        state: started
+      check_mode: yes
+      register: docker_status
+
+    - name: Get running containers
+      command: docker ps --format "{{ '{{' }}.Names{{ '}}' }}: {{ '{{' }}.Status{{ '}}' }}"
+      register: containers
+      changed_when: false
+
+    - name: Display running containers
+      debug:
+        msg: "{{ containers.stdout_lines }}"
+
+- name: Verify GPU nodes
+  hosts: gpu
+  become: yes
+  tasks:
+    - name: Check NVIDIA driver
+      command: nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
+      register: gpu_info
+      changed_when: false
+
+    - name: Display GPU info
+      debug:
+        msg: "GPUs: {{ gpu_info.stdout_lines }}"
+
+- name: Verify Chimera services
+  hosts: inference
+  become: yes
+  tasks:
+    - name: Check Ollama GPU access
+      command: docker exec ollama nvidia-smi
+      register: ollama_gpu
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Ollama GPU status
+      debug:
+        msg: "{{ 'Ollama has GPU access' if ollama_gpu.rc == 0 else 'WARNING: Ollama cannot access GPU!' }}"
+
+    - name: Check OpenWebUI health
+      uri:
+        url: http://localhost:3000/health
+        method: GET
+        status_code: [200, 302]
+      register: webui_health
+      ignore_errors: yes
+
+    - name: OpenWebUI status
+      debug:
+        msg: "{{ 'OpenWebUI is healthy' if webui_health.status == 200 else 'WARNING: OpenWebUI may not be ready' }}"
+
+    - name: Check Ollama API
+      uri:
+        url: http://localhost:11434/api/tags
+        method: GET
+        status_code: 200
+      register: ollama_api
+      ignore_errors: yes
+
+    - name: Ollama API status
+      debug:
+        msg: "{{ 'Ollama API is responding' if ollama_api.status == 200 else 'WARNING: Ollama API not responding' }}"
+
+- name: Final summary
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Deployment complete
+      debug:
+        msg: "Verification complete. Services: Hydra (Traefik, SAML, n8n), Chimera (Ollama, OpenWebUI), Cerberus (training). Access: http://chimera:3000 (WebUI), http://chimera:11434 (Ollama), http://hydra:5678 (n8n)"

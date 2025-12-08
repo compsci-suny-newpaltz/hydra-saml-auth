@@ -1,0 +1,45 @@
+---
+# 00-prepare-nodes.yaml - Base system preparation
+- name: Prepare all nodes
+  hosts: all_nodes
+  become: yes
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install base packages
+      apt:
+        name:
+          - curl
+          - wget
+          - git
+          - htop
+          - vim
+          - net-tools
+          - jq
+          - unzip
+          - ca-certificates
+          - gnupg
+          - lsb-release
+        state: present
+
+    - name: Set timezone
+      timezone:
+        name: America/New_York
+
+    - name: Ensure infra user exists
+      user:
+        name: infra
+        groups: sudo
+        append: yes
+        shell: /bin/bash
+
+    - name: Allow infra sudo without password
+      lineinfile:
+        path: /etc/sudoers.d/infra
+        line: 'infra ALL=(ALL) NOPASSWD:ALL'
+        create: yes
+        mode: '0440'
+        validate: '/usr/sbin/visudo -cf %s'

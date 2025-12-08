@@ -1,0 +1,54 @@
+---
+# 03-deploy-hydra.yaml - Deploy Hydra services
+- name: Deploy Hydra services
+  hosts: control
+  become: yes
+  become_user: infra
+  vars:
+    repo_path: /home/infra/hydra-saml-auth
+    repo_url: https://github.com/compsci-suny-newpaltz/hydra-saml-auth.git
+  tasks:
+    - name: Clone hydra-saml-auth repository
+      git:
+        repo: "{{ repo_url }}"
+        dest: "{{ repo_path }}"
+        update: yes
+        force: yes
+      become_user: infra
+
+    - name: Check if .env file exists
+      stat:
+        path: "{{ repo_path }}/.env"
+      register: env_file
+
+    - name: Warn if .env file missing
+      debug:
+        msg: "WARNING: .env file not found at {{ repo_path }}/.env - you need to create it!"
+      when: not env_file.stat.exists
+
+    - name: Deploy Hydra services
+      shell: |
+        cd {{ repo_path }}
+        docker compose up -d
+      become: yes
+      when: env_file.stat.exists
+
+    - name: Clone traefik-n8n repository
+      git:
+        repo: https://github.com/compsci-suny-newpaltz/traefik-n8n.git
+        dest: /home/infra/traefik-n8n
+        update: yes
+        force: yes
+      become_user: infra
+
+    - name: Check if traefik-n8n .env file exists
+      stat:
+        path: /home/infra/traefik-n8n/.env
+      register: n8n_env_file
+
+    - name: Deploy traefik-n8n services
+      shell: |
+        cd /home/infra/traefik-n8n
+        docker compose up -d
+      become: yes
+      when: n8n_env_file.stat.exists

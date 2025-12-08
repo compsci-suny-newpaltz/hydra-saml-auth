@@ -1,0 +1,29 @@
+---
+# 05-deploy-cerberus.yaml - Deploy Cerberus services (training node)
+- name: Deploy Cerberus services
+  hosts: training
+  become: yes
+  vars:
+    repo_path: /home/infra/hydra-saml-auth
+    repo_url: https://github.com/compsci-suny-newpaltz/hydra-saml-auth.git
+  tasks:
+    - name: Clone hydra-saml-auth repository
+      git:
+        repo: "{{ repo_url }}"
+        dest: "{{ repo_path }}"
+        update: yes
+        force: yes
+      become_user: infra
+
+    - name: Verify GPU access
+      command: nvidia-smi
+      register: gpu_check
+
+    - name: Display GPU status
+      debug:
+        msg: "Cerberus GPU status: {{ gpu_count }} x {{ gpu_type }} available"
+
+    # Future: Add training service deployment here
+    - name: Note about training services
+      debug:
+        msg: "Cerberus is ready for training workloads. Add docker-compose services as needed."

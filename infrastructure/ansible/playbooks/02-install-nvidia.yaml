@@ -1,0 +1,81 @@
+---
+# 02-install-nvidia.yaml - Install NVIDIA drivers and container toolkit (GPU nodes only)
+- name: Install NVIDIA drivers and container toolkit
+  hosts: gpu
+  become: yes
+  tasks:
+    - name: Check if NVIDIA driver is installed
+      command: nvidia-smi
+      register: nvidia_check
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Install NVIDIA driver (if not present)
+      apt:
+        name: nvidia-driver-550
+        state: present
+        update_cache: yes
+      when: nvidia_check.rc != 0
+      notify: Reboot if needed
+
+    - name: Add NVIDIA container toolkit GPG key
+      shell: |
+        curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+      args:
+        creates: /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+
+    - name: Add NVIDIA container toolkit repository
+      shell: |
+        curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
+          sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+          tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+      args:
+        creates: /etc/apt/sources.list.d/nvidia-container-toolkit.list
+
+    - name: Install NVIDIA container toolkit
+      apt:
+        name: nvidia-container-toolkit
+        state: present
+        update_cache: yes
+
+    - name: Configure NVIDIA container runtime for Docker
+      command: nvidia-ctk runtime configure --runtime=docker
+      notify: Restart Docker
+
+    - name: Enable GPU persistence mode
+      command: nvidia-smi -pm 1
+      ignore_errors: yes
+
+    - name: Create GPU persistence systemd service
+      copy:
+        content: |
+          [Unit]
+          Description=NVIDIA GPU Persistence Mode
+          After=nvidia-persistenced.service
+
+          [Service]
+          Type=oneshot
+          ExecStart=/usr/bin/nvidia-smi -pm 1
+          RemainAfterExit=yes
+
+          [Install]
+          WantedBy=multi-user.target
+        dest: /etc/systemd/system/nvidia-persistence.service
+        mode: '0644'
+
+    - name: Enable GPU persistence service
+      systemd:
+        name: nvidia-persistence
+        enabled: yes
+        daemon_reload: yes
+
+  handlers:
+    - name: Restart Docker
+      systemd:
+        name: docker
+        state: restarted
+
+    - name: Reboot if needed
+      reboot:
+        msg: "Rebooting for NVIDIA driver installation"
+        reboot_timeout: 300
