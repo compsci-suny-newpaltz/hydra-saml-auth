@@ -41,12 +41,19 @@ infrastructure/
 │   ├── inventory/hosts.ini     # Node IPs and groups
 │   ├── playbooks/              # Deployment playbooks
 │   └── roles/                  # Reusable Ansible roles
+├── terraform/
+│   ├── main.tf                 # Proxmox VM provisioning
+│   ├── variables.tf            # Configuration variables
+│   ├── modules/proxmox-vm/     # VM module
+│   └── templates/              # Generated Ansible inventory
 ├── scripts/
 │   ├── deploy-all.sh           # Full cluster deployment
 │   ├── deploy-node.sh          # Single node deployment
 │   ├── fix-gpu.sh              # Quick GPU fix
 │   └── health-check.sh         # Verify all services
-└── docker-compose/             # All compose files (reference)
+└── docs/
+    ├── NETWORK_ARCHITECTURE.md # Network and routing details
+    └── SERVICE_LOCATIONS.md    # Service paths and configs
 ```
 
 ## Playbooks
@@ -60,6 +67,66 @@ infrastructure/
 | 04-deploy-chimera.yaml | Deploy Chimera services |
 | 05-deploy-cerberus.yaml | Deploy Cerberus services |
 | 99-verify.yaml | Health checks |
+
+## Terraform (VM Provisioning)
+
+Provision VMs on Proxmox from scratch:
+
+```bash
+cd infrastructure/terraform
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars with your Proxmox credentials and network settings
+terraform init
+terraform plan
+terraform apply
+```
+
+This creates:
+- Hydra (8 cores, 32GB RAM, 100GB disk)
+- Chimera (16 cores, 64GB RAM, 500GB disk, GPU passthrough)
+- Cerberus (16 cores, 64GB RAM, 1TB disk, GPU passthrough)
+
+After VM creation, use Ansible to configure them:
+```bash
+cd ../ansible
+ansible-playbook -i inventory/hosts.ini playbooks/00-prepare-nodes.yaml
+# ... continue with other playbooks
+```
+
+## Student Container Features
+
+### Resource Tiers
+
+| Tier | RAM | CPU | Use Case |
+|------|-----|-----|----------|
+| Tiny | 1GB | 0.5 | Light scripting |
+| Small | 2GB | 1 | Single project |
+| Medium | 4GB | 2 | Multi-project, databases |
+| Large | 8GB | 4 | Heavy compilation, ML |
+
+### Workspace Templates
+
+| Template | Tools | Extensions |
+|----------|-------|------------|
+| Java | OpenJDK 21, Maven, Gradle | Java Pack, Spring Boot |
+| Python | Python 3.11, Jupyter, Poetry | Python, Pylance, Jupyter |
+| Web Dev | Node.js, Vue, React, PHP | ESLint, Prettier, Volar |
+| DevOps | Docker, kubectl, Terraform | Docker, Kubernetes, YAML |
+| Data Science | pandas, numpy, scikit-learn | Jupyter, Data Wrangler |
+
+### API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| /api/containers/init | POST | Create container |
+| /api/containers/tiers | GET | List resource tiers |
+| /api/containers/templates | GET | List workspace templates |
+| /api/containers/renew | POST | Extend expiration (30 days) |
+| /api/containers/tier | POST | Change resource tier |
+| /api/machines/stats | GET | Live resource stats for all machines |
+| /api/courses | GET/POST | Course management (faculty) |
+| /api/courses/:code/join | POST | Join course (students) |
+| /api/shares | GET/POST | Create shareable links |
 
 ## Troubleshooting
 
@@ -80,3 +147,11 @@ sudo docker exec ollama nvidia-smi
 ```bash
 ./scripts/health-check.sh
 ```
+
+### Container Expiration
+Containers expire after 30 days. Run the expiration check:
+```bash
+node services/expiration.js
+```
+
+This stops expired containers and identifies those needing warning emails.

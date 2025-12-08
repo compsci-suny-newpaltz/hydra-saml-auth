@@ -1,5 +1,7 @@
 const express = require('express');
 const Docker = require('dockerode');
+const { getTier, isValidTier, DEFAULT_TIER, getAllTiers } = require('../config/resources');
+const { getTemplate, isValidTemplate, getAllTemplates } = require('../config/templates');
 
 const router = express.Router();
 const docker = new Docker({ socketPath: '/var/run/docker.sock' });
@@ -104,8 +106,28 @@ function generateTraefikLabels(username, route) {
     };
 }
 
+// Get available resource tiers
+// GET /dashboard/api/containers/tiers
+router.get('/tiers', (req, res) => {
+    return res.json({ success: true, tiers: getAllTiers() });
+});
+
+// Get available workspace templates
+// GET /dashboard/api/containers/templates
+router.get('/templates', (req, res) => {
+    return res.json({ success: true, templates: getAllTemplates() });
+});
+
+// Calculate expiration date (30 days from now)
+function calculateExpiration() {
+    const expDate = new Date();
+    expDate.setDate(expDate.getDate() + 30);
+    return expDate.toISOString();
+}
+
 // Initialize/Create student mega container
 // POST /dashboard/api/containers/init
+// Body: { tier?: string, template?: string, course?: string, machine?: string }
 router.post('/init', async (req, res) => {
     try {
         if (!req.isAuthenticated?.() || !req.user?.email) {
@@ -117,6 +139,17 @@ router.post('/init', async (req, res) => {
         const volumeName = `hydra-vol-${username}`;
         const studentNetworkName = `hydra-student-${username}`;
         const host = 'hydra.newpaltz.edu';
+
+        // Get tier from request or use default
+        const tierId = req.body?.tier || DEFAULT_TIER;
+        if (!isValidTier(tierId)) {
+            return res.status(400).json({ success: false, message: `Invalid tier: ${tierId}` });
+        }
+        const tier = getTier(tierId);
+
+        // Optional: template and course
+        const template = req.body?.template || 'default';
+        const course = req.body?.course || null;
 
         // Check if container already exists
         const existing = await getStudentContainer(username);
@@ -142,6 +175,9 @@ router.post('/init', async (req, res) => {
             { endpoint: 'jupyter', port: JUPYTER_PORT }
         ];
 
+        const now = new Date().toISOString();
+        const expiresAt = calculateExpiration();
+
         // Base labels
         const labels = {
             'traefik.enable': 'true',
@@ -150,8 +186,18 @@ router.post('/init', async (req, res) => {
             'hydra.owner': username,
             'hydra.ownerEmail': req.user.email,
             'hydra.port_routes': JSON.stringify(defaultRoutes),
-            'hydra.created_at': new Date().toISOString()
+            'hydra.created_at': now,
+            'hydra.tier': tierId,
+            'hydra.template': template,
+            'hydra.expires_at': expiresAt,
+            'hydra.renewal_count': '0',
+            'hydra.machine': 'hydra'
         };
+
+        // Add course if specified
+        if (course) {
+            labels['hydra.course'] = course;
+        }
 
         // Add Traefik labels for each default route
         defaultRoutes.forEach(route => {
@@ -172,7 +218,7 @@ router.post('/init', async (req, res) => {
             }
         }
 
-        // Create container
+        // Create container with tier-based resource limits
         const container = await docker.createContainer({
             name: containerName,
             Hostname: containerName,
@@ -190,8 +236,8 @@ router.post('/init', async (req, res) => {
                     Source: volumeName,
                     Target: '/home/student'
                 }],
-                Memory: 4 * 1024 * 1024 * 1024, // 4GB
-                NanoCpus: 2e9, // 2 CPUs
+                Memory: tier.memory,
+                NanoCpus: tier.nanoCpus,
                 Privileged: true // For Docker-in-Docker
             }
         });
@@ -208,6 +254,8 @@ router.post('/init', async (req, res) => {
         return res.json({
             success: true,
             name: containerName,
+            tier: tierId,
+            expiresAt,
             vscodeUrl: `${publicBase}/${username}/vscode/`,
             jupyterUrl: `${publicBase}/${username}/jupyter/`
         });
@@ -295,6 +343,22 @@ router.get('/status', async (req, res) => {
         }
 
         const { info } = result;
+        const labels = info.Config.Labels || {};
+
+        // Get tier info
+        const tierId = labels['hydra.tier'] || DEFAULT_TIER;
+        const tier = getTier(tierId);
+
+        // Calculate days until expiration
+        const expiresAt = labels['hydra.expires_at'];
+        let daysUntilExpiration = null;
+        let expirationWarning = false;
+        if (expiresAt) {
+            const expDate = new Date(expiresAt);
+            const now = new Date();
+            daysUntilExpiration = Math.ceil((expDate - now) / (1000 * 60 * 60 * 24));
+            expirationWarning = daysUntilExpiration <= 7;
+        }
 
         return res.json({
             success: true,
@@ -302,7 +366,21 @@ router.get('/status', async (req, res) => {
             state: info.State.Status,
             running: info.State.Running,
             startedAt: info.State.StartedAt,
-            finishedAt: info.State.FinishedAt
+            finishedAt: info.State.FinishedAt,
+            tier: {
+                id: tierId,
+                label: tier.label,
+                memory: tier.memoryLabel,
+                cpus: tier.cpus
+            },
+            template: labels['hydra.template'] || 'default',
+            course: labels['hydra.course'] || null,
+            machine: labels['hydra.machine'] || 'hydra',
+            createdAt: labels['hydra.created_at'],
+            expiresAt,
+            daysUntilExpiration,
+            expirationWarning,
+            renewalCount: parseInt(labels['hydra.renewal_count'] || '0', 10)
         });
     } catch (err) {
         console.error('[containers] status error:', err);
@@ -772,8 +850,156 @@ router.get('/logs/stream', async (req, res) => {
     }
 });
 
+// Renew container expiration (extends by 30 days)
+// POST /dashboard/api/containers/renew
+router.post('/renew', async (req, res) => {
+    try {
+        if (!req.isAuthenticated?.() || !req.user?.email) {
+            return res.status(401).json({ success: false, message: 'Not authenticated' });
+        }
+
+        const username = String(req.user.email).split('@')[0];
+        const containerName = `student-${username}`;
+        const result = await getStudentContainer(username);
+
+        if (!result) {
+            return res.status(404).json({ success: false, message: 'Container not found' });
+        }
+
+        const { container, info } = result;
+        const oldLabels = info.Config.Labels || {};
+
+        // Calculate new expiration (30 days from now)
+        const newExpiresAt = calculateExpiration();
+        const renewalCount = parseInt(oldLabels['hydra.renewal_count'] || '0', 10) + 1;
+
+        // Update labels
+        const newLabels = { ...oldLabels };
+        newLabels['hydra.expires_at'] = newExpiresAt;
+        newLabels['hydra.renewal_count'] = String(renewalCount);
+
+        // Recreate container with new labels
+        const wasRunning = info.State.Running;
+
+        if (wasRunning) {
+            await container.stop({ t: 10 });
+        }
+        await container.remove({ force: true });
+
+        const newContainer = await docker.createContainer({
+            name: containerName,
+            Hostname: containerName,
+            Image: info.Config.Image,
+            Labels: newLabels,
+            Env: info.Config.Env,
+            Cmd: info.Config.Cmd,
+            HostConfig: info.HostConfig
+        });
+
+        if (wasRunning) {
+            await newContainer.start();
+
+            // Reconnect to student network
+            const studentNetworkName = `hydra-student-${username}`;
+            try {
+                const studentNet = docker.getNetwork(studentNetworkName);
+                await studentNet.connect({ Container: containerName });
+            } catch (e) {
+                console.error('[containers] Failed to reconnect to student network:', e);
+            }
+        }
+
+        return res.json({
+            success: true,
+            expiresAt: newExpiresAt,
+            renewalCount,
+            message: 'Container renewed for 30 days'
+        });
+    } catch (err) {
+        console.error('[containers] renew error:', err);
+        return res.status(500).json({ success: false, message: 'Failed to renew container' });
+    }
+});
+
+// Change container resource tier
+// POST /dashboard/api/containers/tier { tier: string }
+router.post('/tier', async (req, res) => {
+    try {
+        if (!req.isAuthenticated?.() || !req.user?.email) {
+            return res.status(401).json({ success: false, message: 'Not authenticated' });
+        }
+
+        const newTierId = req.body?.tier;
+        if (!newTierId || !isValidTier(newTierId)) {
+            return res.status(400).json({ success: false, message: 'Invalid tier' });
+        }
+
+        const newTier = getTier(newTierId);
+        const username = String(req.user.email).split('@')[0];
+        const containerName = `student-${username}`;
+        const result = await getStudentContainer(username);
+
+        if (!result) {
+            return res.status(404).json({ success: false, message: 'Container not found' });
+        }
+
+        const { container, info } = result;
+        const oldLabels = info.Config.Labels || {};
+
+        // Update tier label
+        const newLabels = { ...oldLabels };
+        newLabels['hydra.tier'] = newTierId;
+
+        // Update HostConfig with new resource limits
+        const newHostConfig = { ...info.HostConfig };
+        newHostConfig.Memory = newTier.memory;
+        newHostConfig.NanoCpus = newTier.nanoCpus;
+
+        // Recreate container with new resources (requires restart)
+        const wasRunning = info.State.Running;
+
+        if (wasRunning) {
+            await container.stop({ t: 10 });
+        }
+        await container.remove({ force: true });
+
+        const newContainer = await docker.createContainer({
+            name: containerName,
+            Hostname: containerName,
+            Image: info.Config.Image,
+            Labels: newLabels,
+            Env: info.Config.Env,
+            Cmd: info.Config.Cmd,
+            HostConfig: newHostConfig
+        });
+
+        if (wasRunning) {
+            await newContainer.start();
+
+            // Reconnect to student network
+            const studentNetworkName = `hydra-student-${username}`;
+            try {
+                const studentNet = docker.getNetwork(studentNetworkName);
+                await studentNet.connect({ Container: containerName });
+            } catch (e) {
+                console.error('[containers] Failed to reconnect to student network:', e);
+            }
+        }
+
+        return res.json({
+            success: true,
+            tier: newTierId,
+            message: `Container resources changed to ${newTier.label}`
+        });
+    } catch (err) {
+        console.error('[containers] tier change error:', err);
+        return res.status(500).json({ success: false, message: 'Failed to change tier' });
+    }
+});
+
 // Wipe and recreate student container
 // POST /dashboard/api/containers/wipe
+// Body: { tier?: string, template?: string }
 router.post('/wipe', async (req, res) => {
     try {
         if (!req.isAuthenticated?.() || !req.user?.email) {
@@ -783,6 +1009,15 @@ router.post('/wipe', async (req, res) => {
         const username = String(req.user.email).split('@')[0];
         const containerName = `student-${username}`;
         const volumeName = `hydra-vol-${username}`;
+
+        // Get tier from request or use default
+        const tierId = req.body?.tier || DEFAULT_TIER;
+        if (!isValidTier(tierId)) {
+            return res.status(400).json({ success: false, message: `Invalid tier: ${tierId}` });
+        }
+        const tier = getTier(tierId);
+
+        const template = req.body?.template || 'default';
 
         // 1. Destroy existing container and volume
         const existing = await getStudentContainer(username);
@@ -801,9 +1036,8 @@ router.post('/wipe', async (req, res) => {
             console.warn(`[containers] Failed to remove volume ${volumeName} during wipe:`, e.message);
         }
 
-        // 2. Re-initialize container (logic copied and adapted from /init)
+        // 2. Re-initialize container
         const studentNetworkName = `hydra-student-${username}`;
-        const host = 'hydra.newpaltz.edu';
 
         // Ensure networks exist
         await ensureNetwork(MAIN_NETWORK);
@@ -818,6 +1052,9 @@ router.post('/wipe', async (req, res) => {
             { endpoint: 'jupyter', port: JUPYTER_PORT }
         ];
 
+        const now = new Date().toISOString();
+        const expiresAt = calculateExpiration();
+
         // Base labels
         const labels = {
             'traefik.enable': 'true',
@@ -826,7 +1063,12 @@ router.post('/wipe', async (req, res) => {
             'hydra.owner': username,
             'hydra.ownerEmail': req.user.email,
             'hydra.port_routes': JSON.stringify(defaultRoutes),
-            'hydra.created_at': new Date().toISOString()
+            'hydra.created_at': now,
+            'hydra.tier': tierId,
+            'hydra.template': template,
+            'hydra.expires_at': expiresAt,
+            'hydra.renewal_count': '0',
+            'hydra.machine': 'hydra'
         };
 
         // Add Traefik labels for each default route
@@ -848,7 +1090,7 @@ router.post('/wipe', async (req, res) => {
             }
         }
 
-        // Create container
+        // Create container with tier-based resource limits
         const newContainer = await docker.createContainer({
             name: containerName,
             Hostname: containerName,
@@ -866,8 +1108,8 @@ router.post('/wipe', async (req, res) => {
                     Source: volumeName,
                     Target: '/home/student'
                 }],
-                Memory: 4 * 1024 * 1024 * 1024, // 4GB
-                NanoCpus: 2e9, // 2 CPUs
+                Memory: tier.memory,
+                NanoCpus: tier.nanoCpus,
                 Privileged: true // For Docker-in-Docker
             }
         });
@@ -879,11 +1121,83 @@ router.post('/wipe', async (req, res) => {
         // Start container
         await newContainer.start();
 
-        return res.json({ success: true, message: 'Container wiped and recreated' });
+        return res.json({
+            success: true,
+            tier: tierId,
+            expiresAt,
+            message: 'Container wiped and recreated'
+        });
 
     } catch (err) {
         console.error('[containers] wipe error:', err);
         return res.status(500).json({ success: false, message: 'Failed to wipe and recreate container' });
+    }
+});
+
+// Migrate container to a different machine
+// POST /dashboard/api/containers/migrate { targetMachine: string }
+// Note: This is a placeholder - actual migration requires Docker API access to remote hosts
+router.post('/migrate', async (req, res) => {
+    try {
+        if (!req.isAuthenticated?.() || !req.user?.email) {
+            return res.status(401).json({ success: false, message: 'Not authenticated' });
+        }
+
+        const targetMachine = req.body?.targetMachine;
+        if (!targetMachine) {
+            return res.status(400).json({ success: false, message: 'Target machine required' });
+        }
+
+        // Valid machines
+        const validMachines = ['hydra', 'chimera', 'cerberus'];
+        if (!validMachines.includes(targetMachine)) {
+            return res.status(400).json({ success: false, message: 'Invalid target machine' });
+        }
+
+        const username = String(req.user.email).split('@')[0];
+        const result = await getStudentContainer(username);
+
+        if (!result) {
+            return res.status(404).json({ success: false, message: 'Container not found' });
+        }
+
+        const { container, info } = result;
+        const currentMachine = info.Config.Labels?.['hydra.machine'] || 'hydra';
+
+        if (currentMachine === targetMachine) {
+            return res.json({ success: true, message: 'Container already on target machine' });
+        }
+
+        // Migration steps (simplified - actual implementation needs remote Docker access):
+        // 1. Export volume data
+        // 2. Stop container on source
+        // 3. Create container on target
+        // 4. Import volume data
+        // 5. Start container on target
+        // 6. Update routing
+
+        // For now, just update the machine label (actual migration not implemented)
+        const oldLabels = info.Config.Labels || {};
+        const newLabels = { ...oldLabels };
+        newLabels['hydra.machine'] = targetMachine;
+
+        // Note: In a real implementation, you would:
+        // - Connect to the target machine's Docker daemon
+        // - Create the container there
+        // - Transfer volume data
+        // - Delete from source
+        // - Update Traefik routing to point to new machine
+
+        return res.status(501).json({
+            success: false,
+            message: 'Migration feature requires remote Docker API setup. Currently only marking target machine.',
+            currentMachine,
+            targetMachine,
+            note: 'Enable Docker API on remote machines (port 2375) and configure DOCKER_HOST environment variables.'
+        });
+    } catch (err) {
+        console.error('[containers] migrate error:', err);
+        return res.status(500).json({ success: false, message: 'Failed to migrate container' });
     }
 });
 

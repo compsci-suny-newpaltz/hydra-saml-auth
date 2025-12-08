@@ -1,0 +1,25 @@
+# Generated Ansible Inventory
+# Created by Terraform
+
+[all:vars]
+ansible_user=infra
+ansible_become=yes
+ansible_python_interpreter=/usr/bin/python3
+
+[control]
+hydra ansible_host=${hydra_ip}
+
+[inference]
+chimera ansible_host=${chimera_ip} gpu_count=3 gpu_type=rtx3090
+
+[training]
+cerberus ansible_host=${cerberus_ip} gpu_count=2 gpu_type=rtx5090
+
+[gpu:children]
+inference
+training
+
+[all_nodes:children]
+control
+inference
+training
