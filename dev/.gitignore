@@ -39,3 +39,8 @@ mock-users.md
 
 # Node modules (if accidentally installed here)
 node_modules/
+
+# Traefik dynamic configs (auto-generated)
+traefik-dynamic/*.yaml
+traefik-dynamic/*.yml
+!traefik-dynamic/.gitkeep

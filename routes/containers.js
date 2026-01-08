@@ -1,5 +1,8 @@
 const express = require('express');
 const Docker = require('dockerode');
+const fs = require('fs').promises;
+const path = require('path');
+const yaml = require('js-yaml');
 
 const router = express.Router();
 const docker = new Docker({ socketPath: '/var/run/docker.sock' });
@@ -11,6 +14,7 @@ const CODE_SERVER_PORT = 8443;
 const JUPYTER_PORT = 8888;
 const RESERVED_PORTS = [CODE_SERVER_PORT, JUPYTER_PORT];
 const RESERVED_ENDPOINTS = ['vscode', 'jupyter'];
+const TRAEFIK_DYNAMIC_DIR = process.env.TRAEFIK_DYNAMIC_DIR || '/etc/traefik/dynamic';
 
 // Helper to pull Docker images
 async function pullImage(img) {
@@ -81,27 +85,69 @@ async function getStudentContainer(username) {
     }
 }
 
-// Helper to generate Traefik labels for a route
-function generateTraefikLabels(username, route) {
-    const routerName = `student-${username}-${route.endpoint}`;
-    const basePath = `/students/${username}/${route.endpoint}`;
+// Write routes to Traefik dynamic config file
+async function writeTraefikConfig(username, routes) {
+    const filePath = path.join(TRAEFIK_DYNAMIC_DIR, `student-${username}.yaml`);
 
-    // Jupyter needs base_url and should NOT use stripprefix
-    // Other services like code-server use relative paths and work with stripprefix
-    const middlewares = route.endpoint === 'jupyter'
-        ? `${routerName}-auth`
-        : `${routerName}-auth,${routerName}-strip`;
-
-    return {
-        [`traefik.http.routers.${routerName}.entrypoints`]: 'web',
-        [`traefik.http.routers.${routerName}.rule`]: `PathPrefix(\`${basePath}\`)`,
-        [`traefik.http.routers.${routerName}.service`]: routerName,
-        [`traefik.http.services.${routerName}.loadbalancer.server.port`]: String(route.port),
-        [`traefik.http.middlewares.${routerName}-strip.stripprefix.prefixes`]: basePath,
-        [`traefik.http.middlewares.${routerName}-auth.forwardauth.address`]: 'http://host.docker.internal:6969/auth/verify',
-        [`traefik.http.middlewares.${routerName}-auth.forwardauth.trustForwardHeader`]: 'true',
-        [`traefik.http.routers.${routerName}.middlewares`]: middlewares
+    const config = {
+        http: {
+            routers: {},
+            services: {},
+            middlewares: {}
+        }
     };
+
+    // Add auth middleware (shared)
+    const authMiddlewareName = `student-${username}-auth`;
+    config.http.middlewares[authMiddlewareName] = {
+        forwardAuth: {
+            address: 'http://host.docker.internal:6969/auth/verify',
+            trustForwardHeader: true
+        }
+    };
+
+    for (const route of routes) {
+        const routerName = `student-${username}-${route.endpoint}`;
+        const basePath = `/students/${username}/${route.endpoint}`;
+
+        // Router
+        config.http.routers[routerName] = {
+            entryPoints: ['web'],
+            rule: `PathPrefix(\`${basePath}\`)`,
+            service: routerName,
+            middlewares: route.endpoint === 'jupyter'
+                ? [authMiddlewareName]
+                : [authMiddlewareName, `${routerName}-strip`]
+        };
+
+        // Service - point to student container
+        config.http.services[routerName] = {
+            loadBalancer: {
+                servers: [{ url: `http://student-${username}:${route.port}` }]
+            }
+        };
+
+        // Strip prefix middleware (not for jupyter)
+        if (route.endpoint !== 'jupyter') {
+            config.http.middlewares[`${routerName}-strip`] = {
+                stripPrefix: {
+                    prefixes: [basePath]
+                }
+            };
+        }
+    }
+
+    await fs.writeFile(filePath, yaml.dump(config), 'utf8');
+}
+
+// Delete Traefik config file
+async function deleteTraefikConfig(username) {
+    const filePath = path.join(TRAEFIK_DYNAMIC_DIR, `student-${username}.yaml`);
+    try {
+        await fs.unlink(filePath);
+    } catch (e) {
+        // Ignore if file doesn't exist
+    }
 }
 
 // Initialize/Create student mega container
@@ -142,21 +188,14 @@ router.post('/init', async (req, res) => {
             { endpoint: 'jupyter', port: JUPYTER_PORT }
         ];
 
-        // Base labels
+        // Base labels (no Traefik labels - using file provider instead)
         const labels = {
-            'traefik.enable': 'true',
-            'traefik.docker.network': 'hydra_students_net',
             'hydra.managed_by': 'hydra-saml-auth',
             'hydra.owner': username,
             'hydra.ownerEmail': req.user.email,
             'hydra.port_routes': JSON.stringify(defaultRoutes),
             'hydra.created_at': new Date().toISOString()
         };
-
-        // Add Traefik labels for each default route
-        defaultRoutes.forEach(route => {
-            Object.assign(labels, generateTraefikLabels(username, route));
-        });
 
         // Check if image exists locally, if not try to pull it
         const imagePresent = await imageExists(STUDENT_IMAGE);
@@ -202,6 +241,9 @@ router.post('/init', async (req, res) => {
 
         // Start container
         await container.start();
+
+        // Write Traefik config file for routing
+        await writeTraefikConfig(username, defaultRoutes);
 
         const publicBase = (process.env.PUBLIC_STUDENTS_BASE || `https://${host}/students`).replace(/\/$/, '');
 
@@ -479,15 +521,40 @@ router.get('/routes', async (req, res) => {
             return res.status(404).json({ success: false, message: 'Container not found' });
         }
 
-        const { info } = result;
-        const labels = info.Config.Labels || {};
-        const routesJson = labels['hydra.port_routes'] || '[]';
+        const { container, info } = result;
 
+        // Read routes from file inside the container (new file-based approach)
         let routes = [];
-        try {
-            routes = JSON.parse(routesJson);
-        } catch (e) {
-            console.error('[containers] Failed to parse port_routes:', e);
+        if (info.State.Running) {
+            try {
+                const routesExec = await container.exec({
+                    Cmd: ['sh', '-c', 'cat /home/student/.hydra_routes 2>/dev/null || echo "[]"'],
+                    AttachStdout: true,
+                    AttachStderr: true
+                });
+                const routesStream = await routesExec.start({ Detach: false, Tty: false });
+                let routesOutput = '';
+                routesStream.on('data', (chunk) => {
+                    if (chunk.length > 8) {
+                        routesOutput += chunk.slice(8).toString('utf8');
+                    }
+                });
+                await new Promise((resolve) => routesStream.on('end', resolve));
+                routes = JSON.parse(routesOutput.trim()) || [];
+            } catch (e) {
+                console.error('[containers] Failed to read routes file:', e);
+            }
+        }
+
+        // Fall back to Docker labels if file doesn't exist (backwards compatibility)
+        if (routes.length === 0) {
+            const labels = info.Config.Labels || {};
+            const routesJson = labels['hydra.port_routes'] || '[]';
+            try {
+                routes = JSON.parse(routesJson);
+            } catch (e) {
+                console.error('[containers] Failed to parse port_routes:', e);
+            }
         }
 
         const host = 'hydra.newpaltz.edu';
@@ -568,42 +635,30 @@ router.post('/routes', async (req, res) => {
         const newRoute = { endpoint, port };
         routes.push(newRoute);
 
-        // Prepare new labels
-        const newLabels = { ...oldLabels };
-        newLabels['hydra.port_routes'] = JSON.stringify(routes);
+        // Update container labels (for persistence) without recreating the container
+        // We need to update the label by recreating the container, but we can do it quickly
+        // Actually, Docker doesn't support updating labels without recreating
+        // So we update the label in memory and write to Traefik config file
 
-        // Add Traefik labels for new route
-        Object.assign(newLabels, generateTraefikLabels(username, newRoute));
+        // For label persistence, we need to recreate the container
+        // But per the requirement, we should NOT recreate - just update Traefik config
+        // Labels will be lost on container restart, but routes persist via Traefik file
 
-        // Recreate container with new labels
-        const wasRunning = info.State.Running;
+        // Update Traefik config file (this takes effect immediately)
+        await writeTraefikConfig(username, routes);
 
-        if (wasRunning) {
-            await container.stop({ t: 10 });
-        }
-        await container.remove({ force: true });
-
-        const newContainer = await docker.createContainer({
-            name: containerName,
-            Hostname: containerName,
-            Image: info.Config.Image,
-            Labels: newLabels,
-            Env: info.Config.Env,
-            Cmd: info.Config.Cmd,
-            HostConfig: info.HostConfig
-        });
-
-        if (wasRunning) {
-            await newContainer.start();
-
-            // Reconnect to student network
-            const studentNetworkName = `hydra-student-${username}`;
-            try {
-                const studentNet = docker.getNetwork(studentNetworkName);
-                await studentNet.connect({ Container: containerName });
-            } catch (e) {
-                console.error('[containers] Failed to reconnect to student network:', e);
-            }
+        // Store routes in a file inside the container for persistence
+        // This is a workaround since we can't update Docker labels without recreating
+        try {
+            const routesData = JSON.stringify(routes);
+            const exec = await container.exec({
+                Cmd: ['sh', '-c', `echo '${routesData}' > /home/student/.hydra_routes`],
+                AttachStdout: true,
+                AttachStderr: true
+            });
+            await exec.start({ Detach: false, Tty: false });
+        } catch (e) {
+            console.warn('[containers] Failed to persist routes inside container:', e.message);
         }
 
         const host = 'hydra.newpaltz.edu';
@@ -637,7 +692,6 @@ router.delete('/routes/:endpoint', async (req, res) => {
         }
 
         const username = String(req.user.email).split('@')[0];
-        const containerName = `student-${username}`;
         const result = await getStudentContainer(username);
 
         if (!result) {
@@ -664,55 +718,195 @@ router.delete('/routes/:endpoint', async (req, res) => {
         // Remove route
         routes.splice(routeIndex, 1);
 
-        // Prepare new labels - remove all Traefik labels for this endpoint
-        const newLabels = {};
-        const routerName = `student-${username}-${endpoint}`;
+        // Update Traefik config file (this takes effect immediately)
+        await writeTraefikConfig(username, routes);
 
-        for (const [key, value] of Object.entries(oldLabels)) {
-            // Skip labels related to the deleted endpoint
-            if (key.includes(routerName)) {
-                continue;
-            }
-            newLabels[key] = value;
-        }
-
-        newLabels['hydra.port_routes'] = JSON.stringify(routes);
-
-        // Recreate container with new labels
-        const wasRunning = info.State.Running;
-
-        if (wasRunning) {
-            await container.stop({ t: 10 });
-        }
-        await container.remove({ force: true });
-
-        const newContainer = await docker.createContainer({
-            name: containerName,
-            Hostname: containerName,
-            Image: info.Config.Image,
-            Labels: newLabels,
-            Env: info.Config.Env,
-            Cmd: info.Config.Cmd,
-            HostConfig: info.HostConfig
-        });
-
-        if (wasRunning) {
-            await newContainer.start();
-
-            // Reconnect to student network
-            const studentNetworkName = `hydra-student-${username}`;
-            try {
-                const studentNet = docker.getNetwork(studentNetworkName);
-                await studentNet.connect({ Container: containerName });
-            } catch (e) {
-                console.error('[containers] Failed to reconnect to student network:', e);
-            }
+        // Store routes in a file inside the container for persistence
+        try {
+            const routesData = JSON.stringify(routes);
+            const exec = await container.exec({
+                Cmd: ['sh', '-c', `echo '${routesData}' > /home/student/.hydra_routes`],
+                AttachStdout: true,
+                AttachStderr: true
+            });
+            await exec.start({ Detach: false, Tty: false });
+        } catch (e) {
+            console.warn('[containers] Failed to persist routes inside container:', e.message);
         }
 
         return res.json({ success: true });
     } catch (err) {
         console.error('[containers] delete route error:', err);
         return res.status(500).json({ success: false, message: 'Failed to delete route' });
+    }
+});
+
+// Discover services from supervisor.d configs
+// POST /dashboard/api/containers/discover-services
+router.post('/discover-services', async (req, res) => {
+    try {
+        if (!req.isAuthenticated?.() || !req.user?.email) {
+            return res.status(401).json({ success: false, message: 'Not authenticated' });
+        }
+
+        const autoRegister = req.body?.autoRegister === true;
+        const username = String(req.user.email).split('@')[0];
+        const result = await getStudentContainer(username);
+
+        if (!result) {
+            return res.status(404).json({ success: false, message: 'Container not found' });
+        }
+
+        const { container, info } = result;
+
+        if (!info.State.Running) {
+            return res.status(400).json({ success: false, message: 'Container not running' });
+        }
+
+        // List files in /home/student/supervisor.d/
+        const listExec = await container.exec({
+            Cmd: ['sh', '-c', 'ls -1 /home/student/supervisor.d/*.conf 2>/dev/null || true'],
+            AttachStdout: true,
+            AttachStderr: true
+        });
+
+        const listStream = await listExec.start({ Detach: false, Tty: false });
+        let listOutput = '';
+        listStream.on('data', (chunk) => {
+            if (chunk.length > 8) {
+                listOutput += chunk.slice(8).toString('utf8');
+            }
+        });
+
+        await new Promise((resolve, reject) => {
+            listStream.on('end', resolve);
+            listStream.on('error', reject);
+        });
+
+        const confFiles = listOutput.trim().split('\n').filter(f => f.endsWith('.conf'));
+        const discoveredServices = [];
+
+        // Read each conf file and parse hydra comments
+        for (const confFile of confFiles) {
+            const readExec = await container.exec({
+                Cmd: ['cat', confFile],
+                AttachStdout: true,
+                AttachStderr: true
+            });
+
+            const readStream = await readExec.start({ Detach: false, Tty: false });
+            let fileContent = '';
+            readStream.on('data', (chunk) => {
+                if (chunk.length > 8) {
+                    fileContent += chunk.slice(8).toString('utf8');
+                }
+            });
+
+            await new Promise((resolve, reject) => {
+                readStream.on('end', resolve);
+                readStream.on('error', reject);
+            });
+
+            // Parse for hydra.port and hydra.endpoint comments
+            const portMatch = fileContent.match(/^#\s*hydra\.port\s*=\s*(\d+)/m);
+            const endpointMatch = fileContent.match(/^#\s*hydra\.endpoint\s*=\s*(\S+)/m);
+
+            if (portMatch && endpointMatch) {
+                const port = parseInt(portMatch[1], 10);
+                const endpoint = endpointMatch[1].toLowerCase();
+
+                discoveredServices.push({
+                    file: confFile,
+                    endpoint,
+                    port
+                });
+            }
+        }
+
+        // Optionally auto-register discovered services
+        const registered = [];
+        if (autoRegister && discoveredServices.length > 0) {
+            const labels = info.Config.Labels || {};
+            const routesJson = labels['hydra.port_routes'] || '[]';
+            let routes = [];
+            try {
+                routes = JSON.parse(routesJson);
+            } catch (e) {
+                console.error('[containers] Failed to parse port_routes:', e);
+            }
+
+            for (const service of discoveredServices) {
+                // Skip if already registered or reserved
+                if (routes.some(r => r.endpoint === service.endpoint || r.port === service.port)) {
+                    continue;
+                }
+                if (RESERVED_ENDPOINTS.includes(service.endpoint) || RESERVED_PORTS.includes(service.port)) {
+                    continue;
+                }
+
+                routes.push({ endpoint: service.endpoint, port: service.port });
+                registered.push(service);
+            }
+
+            // Update Traefik config if we registered new routes
+            if (registered.length > 0) {
+                await writeTraefikConfig(username, routes);
+
+                // Store routes in a file inside the container for persistence
+                try {
+                    const routesData = JSON.stringify(routes);
+                    const exec = await container.exec({
+                        Cmd: ['sh', '-c', `echo '${routesData}' > /home/student/.hydra_routes`],
+                        AttachStdout: true,
+                        AttachStderr: true
+                    });
+                    await exec.start({ Detach: false, Tty: false });
+                } catch (e) {
+                    console.warn('[containers] Failed to persist routes inside container:', e.message);
+                }
+            }
+        }
+
+        const host = 'hydra.newpaltz.edu';
+        const publicBase = (process.env.PUBLIC_STUDENTS_BASE || `https://${host}/students`).replace(/\/$/, '');
+
+        // Get existing routes to check which services are already routed
+        let existingRoutes = [];
+        try {
+            const routesExec = await container.exec({
+                Cmd: ['sh', '-c', 'cat /home/student/.hydra_routes 2>/dev/null || echo "[]"'],
+                AttachStdout: true,
+                AttachStderr: true
+            });
+            const routesStream = await routesExec.start({ Detach: false, Tty: false });
+            let routesOutput = '';
+            routesStream.on('data', (chunk) => {
+                if (chunk.length > 8) {
+                    routesOutput += chunk.slice(8).toString('utf8');
+                }
+            });
+            await new Promise((resolve) => routesStream.on('end', resolve));
+            existingRoutes = JSON.parse(routesOutput.trim()) || [];
+        } catch (e) {
+            // Ignore parse errors
+        }
+
+        return res.json({
+            success: true,
+            services: discoveredServices.map(s => ({
+                name: s.file.split('/').pop().replace('.conf', ''),
+                ...s,
+                url: `${publicBase}/${username}/${s.endpoint}/`,
+                alreadyRouted: existingRoutes.some(r => r.endpoint === s.endpoint || r.port === s.port)
+            })),
+            registered: registered.map(s => ({
+                ...s,
+                url: `${publicBase}/${username}/${s.endpoint}/`
+            }))
+        });
+    } catch (err) {
+        console.error('[containers] discover-services error:', err);
+        return res.status(500).json({ success: false, message: 'Failed to discover services' });
     }
 });
 
@@ -801,6 +995,9 @@ router.post('/wipe', async (req, res) => {
             console.warn(`[containers] Failed to remove volume ${volumeName} during wipe:`, e.message);
         }
 
+        // Delete Traefik config file
+        await deleteTraefikConfig(username);
+
         // 2. Re-initialize container (logic copied and adapted from /init)
         const studentNetworkName = `hydra-student-${username}`;
         const host = 'hydra.newpaltz.edu';
@@ -818,21 +1015,14 @@ router.post('/wipe', async (req, res) => {
             { endpoint: 'jupyter', port: JUPYTER_PORT }
         ];
 
-        // Base labels
+        // Base labels (no Traefik labels - using file provider instead)
         const labels = {
-            'traefik.enable': 'true',
-            'traefik.docker.network': 'hydra_students_net',
             'hydra.managed_by': 'hydra-saml-auth',
             'hydra.owner': username,
             'hydra.ownerEmail': req.user.email,
             'hydra.port_routes': JSON.stringify(defaultRoutes),
             'hydra.created_at': new Date().toISOString()
         };
-
-        // Add Traefik labels for each default route
-        defaultRoutes.forEach(route => {
-            Object.assign(labels, generateTraefikLabels(username, route));
-        });
 
         // Check if image exists locally, if not try to pull it
         const imagePresent = await imageExists(STUDENT_IMAGE);
@@ -879,6 +1069,9 @@ router.post('/wipe', async (req, res) => {
         // Start container
         await newContainer.start();
 
+        // Write Traefik config file for routing
+        await writeTraefikConfig(username, defaultRoutes);
+
         return res.json({ success: true, message: 'Container wiped and recreated' });
 
     } catch (err) {
@@ -899,6 +1092,8 @@ router.delete('/destroy', async (req, res) => {
         const result = await getStudentContainer(username);
 
         if (!result) {
+            // Clean up Traefik config even if container doesn't exist
+            await deleteTraefikConfig(username);
             return res.json({ success: true, message: 'Container does not exist' });
         }
 
@@ -918,6 +1113,9 @@ router.delete('/destroy', async (req, res) => {
         } catch (e) {
             console.warn('[containers] Failed to remove volume:', e.message);
         }
+
+        // Delete Traefik config file
+        await deleteTraefikConfig(username);
 
         return res.json({ success: true });
     } catch (err) {
