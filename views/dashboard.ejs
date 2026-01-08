@@ -51,16 +51,16 @@
       <!-- Tabs -->
       <div>
         <div class="flex border-b mb-4" role="tablist">
-          <button id="tab-minecraft" class="px-4 py-2 -mb-px border-b-2 border-[#052049] text-[#052049] font-medium"
-            data-target="#panel-minecraft">Minecraft</button>
+          <button id="tab-containers" class="px-4 py-2 -mb-px border-b-2 border-[#052049] text-[#052049] font-medium"
+            data-target="#panel-containers">Containers</button>
           <button id="tab-openwebui" class="px-4 py-2 text-gray-600 hover:text-gray-900"
             data-target="#panel-openwebui">OpenWebUI</button>
           <button id="tab-n8n" class="px-4 py-2 text-gray-600 hover:text-gray-900" data-target="#panel-n8n">n8n</button>
-          <button id="tab-containers" class="px-4 py-2 text-gray-600 hover:text-gray-900"
-            data-target="#panel-containers">Containers</button>
+          <button id="tab-minecraft" class="px-4 py-2 text-gray-600 hover:text-gray-900"
+            data-target="#panel-minecraft">Minecraft</button>
         </div>
 
-        <section id="panel-minecraft">
+        <section id="panel-minecraft" class="hidden">
           <h3 class="text-xl font-semibold mb-2">Minecraft Server</h3>
           <form id="minecraft-form" class="space-y-3 max-w-md">
             <div>
@@ -200,7 +200,7 @@
         </section>
       </div>
 
-      <section id="panel-containers" class="hidden">
+      <section id="panel-containers">
         <h3 class="text-xl font-semibold mb-4">Student Container</h3>
         <p class="text-gray-700 mb-4">Manage your personal development container with VS Code, Jupyter, and custom port routing.</p>
 
@@ -218,26 +218,26 @@
             </button>
           </div>
           <div id="container-controls" class="hidden">
-            <div class="flex gap-2">
+            <div class="flex flex-wrap gap-2">
               <button onclick="startContainer()" id="start-btn"
-                class="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700">
+                class="px-3 py-2 rounded bg-green-600 text-white hover:bg-green-700 text-sm">
                 <i class="fas fa-play"></i> Start
               </button>
               <button onclick="stopContainer()" id="stop-btn"
-                class="px-4 py-2 rounded bg-red-600 text-white hover:bg-red-700">
+                class="px-3 py-2 rounded bg-red-600 text-white hover:bg-red-700 text-sm">
                 <i class="fas fa-stop"></i> Stop
               </button>
               <button onclick="openLogs()" id="logs-btn"
-                class="px-4 py-2 rounded bg-gray-600 text-white hover:bg-gray-700">
+                class="px-3 py-2 rounded bg-gray-600 text-white hover:bg-gray-700 text-sm">
                 <i class="fas fa-file-alt"></i> Logs
               </button>
               <button onclick="openTerminal()" id="terminal-btn"
-                class="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700">
+                class="px-3 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 text-sm">
                 <i class="fas fa-terminal"></i> Terminal
               </button>
-              <button onclick="showWipeModal()" id="wipe-btn"
-                class="px-4 py-2 rounded bg-yellow-500 text-white hover:bg-yellow-600">
-                <i class="fas fa-exclamation-triangle"></i> Wipe Volume
+              <button onclick="showWipeModal()" id="wipe-btn" title="Wipe Volume"
+                class="px-3 py-2 rounded bg-yellow-500 text-white hover:bg-yellow-600 text-sm">
+                <i class="fas fa-exclamation-triangle"></i> Wipe
               </button>
             </div>
           </div>
@@ -245,8 +245,8 @@
         </div>
 
         <!-- Wipe Confirmation Modal -->
-        <div id="wipe-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
-          <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div id="wipe-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+          <div class="relative top-20 mx-auto p-5 border w-11/12 max-w-sm shadow-lg rounded-md bg-white">
             <div class="mt-3 text-center">
               <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
                 <i class="fas fa-exclamation-triangle text-red-600 text-xl"></i>
@@ -334,6 +334,7 @@
                 <tr>
                   <th class="px-3 py-2 text-left">Endpoint</th>
                   <th class="px-3 py-2 text-left">Port</th>
+                  <th class="px-3 py-2 text-left">Type</th>
                   <th class="px-3 py-2 text-left">URL</th>
                   <th class="px-3 py-2 text-left">Actions</th>
                 </tr>
@@ -343,6 +344,55 @@
               </tbody>
             </table>
           </div>
+
+          <!-- Auto-Discovery Info Section -->
+          <div class="bg-blue-50 border border-blue-200 rounded p-3 mb-4">
+            <h5 class="font-semibold text-blue-800 mb-1"><i class="fas fa-info-circle"></i> Auto-Discovery</h5>
+            <p class="text-xs text-blue-700 mb-2">
+              You can add special comments to your supervisor configs to enable auto-discovery of services:
+            </p>
+            <div class="bg-white rounded border border-blue-100 p-2 font-mono text-xs text-gray-700 mb-2">
+              <div># hydra.port=3000</div>
+              <div># hydra.endpoint=myapp</div>
+            </div>
+            <p class="text-xs text-blue-700">
+              Click "Discover Services" below to scan your supervisor.d configs and find services that can be routed.
+            </p>
+          </div>
+
+          <!-- Discover Services Section -->
+          <div class="border-t pt-4 mb-4">
+            <div class="flex items-center justify-between mb-3">
+              <h5 class="font-semibold"><i class="fas fa-search"></i> Service Discovery</h5>
+              <button onclick="discoverServices()" id="discover-btn"
+                class="px-4 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-700">
+                <i class="fas fa-radar" id="discover-icon"></i> Discover Services
+              </button>
+            </div>
+            <div id="discover-message" class="mb-3"></div>
+            <div id="discovered-services" class="hidden">
+              <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                  <thead class="bg-indigo-50">
+                    <tr>
+                      <th class="px-3 py-2 text-left">Service</th>
+                      <th class="px-3 py-2 text-left">Port</th>
+                      <th class="px-3 py-2 text-left">Endpoint</th>
+                      <th class="px-3 py-2 text-left">Status</th>
+                      <th class="px-3 py-2 text-left">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="discovered-tbody" class="divide-y">
+                    <!-- Populated by JavaScript -->
+                  </tbody>
+                </table>
+              </div>
+              <p id="no-services-found" class="text-gray-500 text-sm py-3 hidden">
+                No discoverable services found. Add hydra comments to your supervisor configs to enable discovery.
+              </p>
+            </div>
+          </div>
+
           <div class="border-t pt-4">
             <h5 class="font-semibold mb-2">Add Custom Route</h5>
             <div class="flex gap-2 items-end">
@@ -392,10 +442,10 @@
 
       // Tabs
       const tabs = [
-        { btn: 'tab-minecraft', panel: 'panel-minecraft' },
+        { btn: 'tab-containers', panel: 'panel-containers' },
         { btn: 'tab-openwebui', panel: 'panel-openwebui' },
         { btn: 'tab-n8n', panel: 'panel-n8n' },
-        { btn: 'tab-containers', panel: 'panel-containers' }
+        { btn: 'tab-minecraft', panel: 'panel-minecraft' }
       ];
       tabs.forEach(t => {
         document.getElementById(t.btn).addEventListener('click', () => {
@@ -410,11 +460,29 @@
         });
       });
 
-      // Minecraft username fetch/save
+      // Centralized API helper with 401 redirect
+      function handleAuthError(res) {
+        if (res.status === 401) {
+          window.location.href = '/login?returnTo=' + encodeURIComponent(window.location.pathname);
+          return true;
+        }
+        return false;
+      }
+
       async function api(url, opts = {}) {
         const res = await fetch(url, opts);
+        if (handleAuthError(res)) return null;
         if (!res.ok) throw new Error(await res.text());
         return await res.json();
+      }
+
+      async function apiJson(url, opts = {}) {
+        const res = await fetch(url, {
+          ...opts,
+          headers: { 'Content-Type': 'application/json', ...opts.headers }
+        });
+        if (handleAuthError(res)) return null;
+        return res;
       }
       async function loadMinecraftUsername() {
         try {
@@ -473,8 +541,13 @@
         changeN8nPassword();
       });
 
-      // Container management - load status when tab is opened
+      // Container management - load status on page load (now default tab) and when tab is clicked
       let containerStatusInterval = null;
+
+      // Load container status immediately since Containers is the default tab
+      loadContainerStatus();
+      containerStatusInterval = setInterval(loadContainerStatus, 5000);
+
       document.getElementById('tab-containers').addEventListener('click', () => {
         loadContainerStatus();
         // Start polling every 5 seconds
@@ -498,6 +571,7 @@
       async function loadContainerStatus() {
         try {
           const res = await fetch('/dashboard/api/containers/status');
+          if (handleAuthError(res)) return;
           const data = await res.json();
 
           const badge = document.getElementById('container-state-badge');
@@ -545,6 +619,7 @@
         msg.innerHTML = '<p class="text-gray-600">Initializing container...</p>';
         try {
           const res = await fetch('/dashboard/api/containers/init', { method: 'POST' });
+          if (handleAuthError(res)) return;
           const data = await res.json();
           if (!res.ok || !data.success) throw new Error(data.message || 'Failed');
 
@@ -561,6 +636,7 @@
         msg.innerHTML = '<p class="text-gray-600">Starting container...</p>';
         try {
           const res = await fetch('/dashboard/api/containers/start', { method: 'POST' });
+          if (handleAuthError(res)) return;
           const data = await res.json();
           if (!res.ok || !data.success) throw new Error(data.message || 'Failed');
 
@@ -578,6 +654,7 @@
         msg.innerHTML = '<p class="text-gray-600">Stopping container...</p>';
         try {
           const res = await fetch('/dashboard/api/containers/stop', { method: 'POST' });
+          if (handleAuthError(res)) return;
           const data = await res.json();
           if (!res.ok || !data.success) throw new Error(data.message || 'Failed');
 
@@ -607,6 +684,7 @@
         msg.innerHTML = '<p class="text-gray-600">Wiping container volume and recreating...</p>';
         try {
           const res = await fetch('/dashboard/api/containers/wipe', { method: 'POST' });
+          if (handleAuthError(res)) return;
           const data = await res.json();
           if (!res.ok || !data.success) throw new Error(data.message || 'Failed');
 
@@ -621,6 +699,7 @@
       async function loadServices() {
         try {
           const res = await fetch('/dashboard/api/containers/services');
+          if (handleAuthError(res)) return;
           const data = await res.json();
 
           if (!data.success || !data.containerRunning) return;
@@ -678,6 +757,7 @@
       async function loadRoutes() {
         try {
           const res = await fetch('/dashboard/api/containers/routes');
+          if (handleAuthError(res)) return;
           const data = await res.json();
 
           if (!data.success) return;
@@ -688,19 +768,31 @@
           const routes = data.routes || [];
           routes.forEach(route => {
             const row = document.createElement('tr');
-            const isReserved = route.endpoint === 'vscode' || route.endpoint === 'jupyter';
+            const isDefault = route.endpoint === 'vscode' || route.endpoint === 'jupyter';
+            const routeType = route.source || (isDefault ? 'default' : 'custom');
+
+            // Determine badge style based on route type
+            let typeBadge = '';
+            if (routeType === 'default') {
+              typeBadge = '<span class="px-2 py-0.5 text-xs rounded bg-gray-100 text-gray-600 border border-gray-200">Default</span>';
+            } else if (routeType === 'auto-discovered') {
+              typeBadge = '<span class="px-2 py-0.5 text-xs rounded bg-indigo-100 text-indigo-700 border border-indigo-200">Auto-discovered</span>';
+            } else {
+              typeBadge = '<span class="px-2 py-0.5 text-xs rounded bg-green-100 text-green-700 border border-green-200">Custom</span>';
+            }
 
             row.innerHTML = `
               <td class="px-3 py-2 font-mono">${route.endpoint}</td>
               <td class="px-3 py-2">${route.port}</td>
+              <td class="px-3 py-2">${typeBadge}</td>
               <td class="px-3 py-2">
                 <a href="${route.url}" target="_blank" class="text-blue-600 underline text-xs">
                   <i class="fas fa-external-link-alt"></i> ${route.url}
                 </a>
               </td>
               <td class="px-3 py-2">
-                ${isReserved
-                  ? '<span class="text-xs text-gray-500">Default</span>'
+                ${isDefault
+                  ? '<span class="text-xs text-gray-400">-</span>'
                   : `<button onclick="deleteRoute('${route.endpoint}')" class="px-2 py-1 text-xs rounded bg-red-100 hover:bg-red-200 text-red-700">
                       <i class="fas fa-trash"></i> Delete
                     </button>`
@@ -770,6 +862,118 @@
           msg.innerHTML = `<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2 text-sm">${err.message || 'Failed to delete route'}</p>`;
         }
       };
+
+      // Store discovered services for reference when adding
+      let discoveredServicesData = [];
+
+      window.discoverServices = async function () {
+        const discoverBtn = document.getElementById('discover-btn');
+        const discoverIcon = document.getElementById('discover-icon');
+        const msg = document.getElementById('discover-message');
+        const servicesContainer = document.getElementById('discovered-services');
+        const tbody = document.getElementById('discovered-tbody');
+        const noServicesMsg = document.getElementById('no-services-found');
+
+        // Show loading state
+        discoverBtn.disabled = true;
+        discoverIcon.className = 'fas fa-spinner fa-spin';
+        msg.innerHTML = '<p class="text-gray-600 text-sm">Scanning supervisor.d configs...</p>';
+
+        try {
+          const res = await fetch('/dashboard/api/containers/discover-services', { method: 'POST' });
+          if (handleAuthError(res)) return;
+          const data = await res.json();
+
+          if (!res.ok || !data.success) throw new Error(data.message || 'Failed to discover services');
+
+          // Reset button state
+          discoverBtn.disabled = false;
+          discoverIcon.className = 'fas fa-radar';
+          msg.innerHTML = '';
+
+          // Store discovered services
+          discoveredServicesData = data.services || [];
+
+          // Show the discovered services section
+          servicesContainer.classList.remove('hidden');
+          tbody.innerHTML = '';
+
+          if (discoveredServicesData.length === 0) {
+            noServicesMsg.classList.remove('hidden');
+            return;
+          }
+
+          noServicesMsg.classList.add('hidden');
+
+          discoveredServicesData.forEach((service, index) => {
+            const row = document.createElement('tr');
+            const isRouted = service.alreadyRouted;
+
+            row.innerHTML = `
+              <td class="px-3 py-2 font-mono">${escapeHtml(service.name)}</td>
+              <td class="px-3 py-2">${service.port}</td>
+              <td class="px-3 py-2 font-mono">${escapeHtml(service.endpoint)}</td>
+              <td class="px-3 py-2">
+                ${isRouted
+                  ? '<span class="text-green-600"><i class="fas fa-check-circle"></i> Already routed</span>'
+                  : '<span class="text-gray-500">Not routed</span>'
+                }
+              </td>
+              <td class="px-3 py-2">
+                ${isRouted
+                  ? '<span class="text-green-600"><i class="fas fa-check"></i></span>'
+                  : `<button onclick="addDiscoveredRoute(${index})" class="px-3 py-1 text-xs rounded bg-green-600 text-white hover:bg-green-700">
+                      <i class="fas fa-plus"></i> Add
+                    </button>`
+                }
+              </td>
+            `;
+            tbody.appendChild(row);
+          });
+        } catch (err) {
+          discoverBtn.disabled = false;
+          discoverIcon.className = 'fas fa-radar';
+          msg.innerHTML = `<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2 text-sm">${err.message || 'Failed to discover services'}</p>`;
+        }
+      };
+
+      window.addDiscoveredRoute = async function (index) {
+        const service = discoveredServicesData[index];
+        if (!service) return;
+
+        const msg = document.getElementById('discover-message');
+        try {
+          msg.innerHTML = '<p class="text-gray-600 text-sm">Adding route...</p>';
+          const res = await fetch('/dashboard/api/containers/routes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              endpoint: service.endpoint,
+              port: service.port,
+              source: 'auto-discovered'
+            })
+          });
+          const data = await res.json();
+
+          if (!res.ok || !data.success) throw new Error(data.message || 'Failed');
+
+          msg.innerHTML = '<p class="text-green-700 bg-green-100 border border-green-200 rounded p-2 text-sm">Route added successfully!</p>';
+          setTimeout(() => { msg.innerHTML = ''; }, 3000);
+
+          // Refresh both the routes table and discovered services
+          loadRoutes();
+          discoverServices();
+        } catch (err) {
+          msg.innerHTML = `<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2 text-sm">${err.message || 'Failed to add route'}</p>`;
+        }
+      };
+
+      // Helper function to escape HTML
+      function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+      }
 
       window.openLogs = function () {
         const w = window.open('', '_blank', 'width=900,height=600');

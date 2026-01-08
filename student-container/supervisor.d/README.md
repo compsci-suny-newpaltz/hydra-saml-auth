@@ -7,7 +7,41 @@ This directory is for adding your own custom services that will run automaticall
 1. Create a `.conf` file in this directory (e.g., `myapp.conf`)
 2. Restart your container or reload supervisord: `sudo supervisorctl reread && sudo supervisorctl update`
 
-## Example: Web Application
+## Auto-Discovery for Port Routing
+
+You can add special comments to your supervisor configs to enable **automatic service discovery** from the dashboard. This allows you to add routes without manually entering port and endpoint information.
+
+Add these comments anywhere in your `.conf` file:
+
+```ini
+# hydra.port=3000
+# hydra.endpoint=myapp
+```
+
+Then click "Discover Services" in the dashboard's Port Routing section to automatically detect and add routes for your services.
+
+### Example: Web App with Auto-Discovery
+
+Create `~/supervisor.d/webapp.conf`:
+
+```ini
+# hydra.port=3000
+# hydra.endpoint=webapp
+
+[program:webapp]
+command=node /home/student/myapp/server.js
+directory=/home/student/myapp
+user=student
+autostart=true
+autorestart=true
+stdout_logfile=/var/log/supervisor/webapp.log
+stderr_logfile=/var/log/supervisor/webapp_err.log
+environment=HOME="/home/student",USER="student",PORT="3000"
+```
+
+After saving, go to the dashboard and click "Discover Services" - your webapp will appear and you can add it with one click.
+
+## Example: Basic Web Application (Manual Routing)
 
 Create `~/supervisor.d/webapp.conf`:
 
@@ -28,6 +62,9 @@ environment=HOME="/home/student",USER="student",PORT="3000"
 Create `~/supervisor.d/flask.conf`:
 
 ```ini
+# hydra.port=5000
+# hydra.endpoint=flask
+
 [program:flaskapp]
 command=/home/student/.local/bin/python /home/student/flask-app/app.py
 directory=/home/student/flask-app
@@ -62,6 +99,7 @@ stderr_logfile=/var/log/supervisor/worker_err.log
 - `autostart=true` means the service starts when the container starts
 - `autorestart=true` means the service restarts if it crashes
 - Logs are stored in `/var/log/supervisor/`
+- Auto-discovery comments (`# hydra.port=` and `# hydra.endpoint=`) are optional but recommended for web services
 
 ## Managing Your Services
 
@@ -95,6 +133,14 @@ sudo supervisorctl update
 
 If your service runs a web server, you can expose it through the dashboard:
 
+### Option 1: Auto-Discovery (Recommended)
+1. Add `# hydra.port=PORT` and `# hydra.endpoint=NAME` comments to your .conf file
+2. Run `sudo supervisorctl reread && sudo supervisorctl update`
+3. Go to the Containers tab in the dashboard
+4. Click "Discover Services" in the Port Routing section
+5. Click "Add" next to your discovered service
+
+### Option 2: Manual Route
 1. Go to the Containers tab in the dashboard
 2. Under "Port Routing", add a new route:
    - **Endpoint**: Choose a URL path (e.g., `myapp`)
@@ -116,3 +162,9 @@ If your service runs a web server, you can expose it through the dashboard:
 **Changes not taking effect?**
 - Always run `sudo supervisorctl reread && sudo supervisorctl update` after editing .conf files
 - For existing services, restart them: `sudo supervisorctl restart myapp`
+
+**Auto-discovery not finding my service?**
+- Make sure the comments are exactly `# hydra.port=NUMBER` and `# hydra.endpoint=NAME`
+- Comments must be on their own line
+- Endpoint names should be lowercase alphanumeric with hyphens only
+- Reload supervisord after adding the comments

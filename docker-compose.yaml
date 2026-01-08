@@ -11,6 +11,7 @@ services:
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - ./traefik-dynamic:/etc/traefik/dynamic
     labels:
       # Make the /auth/verify endpoint accessible to Traefik
       - "traefik.enable=true"
@@ -24,6 +25,8 @@ services:
     command:
       - --providers.docker=true
       - --providers.docker.exposedbydefault=false
+      - --providers.file.directory=/etc/traefik/dynamic
+      - --providers.file.watch=true
       - --entrypoints.web.address=:8082
       - --entrypoints.web.forwardedHeaders.trustedIPs=127.0.0.1/32
       - --api.dashboard=true
@@ -32,6 +35,7 @@ services:
       - "8081:8080"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik-dynamic:/etc/traefik/dynamic:ro
     restart: unless-stopped
     networks:
       - hydra_students_net

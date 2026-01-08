@@ -94,7 +94,8 @@ services:
     ports:
       - "7070:7070"
     networks:
-      - hydra-dev-net
+      hydra-dev-net:
+        ipv4_address: 172.25.0.10
     depends_on:
       - open-webui
 
@@ -114,6 +115,7 @@ services:
       - ../routes:/app/routes:ro
       - ../public:/app/public:ro
       - ./jwt-keys:/app/jwt-keys
+      - ./traefik-dynamic:/etc/traefik/dynamic
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.hydra.rule=Host(`hydra.local`)"
@@ -123,7 +125,7 @@ services:
       - hydra-dev-net
     extra_hosts:
       - "hydra.local:host-gateway"
-      - "chimera:172.20.0.10"  # Points to openwebui-middleman
+      - "chimera:172.25.0.10"  # Points to openwebui-middleman
     depends_on:
       setup-jwt:
         condition: service_completed_successfully
@@ -141,6 +143,8 @@ services:
       - --api.insecure=true
       - --providers.docker=true
       - --providers.docker.exposedbydefault=false
+      - --providers.file.directory=/etc/traefik/dynamic
+      - --providers.file.watch=true
       - --entrypoints.web.address=:80
       - --entrypoints.websecure.address=:443
       - --log.level=DEBUG
@@ -150,9 +154,12 @@ services:
       - "8081:8080"  # Traefik dashboard
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik-dynamic:/etc/traefik/dynamic:ro
     networks:
       - hydra-dev-net
       - hydra_students_net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.traefik-dashboard.rule=Host(`traefik.hydra.local`)"
@@ -185,7 +192,7 @@ networks:
     driver: bridge
     ipam:
       config:
-        - subnet: 172.20.0.0/16
+        - subnet: 172.25.0.0/16
   hydra_students_net:
     driver: bridge
     name: hydra_students_net
