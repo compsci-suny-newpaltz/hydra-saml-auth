@@ -1,0 +1,67 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Minecraft Whitelist</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
+    form, .card { border: 1px solid #ddd; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; }
+    input[type=text]{ padding:.5rem; width: 100%; max-width: 320px; }
+    button{ padding:.5rem .75rem; cursor:pointer }
+    .row{ display:flex; gap:.5rem; align-items:center; margin-top:.5rem;}
+    #message { color: green; }
+  </style>
+</head>
+<body>
+  <h1 id="greeting"></h1>
+
+  <form id="userForm">
+    <h3>Add your Minecraft username to join the server</h3>
+    <div class="row">
+      <input id="minecraftUsername" type="text" placeholder="Minecraft username" required />
+      <button type="submit">Save</button>
+    </div>
+    <p id="message"></p>
+  </form>
+
+  <script>
+    async function api(path, options){
+      const res = await fetch(path, { headers:{ "Content-Type":"application/json" }, ...options });
+      const data = await res.json();
+      if(!res.ok) throw new Error(data.error || "Request failed");
+      return data;
+    }
+
+    async function loadUser() {
+      try {
+        const me = await api('api/me');
+        document.getElementById('greeting').textContent = `Hi, ${me.user.email}`;
+
+        const { minecraft_username } = await api('api/my-username');
+        if (minecraft_username) {
+          document.getElementById('minecraftUsername').value = minecraft_username;
+        }
+      } catch (e) {
+        document.getElementById('greeting').textContent = 'Could not load user data.';
+      }
+    }
+
+    document.getElementById('userForm').onsubmit = async (ev) => {
+      ev.preventDefault();
+      const minecraft_username = document.getElementById('minecraftUsername').value.trim();
+      if (!minecraft_username) return;
+      try {
+        const result = await api('api/my-username', { method: 'POST', body: JSON.stringify({ minecraft_username }) });
+        const messageEl = document.getElementById('message');
+        messageEl.textContent = result.message;
+        setTimeout(() => messageEl.textContent = '', 3000);
+      } catch (e) {
+        alert(e.message);
+      }
+    };
+
+    loadUser();
+  </script>
+</body>
+</html>
