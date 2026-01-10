@@ -5,4 +5,7 @@ node_modules
 # Traefik dynamic configs (auto-generated for student routes)
 traefik-dynamic/*.yaml
 traefik-dynamic/*.yml
-!traefik-dynamic/.gitkeep.claude/
+!traefik-dynamic/.gitkeep
+
+# Claude Code local settings
+.claude/
