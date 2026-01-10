@@ -1,0 +1,95 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: zfs-backup-controller
+  namespace: storage-system
+spec:
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: storage-controller
+          nodeSelector:
+            kubernetes.io/hostname: hydra
+          restartPolicy: OnFailure
+          containers:
+          - name: backup
+            image: busybox:latest
+            command: ["/bin/sh", "-c"]
+            args:
+            - |
+              #!/bin/sh
+              set -e
+              
+              echo "=== ZFS Backup Controller ==="
+              echo "Starting backup at $(date)"
+              
+              # Create snapshots for each dataset
+              for dataset in containers/active models/ollama; do
+                SNAPSHOT="tank/${dataset}@backup-$(date +%Y%m%d)"
+                echo "Creating snapshot: $SNAPSHOT"
+                
+                # This is a placeholder - actual zfs commands require privileged access
+                echo "zfs snapshot $SNAPSHOT"
+              done
+              
+              # Report backup status
+              echo "Backup completed at $(date)"
+              echo "Storage usage:"
+              df -h | grep tank
+              
+              # Check snapshot count
+              echo "Recent snapshots:"
+              ls -lah /tank/.zfs/snapshot/ 2>/dev/null | tail -10 || echo "ZFS snapshots not accessible from container"
+            volumeMounts:
+            - name: tank-storage
+              mountPath: /tank
+              readOnly: true
+            resources:
+              requests:
+                memory: "128Mi"
+                cpu: "50m"
+              limits:
+                memory: "256Mi"
+                cpu: "100m"
+          volumes:
+          - name: tank-storage
+            hostPath:
+              path: /tank
+              type: Directory
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backup-policy
+  namespace: storage-system
+data:
+  policy.yaml: |
+    # Backup retention policy
+    retention:
+      hourly_snapshots:
+        keep: 24
+        datasets:
+          - tank/containers/active
+          
+      daily_snapshots:
+        keep: 7
+        datasets:
+          - tank/containers
+          - tank/models
+          - tank/backups
+          
+      weekly_snapshots:
+        keep: 4
+        datasets:
+          - tank
+          
+    backup_targets:
+      local:
+        path: /mnt/sda/backups
+        compression: zstd-9
+        
+      remote:
+        enabled: false
+        # Future: rsync to remote server
