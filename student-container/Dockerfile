@@ -1,51 +1,83 @@
-FROM ubuntu:22.04
-
+# =============================================================================
+# Hydra Student Container - Optimized Multi-Stage Build
 # Build with: docker build -t hydra-student-container:latest .
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Stage 1: Build LCC VS Code extension
+# -----------------------------------------------------------------------------
+FROM node:20-slim AS lcc-builder
+
+RUN npm install -g @vscode/vsce && \
+    apt-get update && apt-get install -y --no-install-recommends git ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+RUN git clone --depth 1 https://github.com/lettucegoblin/vscode-lcc.git . && \
+    npm ci --omit=dev && \
+    vsce package --allow-missing-repository && \
+    mv *.vsix /lcc-tools.vsix
+
+# -----------------------------------------------------------------------------
+# Stage 2: Final image
+# -----------------------------------------------------------------------------
+FROM ubuntu:22.04
 
 # Prevent interactive prompts during installation
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=America/New_York
 
-# Install base packages
-RUN apt-get update && apt-get install -y \
+# Install all apt packages in a single layer with --no-install-recommends
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Core utilities
     git \
     curl \
     wget \
-    build-essential \
     sudo \
     supervisor \
     ca-certificates \
     gnupg \
     lsb-release \
-    software-properties-common \
+    # Build tools
+    build-essential \
+    gcc \
+    g++ \
+    gdb \
+    cmake \
+    make \
+    clangd \
+    # Python
     python3 \
     python3-pip \
     python3-venv \
+    python-is-python3 \
+    # Java (full JDK for compilation)
     openjdk-21-jdk \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-# Install Docker CE (for Docker-in-Docker)
+# Install Docker CLI only (no daemon - uses host's Docker socket)
 RUN install -m 0755 -d /etc/apt/keyrings && \
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg && \
     chmod a+r /etc/apt/keyrings/docker.gpg && \
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
     $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null && \
     apt-get update && \
-    apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin && \
-    rm -rf /var/lib/apt/lists/*
-
-# Ensure `python` maps to Python 3 for non-interactive use
-RUN apt-get update && apt-get install -y python-is-python3 && rm -rf /var/lib/apt/lists/*
+    apt-get install -y --no-install-recommends \
+        docker-ce-cli \
+        docker-buildx-plugin \
+        docker-compose-plugin && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # Create student user
 RUN useradd -m -s /bin/bash -u 1000 student && \
     echo "student ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers && \
     usermod -aG docker student
 
-# Install nvm and Node.js as student user
+# Switch to student user for remaining installs
 USER student
 WORKDIR /home/student
 
+# Install nvm, Node.js, and pnpm (single layer)
 ENV NVM_DIR=/home/student/.nvm
 ENV NODE_VERSION=20.11.0
 
@@ -53,43 +85,68 @@ RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | b
     . "$NVM_DIR/nvm.sh" && \
     nvm install ${NODE_VERSION} && \
     nvm alias default ${NODE_VERSION} && \
-    nvm use default
+    nvm use default && \
+    npm install -g pnpm && \
+    # Clean npm cache
+    npm cache clean --force && \
+    rm -rf /home/student/.npm/_cacache
 
-# Add nvm to PATH for all sessions
 ENV NODE_PATH=$NVM_DIR/versions/node/v$NODE_VERSION/lib/node_modules
 ENV PATH=$NVM_DIR/versions/node/v$NODE_VERSION/bin:$PATH
 
 # Install code-server
-RUN curl -fsSL https://code-server.dev/install.sh | sh
+RUN curl -fsSL https://code-server.dev/install.sh | sh && \
+    rm -rf /tmp/*
 
-# Install Jupyter
+# Copy extension list and settings
+COPY code-server/extensions.txt /tmp/extensions.txt
+COPY code-server/settings.json /tmp/default-settings.json
+
+# Install VS Code extensions (skip comments/empty lines, continue on failure)
+RUN while IFS= read -r ext || [ -n "$ext" ]; do \
+      case "$ext" in \#*|"") continue ;; esac; \
+      echo "Installing extension: $ext"; \
+      code-server --install-extension "$ext" || true; \
+    done < /tmp/extensions.txt && \
+    # Clean extension download cache
+    rm -rf /home/student/.local/share/code-server/CachedExtensionVSIXs
+
+# Copy pre-built LCC extension from builder stage and install
+COPY --from=lcc-builder /lcc-tools.vsix /tmp/lcc-tools.vsix
+RUN code-server --install-extension /tmp/lcc-tools.vsix && \
+    rm /tmp/lcc-tools.vsix
+
+# Setup code-server settings
+RUN mkdir -p /home/student/.local/share/code-server/User && \
+    cp /tmp/default-settings.json /home/student/.local/share/code-server/User/settings.json
+
+# Install Jupyter (with cache cleanup)
 RUN pip3 install --user --no-cache-dir \
     jupyter \
     jupyterlab \
-    notebook
+    notebook && \
+    rm -rf /home/student/.cache/pip
 
-# Add Python user bin to PATH
 ENV PATH=/home/student/.local/bin:$PATH
 
-# Create supervisor drop-in directory and copy template files
+# Create supervisor drop-in directory
 RUN mkdir -p /home/student/supervisor.d
 COPY supervisor.d/ /home/student/supervisor.d/
 
-# Switch back to root for supervisor setup
+# Switch to root for final setup
 USER root
 
-# Copy supervisor configuration
-COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+# Setup /etc/skel for fresh volumes and supervisor config
+RUN mkdir -p /etc/skel/.local/share/code-server/User && \
+    cp /tmp/default-settings.json /etc/skel/.local/share/code-server/User/settings.json && \
+    rm -rf /tmp/*
 
-# Copy entrypoint script
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-# Expose ports
+# Expose ports: code-server, jupyter, supervisor
 EXPOSE 8443 8888 9001
 
-# Set working directory
 WORKDIR /home/student
-
-# Run entrypoint
 ENTRYPOINT ["/entrypoint.sh"]

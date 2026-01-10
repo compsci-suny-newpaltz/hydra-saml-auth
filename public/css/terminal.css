@@ -1,0 +1,413 @@
+/* Bloomberg Terminal-style CSS for /servers page */
+
+:root {
+  --bg-dark: #0a0a0a;
+  --bg-panel: #0f0f0f;
+  --text-green: #00ff41;
+  --text-green-dim: #00aa2a;
+  --text-amber: #ffb000;
+  --text-red: #ff3333;
+  --text-cyan: #00d4ff;
+  --text-white: #e0e0e0;
+  --text-dim: #4a4a4a;
+  --border-green: #00aa2a;
+  --border-dim: #333;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body.terminal-bg {
+  background-color: var(--bg-dark);
+  color: var(--text-green);
+  font-family: 'IBM Plex Mono', 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0;
+  padding: 20px;
+  min-height: 100vh;
+}
+
+.terminal-container {
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+/* Header */
+.terminal-header {
+  text-align: center;
+  margin-bottom: 24px;
+  color: var(--text-green);
+  white-space: pre;
+  font-size: 14px;
+}
+
+.terminal-header .title {
+  color: var(--text-cyan);
+  font-weight: bold;
+}
+
+.terminal-header .timestamp {
+  color: var(--text-amber);
+}
+
+/* Grid layout */
+.terminal-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+@media (max-width: 1200px) {
+  .terminal-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 800px) {
+  .terminal-grid {
+    grid-template-columns: 1fr;
+  }
+  body.terminal-bg {
+    font-size: 11px;
+    padding: 10px;
+  }
+}
+
+/* Server panels */
+.server-panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-dim);
+  padding: 0;
+  font-family: inherit;
+}
+
+.server-panel.online {
+  border-color: var(--border-green);
+}
+
+.server-panel.warning {
+  border-color: var(--text-amber);
+}
+
+.server-panel.offline {
+  border-color: var(--text-red);
+}
+
+.server-panel.busy {
+  border-color: var(--text-amber);
+}
+
+/* Panel header */
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-dim);
+  background: linear-gradient(to bottom, #1a1a1a, #0f0f0f);
+}
+
+.panel-title {
+  font-weight: bold;
+  color: var(--text-cyan);
+}
+
+.panel-status {
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.panel-status.online {
+  color: var(--bg-dark);
+  background: var(--text-green);
+}
+
+.panel-status.warning {
+  color: var(--bg-dark);
+  background: var(--text-amber);
+}
+
+.panel-status.offline {
+  color: var(--text-white);
+  background: var(--text-red);
+}
+
+.panel-status.busy {
+  color: var(--bg-dark);
+  background: var(--text-amber);
+}
+
+/* Panel body */
+.panel-body {
+  padding: 12px;
+}
+
+/* Section headers */
+.section-header {
+  color: var(--text-dim);
+  font-size: 11px;
+  margin: 12px 0 6px 0;
+  padding-bottom: 4px;
+  border-bottom: 1px dashed var(--border-dim);
+}
+
+.section-header:first-child {
+  margin-top: 0;
+}
+
+/* Metric rows */
+.metric-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 6px 0;
+}
+
+.metric-label {
+  color: var(--text-green-dim);
+  min-width: 60px;
+}
+
+.metric-bar-container {
+  flex: 1;
+  margin: 0 10px;
+  display: flex;
+  align-items: center;
+}
+
+.metric-bar {
+  height: 10px;
+  background: var(--text-dim);
+  flex: 1;
+  position: relative;
+}
+
+.metric-bar-fill {
+  height: 100%;
+  background: var(--text-green);
+  transition: width 0.3s ease;
+}
+
+.metric-bar-fill.medium {
+  background: var(--text-amber);
+}
+
+.metric-bar-fill.high {
+  background: var(--text-red);
+}
+
+.metric-value {
+  min-width: 80px;
+  text-align: right;
+  color: var(--text-white);
+  font-size: 12px;
+}
+
+/* GPU cards */
+.gpu-card {
+  background: rgba(0, 170, 42, 0.1);
+  border: 1px solid var(--border-dim);
+  padding: 8px 10px;
+  margin: 8px 0;
+}
+
+.gpu-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.gpu-name {
+  color: var(--text-cyan);
+  font-weight: bold;
+}
+
+.gpu-temp {
+  color: var(--text-amber);
+}
+
+.gpu-temp.hot {
+  color: var(--text-red);
+}
+
+/* Job info */
+.job-info {
+  background: rgba(255, 176, 0, 0.1);
+  border: 1px solid var(--text-amber);
+  padding: 10px;
+  margin-top: 12px;
+}
+
+.job-title {
+  color: var(--text-amber);
+  font-weight: bold;
+  margin-bottom: 6px;
+}
+
+.job-name {
+  color: var(--text-white);
+  font-size: 12px;
+}
+
+.progress-bar {
+  height: 12px;
+  background: var(--text-dim);
+  margin: 8px 0;
+  position: relative;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--text-amber);
+  transition: width 0.5s ease;
+}
+
+.progress-text {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  color: var(--bg-dark);
+  font-weight: bold;
+}
+
+/* Queue info */
+.queue-info {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-dim);
+}
+
+.queue-stat {
+  text-align: center;
+}
+
+.queue-value {
+  font-size: 18px;
+  font-weight: bold;
+  color: var(--text-cyan);
+}
+
+.queue-label {
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+/* Footer */
+.terminal-footer {
+  margin-top: 24px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-dim);
+  display: flex;
+  justify-content: space-between;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.footer-link {
+  color: var(--text-green-dim);
+  text-decoration: none;
+}
+
+.footer-link:hover {
+  color: var(--text-green);
+}
+
+/* Loading/error states */
+.loading {
+  text-align: center;
+  padding: 40px;
+  color: var(--text-dim);
+}
+
+.loading::after {
+  content: '';
+  animation: blink 1s infinite;
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+.error-message {
+  color: var(--text-red);
+  background: rgba(255, 51, 51, 0.1);
+  border: 1px solid var(--text-red);
+  padding: 10px;
+  text-align: center;
+}
+
+/* ASCII decorations */
+.ascii-border {
+  color: var(--border-green);
+}
+
+/* Cursor blink effect */
+.cursor-blink {
+  animation: cursor-blink 1s step-end infinite;
+}
+
+@keyframes cursor-blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+/* Role badges */
+.role-badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  margin-left: 8px;
+}
+
+.role-badge.control {
+  background: var(--text-cyan);
+  color: var(--bg-dark);
+}
+
+.role-badge.inference {
+  background: var(--text-green);
+  color: var(--bg-dark);
+}
+
+.role-badge.training {
+  background: var(--text-amber);
+  color: var(--bg-dark);
+}
+
+/* Connection status indicator */
+.connection-indicator {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+}
+
+.connection-indicator.connected {
+  background: var(--text-green);
+  box-shadow: 0 0 6px var(--text-green);
+}
+
+.connection-indicator.disconnected {
+  background: var(--text-red);
+}
+
+/* Refresh indicator */
+.refresh-indicator {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.refresh-indicator.updating {
+  color: var(--text-amber);
+}

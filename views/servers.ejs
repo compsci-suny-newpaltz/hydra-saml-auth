@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HYDRA CLUSTER STATUS</title>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/terminal.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🖥️</text></svg>">
+</head>
+<body class="terminal-bg">
+  <div class="terminal-container">
+    <!-- Header -->
+    <div class="terminal-header">
+<span class="ascii-border">╔══════════════════════════════════════════════════════════════════════════════════╗</span>
+<span class="ascii-border">║</span>  <span class="title">HYDRA CLUSTER STATUS MONITOR</span>  <span class="ascii-border">│</span>  hydra.newpaltz.edu  <span class="ascii-border">│</span>  <span class="timestamp" id="header-timestamp">--:--:--</span>  <span class="ascii-border">║</span>
+<span class="ascii-border">╚══════════════════════════════════════════════════════════════════════════════════╝</span>
+    </div>
+
+    <!-- Refresh indicator -->
+    <div class="refresh-indicator" id="refresh-indicator">
+      <span class="connection-indicator connected" id="connection-dot"></span>
+      <span id="refresh-text">Connected</span>
+    </div>
+
+    <!-- Server Grid -->
+    <div class="terminal-grid" id="server-grid">
+      <!-- Hydra Panel -->
+      <div class="server-panel online" id="panel-hydra">
+        <div class="panel-header">
+          <span class="panel-title">HYDRA</span>
+          <span class="panel-status online" id="status-hydra">ONLINE</span>
+        </div>
+        <div class="panel-body">
+          <div class="metric-row">
+            <span class="metric-label">ROLE:</span>
+            <span class="role-badge control">CONTROL PLANE</span>
+          </div>
+
+          <div class="section-header">SYSTEM RESOURCES</div>
+
+          <div class="metric-row">
+            <span class="metric-label">CPU:</span>
+            <div class="metric-bar-container">
+              <div class="metric-bar">
+                <div class="metric-bar-fill" id="hydra-cpu-bar" style="width: 0%"></div>
+              </div>
+            </div>
+            <span class="metric-value" id="hydra-cpu">--%</span>
+          </div>
+
+          <div class="metric-row">
+            <span class="metric-label">RAM:</span>
+            <div class="metric-bar-container">
+              <div class="metric-bar">
+                <div class="metric-bar-fill" id="hydra-ram-bar" style="width: 0%"></div>
+              </div>
+            </div>
+            <span class="metric-value" id="hydra-ram">--/-- GB</span>
+          </div>
+
+          <div class="metric-row">
+            <span class="metric-label">DISK:</span>
+            <div class="metric-bar-container">
+              <div class="metric-bar">
+                <div class="metric-bar-fill" id="hydra-disk-bar" style="width: 0%"></div>
+              </div>
+            </div>
+            <span class="metric-value" id="hydra-disk">--/-- TB</span>
+          </div>
+
+          <div class="section-header">CLUSTER INFO</div>
+          <div class="metric-row">
+            <span class="metric-label">CONTAINERS:</span>
+            <span class="metric-value" id="hydra-containers">-- running</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">ZFS POOL:</span>
+            <span class="metric-value" id="hydra-zfs">--</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chimera Panel -->
+      <div class="server-panel online" id="panel-chimera">
+        <div class="panel-header">
+          <span class="panel-title">CHIMERA</span>
+          <span class="panel-status online" id="status-chimera">ONLINE</span>
+        </div>
+        <div class="panel-body">
+          <div class="metric-row">
+            <span class="metric-label">ROLE:</span>
+            <span class="role-badge inference">INFERENCE NODE</span>
+          </div>
+
+          <div class="section-header">GPU STATUS</div>
+          <div id="chimera-gpus">
+            <!-- GPU cards will be inserted here -->
+            <div class="loading">Loading GPU data...</div>
+          </div>
+
+          <div class="section-header">SYSTEM</div>
+          <div class="metric-row">
+            <span class="metric-label">CPU:</span>
+            <div class="metric-bar-container">
+              <div class="metric-bar">
+                <div class="metric-bar-fill" id="chimera-cpu-bar" style="width: 0%"></div>
+              </div>
+            </div>
+            <span class="metric-value" id="chimera-cpu">--%</span>
+          </div>
+
+          <div class="metric-row">
+            <span class="metric-label">RAM:</span>
+            <div class="metric-bar-container">
+              <div class="metric-bar">
+                <div class="metric-bar-fill" id="chimera-ram-bar" style="width: 0%"></div>
+              </div>
+            </div>
+            <span class="metric-value" id="chimera-ram">--/-- GB</span>
+          </div>
+
+          <div class="queue-info">
+            <div class="queue-stat">
+              <div class="queue-value" id="chimera-queue">--</div>
+              <div class="queue-label">QUEUE</div>
+            </div>
+            <div class="queue-stat">
+              <div class="queue-value" id="chimera-wait">--</div>
+              <div class="queue-label">AVG WAIT</div>
+            </div>
+            <div class="queue-stat">
+              <div class="queue-value" id="chimera-containers">--</div>
+              <div class="queue-label">RUNNING</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cerberus Panel -->
+      <div class="server-panel online" id="panel-cerberus">
+        <div class="panel-header">
+          <span class="panel-title">CERBERUS</span>
+          <span class="panel-status online" id="status-cerberus">ONLINE</span>
+        </div>
+        <div class="panel-body">
+          <div class="metric-row">
+            <span class="metric-label">ROLE:</span>
+            <span class="role-badge training">TRAINING NODE</span>
+          </div>
+
+          <div class="section-header">GPU STATUS</div>
+          <div id="cerberus-gpus">
+            <!-- GPU cards will be inserted here -->
+            <div class="loading">Loading GPU data...</div>
+          </div>
+
+          <div class="section-header">SYSTEM</div>
+          <div class="metric-row">
+            <span class="metric-label">CPU:</span>
+            <div class="metric-bar-container">
+              <div class="metric-bar">
+                <div class="metric-bar-fill" id="cerberus-cpu-bar" style="width: 0%"></div>
+              </div>
+            </div>
+            <span class="metric-value" id="cerberus-cpu">--%</span>
+          </div>
+
+          <div class="metric-row">
+            <span class="metric-label">RAM:</span>
+            <div class="metric-bar-container">
+              <div class="metric-bar">
+                <div class="metric-bar-fill" id="cerberus-ram-bar" style="width: 0%"></div>
+              </div>
+            </div>
+            <span class="metric-value" id="cerberus-ram">--/-- GB</span>
+          </div>
+
+          <!-- Active training job -->
+          <div class="job-info" id="cerberus-job" style="display: none;">
+            <div class="job-title">ACTIVE TRAINING JOB</div>
+            <div class="job-name" id="cerberus-job-name">--</div>
+            <div class="progress-bar">
+              <div class="progress-fill" id="cerberus-job-progress" style="width: 0%"></div>
+              <span class="progress-text" id="cerberus-job-percent">0%</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">ETA:</span>
+              <span class="metric-value" id="cerberus-job-eta">--</span>
+            </div>
+          </div>
+
+          <div class="queue-info">
+            <div class="queue-stat">
+              <div class="queue-value" id="cerberus-queue">--</div>
+              <div class="queue-label">QUEUE</div>
+            </div>
+            <div class="queue-stat">
+              <div class="queue-value" id="cerberus-containers">--</div>
+              <div class="queue-label">RUNNING</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="terminal-footer">
+      <span>Hydra Lab - SUNY New Paltz Computer Science</span>
+      <span>Auto-refresh: 30s | <a href="/dashboard" class="footer-link">Dashboard</a></span>
+    </div>
+  </div>
+
+  <script src="/js/servers.js"></script>
+</body>
+</html>
