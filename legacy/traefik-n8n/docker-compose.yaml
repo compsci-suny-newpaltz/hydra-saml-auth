@@ -1,0 +1,99 @@
+services:
+  traefik:
+    image: traefik:v2.11
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:8080"
+      - "--log.level=INFO"
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    environment:
+      # --- DB (Postgres) ---
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB}
+      - DB_POSTGRESDB_USER=${POSTGRES_USER}
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_POSTGRESDB_SCHEMA=public
+
+      # --- n8n / proxy ---
+      - N8N_HOST=${DOMAIN_NAME}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - N8N_PATH=${N8N_PATH}                # set "/" unless you want a subpath
+      - WEBHOOK_URL=https://${DOMAIN_NAME}${N8N_PATH}
+      - N8N_EDITOR_BASE_URL=https://${DOMAIN_NAME}${N8N_PATH}
+      - N8N_PROXY_HOPS=2
+      - TZ=America/New_York
+
+      # Pin a key so credentials survive container restarts (new instance = new data)
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+
+    volumes:
+      - n8n_data:/home/node/.n8n
+    labels:
+      - traefik.enable=true
+      # Root path (N8N_PATH="/"):
+      - traefik.http.routers.n8n.rule=Host(`${DOMAIN_NAME}`)
+      - traefik.http.routers.n8n.entrypoints=web
+      - traefik.http.routers.n8n.priority=10
+      - traefik.http.services.n8n.loadbalancer.server.port=5678
+
+      # If you ever set N8N_PATH to a subpath like "/n8n", switch the router rule to:
+      # - traefik.http.routers.n8n.rule=Host(`${DOMAIN_NAME}`) && PathPrefix(`${N8N_PATH}`)
+      # Note that n8n does not support subpaths well, so you may run into issues(login redirects to 404, /n8n/n8n path repetitions due to their misconfiguration internally). Use at your own risk.
+    restart: unless-stopped
+    depends_on:
+      - postgres
+
+  n8n-user-manager:
+    build:
+      context: ./user-manager
+      dockerfile: Dockerfile
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - N8N_USER_MANAGER_API_KEY=${N8N_USER_MANAGER_API_KEY}
+      - N8N_USER_MANAGER_PORT=3000
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.n8n-user-manager.rule=PathPrefix(`/n8n-user-manager`)
+      - traefik.http.routers.n8n-user-manager.entrypoints=web
+      - traefik.http.routers.n8n-user-manager.priority=100
+      - traefik.http.services.n8n-user-manager.loadbalancer.server.port=3000
+      # Strip /n8n-user-manager prefix before forwarding to the service
+      - traefik.http.middlewares.n8n-user-manager-stripprefix.stripprefix.prefixes=/n8n-user-manager
+      - traefik.http.routers.n8n-user-manager.middlewares=n8n-user-manager-stripprefix
+    restart: unless-stopped
+    depends_on:
+      - postgres
+
+volumes:
+  n8n_data:
+  pg_data:
