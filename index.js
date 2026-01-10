@@ -504,6 +504,14 @@ const ensureAuthenticated = (req, res, next) =>
       console.warn('[Init] containers routes not mounted:', e?.message || e);
     }
 
+    // Mount API routes for server status and metrics (public)
+    try {
+      const serversApiRouter = require('./routes/servers-api');
+      app.use('/api/servers', serversApiRouter);
+    } catch (e) {
+      console.warn('[Init] servers-api routes not mounted:', e?.message || e);
+    }
+
     // WebSocket terminal for containers (behind auth)
     app.ws('/dashboard/ws/containers/:name/exec', async (ws, req) => {
       try {
@@ -588,6 +596,11 @@ const ensureAuthenticated = (req, res, next) =>
       res.render('dashboard', { user: viewUser, baseUrl: BASE_URL });
     });
 
+    // Cluster status page (public, Bloomberg terminal style)
+    app.get('/servers', (_req, res) => {
+      res.render('servers');
+    });
+
     app.get('/logout', (req, res, next) => {
       const returnTo = sanitizeReturnTo(req.query.returnTo || req.get('referer') || '/dashboard');
       console.log('Logout requested. ReturnTo:', returnTo);
@@ -597,6 +610,27 @@ const ensureAuthenticated = (req, res, next) =>
     });
 
     app.get('/login-failed', (_req, res) => res.status(401).send('Authentication failed.'));
+
+    // Start background services
+    try {
+      const containerReminder = require('./services/container-reminder');
+      containerReminder.start();
+
+      // Admin endpoint to manually trigger reminders (requires admin role)
+      app.post('/api/admin/send-reminders', ensureAuthenticated, async (req, res) => {
+        if (!req.user?.roles?.includes('admin')) {
+          return res.status(403).json({ error: 'Admin access required' });
+        }
+        try {
+          const result = await containerReminder.triggerReminders();
+          res.json({ success: true, ...result });
+        } catch (err) {
+          res.status(500).json({ error: err.message });
+        }
+      });
+    } catch (e) {
+      console.warn('[Init] container-reminder service not started:', e?.message || e);
+    }
 
     // Start
     app.listen(PORT, '0.0.0.0', () => {

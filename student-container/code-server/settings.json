@@ -1,0 +1,14 @@
+{
+  "editor.fontSize": 14,
+  "editor.tabSize": 2,
+  "editor.formatOnSave": true,
+  "editor.minimap.enabled": false,
+  "editor.wordWrap": "on",
+  "terminal.integrated.fontSize": 14,
+  "files.autoSave": "afterDelay",
+  "files.autoSaveDelay": 1000,
+  "workbench.colorTheme": "Default Dark+",
+  "python.defaultInterpreterPath": "/usr/bin/python3",
+  "git.autofetch": true,
+  "git.confirmSync": false
+}

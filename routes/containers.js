@@ -16,6 +16,24 @@ const RESERVED_PORTS = [CODE_SERVER_PORT, JUPYTER_PORT];
 const RESERVED_ENDPOINTS = ['vscode', 'jupyter'];
 const TRAEFIK_DYNAMIC_DIR = process.env.TRAEFIK_DYNAMIC_DIR || '/etc/traefik/dynamic';
 
+// Shared read-only directory for course materials, downloads, etc.
+// Students can view/download but cannot modify files on the host
+const SHARED_DIR = process.env.SHARED_DIR || '/srv/shared';
+const SHARED_MOUNT_TARGET = '/shared';
+
+// Helper to ensure shared directory exists
+async function ensureSharedDir() {
+    const fsSync = require('fs');
+    try {
+        if (!fsSync.existsSync(SHARED_DIR)) {
+            fsSync.mkdirSync(SHARED_DIR, { recursive: true, mode: 0o755 });
+            console.log(`[containers] Created shared directory: ${SHARED_DIR}`);
+        }
+    } catch (err) {
+        console.warn(`[containers] Could not create shared directory ${SHARED_DIR}:`, err.message);
+    }
+}
+
 // Helper to pull Docker images
 async function pullImage(img) {
     return new Promise((resolve, reject) => {
@@ -182,6 +200,9 @@ router.post('/init', async (req, res) => {
         // Ensure volume exists
         await ensureVolume(volumeName, username);
 
+        // Ensure shared directory exists on host
+        await ensureSharedDir();
+
         // Default routes for code-server and jupyter
         const defaultRoutes = [
             { endpoint: 'vscode', port: CODE_SERVER_PORT },
@@ -224,11 +245,19 @@ router.post('/init', async (req, res) => {
             HostConfig: {
                 NetworkMode: MAIN_NETWORK,
                 RestartPolicy: { Name: 'unless-stopped' },
-                Mounts: [{
-                    Type: 'volume',
-                    Source: volumeName,
-                    Target: '/home/student'
-                }],
+                Mounts: [
+                    {
+                        Type: 'volume',
+                        Source: volumeName,
+                        Target: '/home/student'
+                    },
+                    {
+                        Type: 'bind',
+                        Source: SHARED_DIR,
+                        Target: SHARED_MOUNT_TARGET,
+                        ReadOnly: true
+                    }
+                ],
                 Memory: 4 * 1024 * 1024 * 1024, // 4GB
                 NanoCpus: 2e9, // 2 CPUs
                 Privileged: true // For Docker-in-Docker
@@ -1009,6 +1038,9 @@ router.post('/wipe', async (req, res) => {
         // Ensure volume exists
         await ensureVolume(volumeName, username);
 
+        // Ensure shared directory exists on host
+        await ensureSharedDir();
+
         // Default routes for code-server and jupyter
         const defaultRoutes = [
             { endpoint: 'vscode', port: CODE_SERVER_PORT },
@@ -1051,11 +1083,19 @@ router.post('/wipe', async (req, res) => {
             HostConfig: {
                 NetworkMode: MAIN_NETWORK,
                 RestartPolicy: { Name: 'unless-stopped' },
-                Mounts: [{
-                    Type: 'volume',
-                    Source: volumeName,
-                    Target: '/home/student'
-                }],
+                Mounts: [
+                    {
+                        Type: 'volume',
+                        Source: volumeName,
+                        Target: '/home/student'
+                    },
+                    {
+                        Type: 'bind',
+                        Source: SHARED_DIR,
+                        Target: SHARED_MOUNT_TARGET,
+                        ReadOnly: true
+                    }
+                ],
                 Memory: 4 * 1024 * 1024 * 1024, // 4GB
                 NanoCpus: 2e9, // 2 CPUs
                 Privileged: true // For Docker-in-Docker
