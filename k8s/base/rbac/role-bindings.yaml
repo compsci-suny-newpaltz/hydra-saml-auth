@@ -1,0 +1,45 @@
+# Hydra RBAC Role Bindings
+---
+# Bind student-pod-manager role to hydra-auth service account
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: hydra-auth-student-pods
+  namespace: hydra-students
+subjects:
+  - kind: ServiceAccount
+    name: hydra-auth
+    namespace: hydra-system
+roleRef:
+  kind: Role
+  name: student-pod-manager
+  apiGroup: rbac.authorization.k8s.io
+---
+# Bind hydra-auth-role to hydra-auth in hydra-system
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: hydra-auth-system
+  namespace: hydra-system
+subjects:
+  - kind: ServiceAccount
+    name: hydra-auth
+    namespace: hydra-system
+roleRef:
+  kind: Role
+  name: hydra-auth-role
+  apiGroup: rbac.authorization.k8s.io
+---
+# Bind node-reader cluster role for GPU scheduling
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: hydra-auth-nodes
+subjects:
+  - kind: ServiceAccount
+    name: hydra-auth
+    namespace: hydra-system
+roleRef:
+  kind: ClusterRole
+  name: hydra-node-reader
+  apiGroup: rbac.authorization.k8s.io

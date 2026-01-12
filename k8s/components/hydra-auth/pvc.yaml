@@ -1,0 +1,16 @@
+# Hydra Auth Data PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hydra-auth-data
+  namespace: hydra-system
+  labels:
+    app.kubernetes.io/name: hydra
+    app.kubernetes.io/component: auth
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: hydra-local
+  resources:
+    requests:
+      storage: 1Gi

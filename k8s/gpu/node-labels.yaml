@@ -1,0 +1,59 @@
+# GPU Node Labels Reference
+# Apply these labels to GPU nodes for proper scheduling
+#
+# For Chimera (RTX 3090 x3):
+#   kubectl label nodes chimera hydra.gpu-enabled=true
+#   kubectl label nodes chimera hydra.node-role=inference
+#   kubectl label nodes chimera nvidia.com/gpu.product=NVIDIA-GeForce-RTX-3090
+#   kubectl label nodes chimera hydra.gpu-count=3
+#   kubectl label nodes chimera hydra.gpu-vram=72
+#
+# For Cerberus (RTX 5090 x2):
+#   kubectl label nodes cerberus hydra.gpu-enabled=true
+#   kubectl label nodes cerberus hydra.node-role=training
+#   kubectl label nodes cerberus nvidia.com/gpu.product=NVIDIA-GeForce-RTX-5090
+#   kubectl label nodes cerberus hydra.gpu-count=2
+#   kubectl label nodes cerberus hydra.gpu-vram=64
+#
+# For Hydra (Control Plane, no GPU):
+#   kubectl label nodes hydra hydra.node-role=control-plane
+#   kubectl label nodes hydra hydra.gpu-enabled=false
+#
+# Taints for GPU nodes (optional - prevents non-GPU pods from scheduling):
+#   kubectl taint nodes chimera nvidia.com/gpu=present:NoSchedule
+#   kubectl taint nodes cerberus nvidia.com/gpu=present:NoSchedule
+
+---
+# ResourceQuota for GPU resources in hydra-students namespace
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: gpu-quota
+  namespace: hydra-students
+spec:
+  hard:
+    requests.nvidia.com/gpu: "5"  # Max 5 GPUs total for students
+    limits.nvidia.com/gpu: "5"
+---
+# LimitRange for student pods
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: student-limits
+  namespace: hydra-students
+spec:
+  limits:
+    - type: Container
+      default:
+        memory: "1Gi"
+        cpu: "1"
+      defaultRequest:
+        memory: "512Mi"
+        cpu: "500m"
+      max:
+        memory: "48Gi"
+        cpu: "16"
+        nvidia.com/gpu: "2"
+      min:
+        memory: "256Mi"
+        cpu: "100m"

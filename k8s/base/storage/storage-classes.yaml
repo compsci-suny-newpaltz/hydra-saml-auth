@@ -1,0 +1,82 @@
+# Hydra Storage Classes for ZFS-backed tiered storage
+---
+# Hot tier - Active student containers (NVMe/SSD backed ZFS)
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: hydra-hot
+  labels:
+    app.kubernetes.io/name: hydra
+    hydra.storage-tier: hot
+provisioner: zfs.csi.openebs.io
+parameters:
+  poolname: "tank/containers/active"
+  compression: "lz4"
+  recordsize: "128k"
+  dedup: "off"
+reclaimPolicy: Retain
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+---
+# Warm tier - Inactive student containers
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: hydra-warm
+  labels:
+    app.kubernetes.io/name: hydra
+    hydra.storage-tier: warm
+provisioner: zfs.csi.openebs.io
+parameters:
+  poolname: "tank/containers/inactive"
+  compression: "lz4"
+  recordsize: "128k"
+reclaimPolicy: Retain
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+---
+# Cold tier - Archived student containers
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: hydra-cold
+  labels:
+    app.kubernetes.io/name: hydra
+    hydra.storage-tier: cold
+provisioner: zfs.csi.openebs.io
+parameters:
+  poolname: "tank/containers/archive"
+  compression: "gzip-9"
+  recordsize: "1m"
+reclaimPolicy: Retain
+volumeBindingMode: WaitForFirstConsumer
+---
+# GPU workload storage - High performance for ML/AI workloads
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: hydra-gpu
+  labels:
+    app.kubernetes.io/name: hydra
+    hydra.storage-tier: gpu
+provisioner: zfs.csi.openebs.io
+parameters:
+  poolname: "tank/containers/active"
+  recordsize: "1m"
+  compression: "off"
+  sync: "disabled"
+reclaimPolicy: Retain
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+---
+# Local path provisioner for dev environments (k3d)
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: hydra-local
+  labels:
+    app.kubernetes.io/name: hydra
+    hydra.storage-tier: local
+provisioner: rancher.io/local-path
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer

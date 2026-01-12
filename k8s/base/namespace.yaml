@@ -1,0 +1,19 @@
+# Hydra Kubernetes Namespaces
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hydra-system
+  labels:
+    app.kubernetes.io/name: hydra
+    app.kubernetes.io/component: control-plane
+    pod-security.kubernetes.io/enforce: baseline
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hydra-students
+  labels:
+    app.kubernetes.io/name: hydra
+    app.kubernetes.io/component: student-workloads
+    pod-security.kubernetes.io/enforce: restricted

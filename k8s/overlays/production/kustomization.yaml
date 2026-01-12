@@ -1,0 +1,82 @@
+# Production overlay for RKE2 cluster
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: hydra-system
+
+resources:
+  - ../../base/namespace.yaml
+  - ../../base/rbac
+  - ../../base/storage/storage-classes.yaml
+  - ../../components/hydra-auth
+  - ../../components/traefik
+  - ../../gpu/nvidia-device-plugin.yaml
+
+# Production-specific patches
+patches:
+  # Enable production replicas
+  - target:
+      kind: Deployment
+      name: hydra-auth
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 2
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: "512Mi"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: "500m"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: "1Gi"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: "1"
+
+  # Production storage
+  - target:
+      kind: PersistentVolumeClaim
+      name: hydra-auth-db
+    patch: |-
+      - op: replace
+        path: /spec/storageClassName
+        value: hydra-hot
+      - op: replace
+        path: /spec/resources/requests/storage
+        value: "10Gi"
+
+  # Enable TLS on Traefik
+  - target:
+      kind: Deployment
+      name: traefik
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/args/-
+        value: "--entrypoints.websecure.http.tls=true"
+
+configMapGenerator:
+  - name: hydra-env-prod
+    literals:
+      - ORCHESTRATOR=kubernetes
+      - K8S_IN_CLUSTER=true
+      - K8S_NAMESPACE=hydra-students
+      - K8S_SYSTEM_NAMESPACE=hydra-system
+      - NODE_ENV=production
+      - LOG_LEVEL=info
+
+secretGenerator:
+  - name: hydra-secrets
+    type: Opaque
+    options:
+      disableNameSuffixHash: true
+    literals:
+      - SESSION_SECRET=REPLACE_WITH_SECURE_SECRET
+      - JWT_SECRET=REPLACE_WITH_SECURE_SECRET
+
+commonLabels:
+  environment: production
+
+commonAnnotations:
+  app.kubernetes.io/version: "1.0.0"

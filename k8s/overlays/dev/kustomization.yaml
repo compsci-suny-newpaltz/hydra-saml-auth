@@ -1,0 +1,54 @@
+# Development overlay for k3d local cluster
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: hydra-system
+
+resources:
+  - ../../base/namespace.yaml
+  - ../../base/rbac
+  - ../../base/storage/storage-classes.yaml
+  - ../../components/hydra-auth
+  - ../../components/traefik
+  - ../../dev/mock-services
+
+# Development-specific patches
+patches:
+  # Reduce resource requests for dev
+  - target:
+      kind: Deployment
+      name: hydra-auth
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: "128Mi"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: "100m"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: "256Mi"
+
+  # Use local storage class for dev
+  - target:
+      kind: PersistentVolumeClaim
+      name: hydra-auth-db
+    patch: |-
+      - op: replace
+        path: /spec/storageClassName
+        value: local-path
+      - op: replace
+        path: /spec/resources/requests/storage
+        value: "1Gi"
+
+configMapGenerator:
+  - name: hydra-env-dev
+    literals:
+      - ORCHESTRATOR=kubernetes
+      - K8S_IN_CLUSTER=true
+      - K8S_NAMESPACE=hydra-students
+      - NODE_ENV=development
+      - LOG_LEVEL=debug
+
+commonLabels:
+  environment: development

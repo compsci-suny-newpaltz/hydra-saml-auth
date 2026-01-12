@@ -1,0 +1,117 @@
+# Mock Metrics Server for local development
+# Simulates GPU and node metrics for testing resource allocation
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mock-metrics
+  namespace: hydra-system
+  labels:
+    app.kubernetes.io/name: mock-metrics
+    app.kubernetes.io/component: dev-mock
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mock-metrics
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mock-metrics
+    spec:
+      containers:
+        - name: metrics
+          image: node:20-alpine
+          command: ["node", "/app/mock-metrics-server.js"]
+          ports:
+            - name: http
+              containerPort: 9100
+          volumeMounts:
+            - name: app
+              mountPath: /app
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "100m"
+      volumes:
+        - name: app
+          configMap:
+            name: mock-metrics-script
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mock-metrics-script
+  namespace: hydra-system
+data:
+  mock-metrics-server.js: |
+    const http = require('http');
+
+    const nodes = {
+      hydra: {
+        cpu_total: 64,
+        cpu_used: 12,
+        memory_total_gb: 251,
+        memory_used_gb: 45,
+        storage_total_tb: 21,
+        storage_used_tb: 3.2,
+        containers: 24
+      },
+      chimera: {
+        cpu_total: 32,
+        cpu_used: 8,
+        memory_total_gb: 128,
+        memory_used_gb: 32,
+        gpu_count: 3,
+        gpu_model: 'RTX 3090',
+        gpu_vram_total_gb: 72,
+        gpu_vram_used_gb: 18,
+        containers: 5
+      },
+      cerberus: {
+        cpu_total: 48,
+        cpu_used: 4,
+        memory_total_gb: 256,
+        memory_used_gb: 24,
+        gpu_count: 2,
+        gpu_model: 'RTX 5090',
+        gpu_vram_total_gb: 64,
+        gpu_vram_used_gb: 0,
+        containers: 2
+      }
+    };
+
+    const server = http.createServer((req, res) => {
+      if (req.url === '/metrics') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(nodes, null, 2));
+      } else if (req.url === '/health') {
+        res.writeHead(200);
+        res.end('OK');
+      } else {
+        res.writeHead(404);
+        res.end('Not Found');
+      }
+    });
+
+    server.listen(9100, () => {
+      console.log('Mock metrics server running on port 9100');
+    });
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mock-metrics
+  namespace: hydra-system
+  labels:
+    app.kubernetes.io/name: mock-metrics
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 9100
+      targetPort: 9100
+  selector:
+    app.kubernetes.io/name: mock-metrics

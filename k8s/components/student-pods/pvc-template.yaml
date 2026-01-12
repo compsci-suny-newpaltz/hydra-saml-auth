@@ -1,0 +1,23 @@
+# Student PVC Template
+# Variables: ${USERNAME}, ${STORAGE_GB}, ${STORAGE_CLASS}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hydra-vol-${USERNAME}
+  namespace: hydra-students
+  labels:
+    app.kubernetes.io/name: student-volume
+    app.kubernetes.io/instance: ${USERNAME}
+    app.kubernetes.io/managed-by: hydra-auth
+    hydra.owner: ${USERNAME}
+  annotations:
+    hydra.created-at: ${CREATED_AT}
+    hydra.storage-tier: ${STORAGE_TIER}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ${STORAGE_CLASS}
+  resources:
+    requests:
+      storage: ${STORAGE_GB}Gi

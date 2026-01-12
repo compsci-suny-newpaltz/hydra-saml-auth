@@ -1,0 +1,49 @@
+# Traefik IngressRoutes for Hydra
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: hydra-auth
+  namespace: hydra-system
+  labels:
+    app.kubernetes.io/name: hydra
+spec:
+  entryPoints:
+    - web
+    - hydra
+  routes:
+    - match: Host(`hydra.local`)
+      kind: Rule
+      services:
+        - name: hydra-auth
+          port: 6969
+---
+# Middleware for ForwardAuth (student routes)
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: hydra-forward-auth
+  namespace: hydra-system
+spec:
+  forwardAuth:
+    address: http://hydra-auth.hydra-system.svc.cluster.local:6969/auth/verify
+    trustForwardHeader: true
+    authResponseHeaders:
+      - X-Hydra-User
+      - X-Hydra-Email
+---
+# Traefik Dashboard IngressRoute
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: traefik-dashboard
+  namespace: hydra-system
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: Host(`traefik.hydra.local`)
+      kind: Rule
+      services:
+        - name: api@internal
+          kind: TraefikService
