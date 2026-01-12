@@ -239,9 +239,30 @@
                 class="px-3 py-2 rounded bg-yellow-500 text-white hover:bg-yellow-600 text-sm">
                 <i class="fas fa-exclamation-triangle"></i> Wipe
               </button>
+              <button onclick="showResourceModal()" id="resource-config-btn" title="Configure Resources"
+                class="px-3 py-2 rounded bg-purple-600 text-white hover:bg-purple-700 text-sm">
+                <i class="fas fa-cog"></i> Configure
+              </button>
             </div>
           </div>
           <div id="container-message" class="mt-3"></div>
+        </div>
+
+        <!-- Pending Resource Request Status -->
+        <div id="pending-request-section" class="mb-6 border rounded p-4 bg-yellow-50 border-yellow-200 hidden">
+          <div class="flex items-center justify-between">
+            <div>
+              <h4 class="text-lg font-semibold text-yellow-800"><i class="fas fa-clock"></i> Pending Resource Request</h4>
+              <p class="text-sm text-yellow-700 mt-1">
+                <span class="font-medium">Target:</span> <span id="pending-target-node">-</span> |
+                <span class="font-medium">Resources:</span> <span id="pending-resources">-</span>
+              </p>
+              <p class="text-xs text-yellow-600 mt-1">Submitted: <span id="pending-submitted">-</span></p>
+            </div>
+            <button onclick="cancelPendingRequest()" class="px-3 py-2 rounded bg-yellow-600 text-white hover:bg-yellow-700 text-sm">
+              <i class="fas fa-times"></i> Cancel
+            </button>
+          </div>
         </div>
 
         <!-- Wipe Confirmation Modal -->
@@ -269,6 +290,181 @@
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- Resource Configuration Modal -->
+        <div id="resource-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+          <div class="relative top-10 mx-auto p-5 border w-11/12 max-w-2xl shadow-lg rounded-md bg-white">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-xl font-semibold text-gray-900"><i class="fas fa-cog text-purple-600"></i> Configure Resources</h3>
+              <button onclick="hideResourceModal()" class="text-gray-500 hover:text-gray-700">
+                <i class="fas fa-times text-xl"></i>
+              </button>
+            </div>
+
+            <!-- Current Configuration -->
+            <div class="bg-gray-50 rounded p-3 mb-4">
+              <p class="text-sm font-medium text-gray-700 mb-2">Current Configuration</p>
+              <div class="grid grid-cols-2 gap-2 text-sm">
+                <div><span class="text-gray-500">Node:</span> <span id="current-node" class="font-medium">Hydra</span></div>
+                <div><span class="text-gray-500">Memory:</span> <span id="current-memory" class="font-medium">4 GB</span></div>
+                <div><span class="text-gray-500">CPUs:</span> <span id="current-cpus" class="font-medium">2</span></div>
+                <div><span class="text-gray-500">Storage:</span> <span id="current-storage" class="font-medium">40 GB</span></div>
+              </div>
+            </div>
+
+            <!-- Auto-Recommendation Banner -->
+            <div id="recommendation-banner" class="bg-blue-50 border border-blue-200 rounded p-3 mb-4 hidden">
+              <div class="flex items-start gap-2">
+                <i class="fas fa-lightbulb text-blue-600 mt-0.5"></i>
+                <div class="flex-1">
+                  <p class="text-sm font-medium text-blue-800">Recommended: <span id="rec-node-name">Hydra</span></p>
+                  <p class="text-xs text-blue-700" id="rec-reason">Best node for your workload</p>
+                  <button type="button" onclick="applyRecommendation()" class="mt-1 text-xs text-blue-700 underline hover:text-blue-900">
+                    Apply recommendation
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Node Status Cards -->
+            <div class="grid grid-cols-3 gap-2 mb-4">
+              <!-- Hydra -->
+              <div id="node-card-hydra" class="border rounded p-2 cursor-pointer hover:border-purple-400 transition-colors" onclick="selectNode('hydra')">
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-xs font-semibold">Hydra</span>
+                  <span id="hydra-status-dot" class="w-2 h-2 rounded-full bg-green-500"></span>
+                </div>
+                <p class="text-xs text-gray-500 mb-1">Control Plane</p>
+                <div class="h-1.5 bg-gray-200 rounded-full overflow-hidden mb-1">
+                  <div id="hydra-capacity-bar" class="h-full bg-green-500 transition-all" style="width: 30%"></div>
+                </div>
+                <p class="text-xs text-gray-600"><span id="hydra-slots">70</span> slots free</p>
+              </div>
+              <!-- Chimera -->
+              <div id="node-card-chimera" class="border rounded p-2 cursor-pointer hover:border-purple-400 transition-colors" onclick="selectNode('chimera')">
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-xs font-semibold">Chimera</span>
+                  <span id="chimera-status-dot" class="w-2 h-2 rounded-full bg-green-500"></span>
+                </div>
+                <p class="text-xs text-gray-500 mb-1">3× RTX 3090</p>
+                <div class="h-1.5 bg-gray-200 rounded-full overflow-hidden mb-1">
+                  <div id="chimera-capacity-bar" class="h-full bg-yellow-500 transition-all" style="width: 60%"></div>
+                </div>
+                <div class="flex justify-between text-xs text-gray-600">
+                  <span><span id="chimera-slots">8</span> slots</span>
+                  <span><span id="chimera-gpu-util">45</span>% GPU</span>
+                </div>
+              </div>
+              <!-- Cerberus -->
+              <div id="node-card-cerberus" class="border rounded p-2 cursor-pointer hover:border-purple-400 transition-colors" onclick="selectNode('cerberus')">
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-xs font-semibold">Cerberus</span>
+                  <span id="cerberus-status-dot" class="w-2 h-2 rounded-full bg-yellow-500"></span>
+                </div>
+                <p class="text-xs text-gray-500 mb-1">2× RTX 5090</p>
+                <div class="h-1.5 bg-gray-200 rounded-full overflow-hidden mb-1">
+                  <div id="cerberus-capacity-bar" class="h-full bg-red-500 transition-all" style="width: 80%"></div>
+                </div>
+                <div class="flex justify-between text-xs text-gray-600">
+                  <span><span id="cerberus-slots">2</span> slots</span>
+                  <span><span id="cerberus-gpu-util">92</span>% GPU</span>
+                </div>
+              </div>
+            </div>
+
+            <form id="resource-config-form" class="space-y-4">
+              <!-- Target Node (hidden, controlled by cards) -->
+              <input type="hidden" id="target-node" value="hydra">
+
+              <!-- Selected Node Display -->
+              <div class="bg-purple-50 border border-purple-200 rounded p-3">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-sm font-medium text-purple-800">Selected: <span id="selected-node-label">Hydra (Control Plane)</span></p>
+                    <p id="node-status" class="text-xs text-purple-600 mt-1"></p>
+                  </div>
+                  <div id="selected-node-gpu-info" class="text-right hidden">
+                    <p class="text-xs text-purple-700"><span id="selected-gpu-avail">3</span> GPUs available</p>
+                    <p class="text-xs text-purple-600"><span id="selected-gpu-model">RTX 3090</span></p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Resource Preset -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Resource Preset</label>
+                <select id="resource-preset" class="w-full rounded border border-gray-300 px-3 py-2">
+                  <option value="conservative">Conservative (4GB RAM, 2 CPU) - Auto-approved</option>
+                  <option value="standard">Standard (8GB RAM, 4 CPU)</option>
+                  <option value="enhanced">Enhanced (16GB RAM, 8 CPU)</option>
+                  <option value="gpu_inference">GPU Inference (32GB RAM, 8 CPU, 1 GPU)</option>
+                  <option value="gpu_training">GPU Training (48GB RAM, 16 CPU, 2 GPU)</option>
+                </select>
+                <p id="preset-capacity-warning" class="text-xs text-orange-600 mt-1 hidden">
+                  <i class="fas fa-exclamation-triangle"></i> Limited capacity for this preset
+                </p>
+              </div>
+
+              <!-- Storage Tier -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Storage</label>
+                <select id="storage-tier" class="w-full rounded border border-gray-300 px-3 py-2">
+                  <option value="10">10 GB</option>
+                  <option value="25">25 GB</option>
+                  <option value="40" selected>40 GB (Default)</option>
+                  <option value="50">50 GB</option>
+                  <option value="75">75 GB (Requires approval)</option>
+                  <option value="100">100 GB (Requires approval)</option>
+                  <option value="200">200 GB - GPU Training (Requires approval)</option>
+                </select>
+              </div>
+
+              <!-- Reason (for approval requests) -->
+              <div id="reason-section" class="hidden">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Reason for Request</label>
+                <textarea id="request-reason" rows="2" class="w-full rounded border border-gray-300 px-3 py-2"
+                  placeholder="Briefly explain why you need these resources..."></textarea>
+              </div>
+
+              <!-- Approval Warning -->
+              <div id="approval-warning" class="bg-yellow-50 border border-yellow-200 rounded p-3 hidden">
+                <p class="text-sm text-yellow-800">
+                  <i class="fas fa-exclamation-circle"></i>
+                  <strong>Requires Approval:</strong> This configuration requires admin approval. You will receive an email when reviewed.
+                </p>
+              </div>
+
+              <!-- Auto-Approve Info -->
+              <div id="auto-approve-info" class="bg-green-50 border border-green-200 rounded p-3">
+                <p class="text-sm text-green-800">
+                  <i class="fas fa-check-circle"></i>
+                  <strong>Auto-approved:</strong> Applied immediately on next container restart.
+                </p>
+              </div>
+
+              <!-- Queue/Wait Time Info -->
+              <div id="queue-info" class="bg-gray-50 border border-gray-200 rounded p-3 hidden">
+                <p class="text-sm text-gray-700">
+                  <i class="fas fa-clock"></i>
+                  <strong>Estimated Wait:</strong> <span id="estimated-wait">Immediate</span>
+                </p>
+              </div>
+
+              <div id="resource-modal-message" class="mt-2"></div>
+
+              <div class="flex justify-end gap-2 pt-2">
+                <button type="button" onclick="hideResourceModal()"
+                  class="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">
+                  Cancel
+                </button>
+                <button type="submit" id="submit-resource-btn"
+                  class="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700">
+                  <i class="fas fa-paper-plane"></i> Submit Request
+                </button>
+              </div>
+            </form>
           </div>
         </div>
 
@@ -548,7 +744,7 @@
                 <i class="fas fa-chevron-down text-gray-400 group-open:rotate-180 transition-transform"></i>
               </summary>
               <div class="px-4 pb-4 text-sm text-gray-600">
-                Open WebUI provides access to AI language models hosted on the Hydra cluster. Create an account in the Open WebUI tab to chat with models, get coding help, or use AI for your coursework.
+                Open WebUI provides access to AI language models hosted on the Hydra cluster. You can chat with models, generate API keys for personal projects, and experiment with LLMs. Go to <strong>Settings &gt; Account</strong> in Open WebUI to get your API key—it's OpenAI-compatible, so you can use it with standard libraries. <em>Note: Always follow your course's academic integrity policies when using AI tools.</em>
               </div>
             </details>
             <details class="group">
@@ -566,7 +762,7 @@
                 <i class="fas fa-chevron-down text-gray-400 group-open:rotate-180 transition-transform"></i>
               </summary>
               <div class="px-4 pb-4 text-sm text-gray-600">
-                Yes! If you have a service that would benefit the CS lab or department (research tools, course-specific software, etc.), please contact the <a href="mailto:cslab@newpaltz.edu" class="text-blue-600 underline">department assistant</a> with your request.
+                Yes! If you have a service that would benefit the CS lab or department (research tools, course-specific software, etc.), please contact the <a href="mailto:compsci@newpaltz.edu" class="text-blue-600 underline">department assistant</a> with your request.
               </div>
             </details>
           </div>
@@ -856,6 +1052,353 @@
           msg.innerHTML = `<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2">${err.message || 'Failed to wipe container'}</p>`;
         }
       }
+
+      // Resource Configuration Functions
+      let resourceConfig = null;
+      let pendingRequestId = null;
+      let currentRecommendation = null;
+      let selectedNode = 'hydra';
+
+      window.showResourceModal = async function () {
+        const modal = document.getElementById('resource-modal');
+        const msg = document.getElementById('resource-modal-message');
+        msg.innerHTML = '<p class="text-gray-600">Loading configuration...</p>';
+        modal.classList.remove('hidden');
+
+        try {
+          // Load current configuration with node metrics
+          const res = await fetch('/dashboard/api/resource-requests/presets');
+          if (handleAuthError(res)) return;
+          resourceConfig = await res.json();
+
+          // Update current config display
+          if (resourceConfig.currentConfig) {
+            document.getElementById('current-node').textContent = resourceConfig.currentConfig.current_node || 'Hydra';
+            document.getElementById('current-memory').textContent = (resourceConfig.currentConfig.memory_gb || 4) + ' GB';
+            document.getElementById('current-cpus').textContent = resourceConfig.currentConfig.cpus || 2;
+            document.getElementById('current-storage').textContent = (resourceConfig.currentConfig.storage_gb || 40) + ' GB';
+            selectedNode = (resourceConfig.currentConfig.current_node || 'hydra').toLowerCase();
+          }
+
+          // Update node cards with live metrics from nodes object
+          if (resourceConfig.nodes) {
+            updateNodeCards(resourceConfig.nodes);
+          }
+
+          // Show recommendation if available
+          if (resourceConfig.recommendation) {
+            currentRecommendation = resourceConfig.recommendation;
+            showRecommendation(currentRecommendation);
+          }
+
+          // Highlight currently selected node
+          selectNode(selectedNode, false);
+
+          msg.innerHTML = '';
+          updateApprovalStatus();
+        } catch (err) {
+          msg.innerHTML = `<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2">${err.message || 'Failed to load configuration'}</p>`;
+        }
+      };
+
+      // Update node cards with live metrics from API
+      function updateNodeCards(nodes) {
+        // Hydra
+        if (nodes.hydra) {
+          const h = nodes.hydra;
+          const capacity = h.capacity || {};
+          const usedSlots = h.maxContainers - (capacity.availableSlots || 0);
+          const usedPercent = h.maxContainers > 0 ? Math.round((usedSlots / h.maxContainers) * 100) : 0;
+          document.getElementById('hydra-capacity-bar').style.width = usedPercent + '%';
+          document.getElementById('hydra-capacity-bar').className = 'h-full transition-all ' + getCapacityColor(usedPercent);
+          document.getElementById('hydra-slots').textContent = capacity.availableSlots || 0;
+          document.getElementById('hydra-status-dot').className = 'w-2 h-2 rounded-full ' + (h.online && !h.maintenance ? 'bg-green-500' : 'bg-red-500');
+        }
+
+        // Chimera
+        if (nodes.chimera) {
+          const c = nodes.chimera;
+          const capacity = c.capacity || {};
+          const usedSlots = c.maxContainers - (capacity.availableSlots || 0);
+          const usedPercent = c.maxContainers > 0 ? Math.round((usedSlots / c.maxContainers) * 100) : 0;
+          document.getElementById('chimera-capacity-bar').style.width = usedPercent + '%';
+          document.getElementById('chimera-capacity-bar').className = 'h-full transition-all ' + getCapacityColor(usedPercent);
+          document.getElementById('chimera-slots').textContent = capacity.availableSlots || 0;
+          document.getElementById('chimera-gpu-util').textContent = c.gpu ? (c.gpu.utilization || 0) : 0;
+          document.getElementById('chimera-status-dot').className = 'w-2 h-2 rounded-full ' + (c.online && !c.maintenance ? 'bg-green-500' : 'bg-red-500');
+        }
+
+        // Cerberus
+        if (nodes.cerberus) {
+          const cb = nodes.cerberus;
+          const capacity = cb.capacity || {};
+          const usedSlots = cb.maxContainers - (capacity.availableSlots || 0);
+          const usedPercent = cb.maxContainers > 0 ? Math.round((usedSlots / cb.maxContainers) * 100) : 0;
+          document.getElementById('cerberus-capacity-bar').style.width = usedPercent + '%';
+          document.getElementById('cerberus-capacity-bar').className = 'h-full transition-all ' + getCapacityColor(usedPercent);
+          document.getElementById('cerberus-slots').textContent = capacity.availableSlots || 0;
+          document.getElementById('cerberus-gpu-util').textContent = cb.gpu ? (cb.gpu.utilization || 0) : 0;
+          document.getElementById('cerberus-status-dot').className = 'w-2 h-2 rounded-full ' + (cb.online ? (cb.maintenance ? 'bg-yellow-500' : 'bg-green-500') : 'bg-red-500');
+        }
+      }
+
+      function getCapacityColor(percent) {
+        if (percent >= 80) return 'bg-red-500';
+        if (percent >= 60) return 'bg-yellow-500';
+        return 'bg-green-500';
+      }
+
+      // Show recommendation banner
+      function showRecommendation(rec) {
+        if (!rec || !rec.recommended) {
+          document.getElementById('recommendation-banner').classList.add('hidden');
+          return;
+        }
+
+        document.getElementById('rec-node-name').textContent = rec.recommended.charAt(0).toUpperCase() + rec.recommended.slice(1);
+        document.getElementById('rec-reason').textContent = rec.reason || 'Best fit for your workload';
+        document.getElementById('recommendation-banner').classList.remove('hidden');
+      }
+
+      // Handle node card selection
+      window.selectNode = function(nodeName, updateRec = true) {
+        selectedNode = nodeName.toLowerCase();
+        document.getElementById('target-node').value = selectedNode;
+
+        // Update visual selection on cards
+        ['hydra', 'chimera', 'cerberus'].forEach(n => {
+          const card = document.getElementById('node-card-' + n);
+          if (n === selectedNode) {
+            card.classList.add('border-purple-500', 'border-2', 'bg-purple-50');
+          } else {
+            card.classList.remove('border-purple-500', 'border-2', 'bg-purple-50');
+          }
+        });
+
+        // Update selected node display
+        const labels = {
+          hydra: 'Hydra (Control Plane)',
+          chimera: 'Chimera (GPU Inference)',
+          cerberus: 'Cerberus (GPU Training)'
+        };
+        document.getElementById('selected-node-label').textContent = labels[selectedNode] || selectedNode;
+
+        // Show GPU info for GPU nodes
+        const gpuInfo = document.getElementById('selected-node-gpu-info');
+        if (selectedNode === 'chimera' || selectedNode === 'cerberus') {
+          gpuInfo.classList.remove('hidden');
+          if (resourceConfig && resourceConfig.nodes && resourceConfig.nodes[selectedNode]) {
+            const node = resourceConfig.nodes[selectedNode];
+            const availGpus = node.gpu ? (node.gpu.available || 0) : 0;
+            document.getElementById('selected-gpu-avail').textContent = availGpus;
+            document.getElementById('selected-gpu-model').textContent = node.gpuModel || (selectedNode === 'chimera' ? 'RTX 3090' : 'RTX 5090');
+          }
+        } else {
+          gpuInfo.classList.add('hidden');
+        }
+
+        // Update approval status and get new recommendation
+        updateApprovalStatus();
+        if (updateRec) {
+          updateRecommendation();
+        }
+      };
+
+      // Apply the auto-recommendation
+      window.applyRecommendation = function() {
+        if (currentRecommendation && currentRecommendation.recommended) {
+          selectNode(currentRecommendation.recommended, false);
+        }
+      };
+
+      // Get updated recommendation based on current selections
+      async function updateRecommendation() {
+        const preset = document.getElementById('resource-preset').value;
+        const storage = parseInt(document.getElementById('storage-tier').value);
+
+        try {
+          const res = await fetch('/dashboard/api/resource-requests/recommend', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ preset_id: preset, storage_gb: storage })
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            // API returns { recommendation: {...}, nodeMetrics: {...} }
+            currentRecommendation = data.recommendation || data;
+            showRecommendation(currentRecommendation);
+
+            // Update node metrics if provided
+            if (data.nodeMetrics) {
+              if (!resourceConfig.nodes) resourceConfig.nodes = {};
+              Object.assign(resourceConfig.nodes, data.nodeMetrics);
+              updateNodeCards(resourceConfig.nodes);
+            }
+
+            // Update wait time info
+            const wait = currentRecommendation.estimatedWait || currentRecommendation.estimated_wait;
+            if (wait) {
+              document.getElementById('queue-info').classList.remove('hidden');
+              document.getElementById('estimated-wait').textContent = wait;
+            } else {
+              document.getElementById('queue-info').classList.add('hidden');
+            }
+
+            // Show capacity warning if node is busy
+            const capacityWarning = document.getElementById('preset-capacity-warning');
+            if (currentRecommendation.alternatives && currentRecommendation.alternatives.length > 0) {
+              capacityWarning.classList.remove('hidden');
+            } else {
+              capacityWarning.classList.add('hidden');
+            }
+          }
+        } catch (err) {
+          console.error('Failed to get recommendation:', err);
+        }
+      }
+
+      window.hideResourceModal = function () {
+        document.getElementById('resource-modal').classList.add('hidden');
+      };
+
+      function updateApprovalStatus() {
+        const targetNode = document.getElementById('target-node').value;
+        const preset = document.getElementById('resource-preset').value;
+        const storage = parseInt(document.getElementById('storage-tier').value);
+
+        // Check if this requires approval
+        const needsApproval = (
+          targetNode !== 'hydra' ||
+          preset !== 'conservative' ||
+          storage > 50
+        );
+
+        const approvalWarning = document.getElementById('approval-warning');
+        const autoApproveInfo = document.getElementById('auto-approve-info');
+        const reasonSection = document.getElementById('reason-section');
+
+        if (needsApproval) {
+          approvalWarning.classList.remove('hidden');
+          autoApproveInfo.classList.add('hidden');
+          reasonSection.classList.remove('hidden');
+        } else {
+          approvalWarning.classList.add('hidden');
+          autoApproveInfo.classList.remove('hidden');
+          reasonSection.classList.add('hidden');
+        }
+
+        // Update button text
+        const submitBtn = document.getElementById('submit-resource-btn');
+        submitBtn.innerHTML = needsApproval
+          ? '<i class="fas fa-paper-plane"></i> Submit Request'
+          : '<i class="fas fa-check"></i> Apply Configuration';
+      }
+
+      // Add change listeners
+      document.getElementById('target-node').addEventListener('change', updateApprovalStatus);
+      document.getElementById('resource-preset').addEventListener('change', function() {
+        updateApprovalStatus();
+        updateRecommendation();
+      });
+      document.getElementById('storage-tier').addEventListener('change', function() {
+        updateApprovalStatus();
+        updateRecommendation();
+      });
+
+      // Handle form submission
+      document.getElementById('resource-config-form').addEventListener('submit', async function (e) {
+        e.preventDefault();
+
+        const msg = document.getElementById('resource-modal-message');
+        msg.innerHTML = '<p class="text-gray-600">Submitting request...</p>';
+
+        try {
+          const res = await fetch('/dashboard/api/resource-requests', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              target_node: document.getElementById('target-node').value,
+              preset_id: document.getElementById('resource-preset').value,
+              storage_gb: parseInt(document.getElementById('storage-tier').value),
+              reason: document.getElementById('request-reason').value || null
+            })
+          });
+
+          if (handleAuthError(res)) return;
+          const data = await res.json();
+
+          if (!res.ok) {
+            throw new Error(data.error || 'Failed to submit request');
+          }
+
+          if (data.auto_approved) {
+            msg.innerHTML = '<p class="text-green-700 bg-green-100 border border-green-200 rounded p-2">Configuration applied! Restart your container to use the new settings.</p>';
+          } else {
+            msg.innerHTML = '<p class="text-green-700 bg-green-100 border border-green-200 rounded p-2">Request submitted! You will receive an email when it is reviewed.</p>';
+          }
+
+          setTimeout(() => {
+            hideResourceModal();
+            loadPendingRequests();
+          }, 2000);
+        } catch (err) {
+          msg.innerHTML = `<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2">${err.message || 'Failed to submit request'}</p>`;
+        }
+      });
+
+      async function loadPendingRequests() {
+        try {
+          const res = await fetch('/dashboard/api/resource-requests/my');
+          if (handleAuthError(res)) return;
+          const data = await res.json();
+
+          const section = document.getElementById('pending-request-section');
+          if (data.hasPendingRequest && data.pending.length > 0) {
+            const request = data.pending[0];
+            pendingRequestId = request.id;
+
+            document.getElementById('pending-target-node').textContent = request.target_node.charAt(0).toUpperCase() + request.target_node.slice(1);
+            document.getElementById('pending-resources').textContent = `${request.requested_memory_gb}GB RAM, ${request.requested_cpus} CPUs, ${request.requested_storage_gb}GB storage`;
+            document.getElementById('pending-submitted').textContent = new Date(request.created_at).toLocaleString();
+
+            section.classList.remove('hidden');
+          } else {
+            section.classList.add('hidden');
+            pendingRequestId = null;
+          }
+        } catch (err) {
+          console.error('Failed to load pending requests:', err);
+        }
+      }
+
+      window.cancelPendingRequest = async function () {
+        if (!pendingRequestId) return;
+        if (!confirm('Cancel this resource request?')) return;
+
+        try {
+          const res = await fetch(`/dashboard/api/resource-requests/${pendingRequestId}`, {
+            method: 'DELETE'
+          });
+
+          if (handleAuthError(res)) return;
+          const data = await res.json();
+
+          if (!res.ok) throw new Error(data.error || 'Failed to cancel');
+
+          const msg = document.getElementById('container-message');
+          msg.innerHTML = '<p class="text-green-700 bg-green-100 border border-green-200 rounded p-2">Request cancelled.</p>';
+          setTimeout(() => { msg.innerHTML = ''; }, 3000);
+
+          loadPendingRequests();
+        } catch (err) {
+          const msg = document.getElementById('container-message');
+          msg.innerHTML = `<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2">${err.message || 'Failed to cancel request'}</p>`;
+        }
+      };
+
+      // Load pending requests on page load
+      loadPendingRequests();
 
       async function loadServices() {
         try {

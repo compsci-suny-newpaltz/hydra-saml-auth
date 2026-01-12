@@ -504,6 +504,22 @@ const ensureAuthenticated = (req, res, next) =>
       console.warn('[Init] containers routes not mounted:', e?.message || e);
     }
 
+    // Mount API routes for resource requests (behind auth)
+    try {
+      const resourceRequestsRouter = require('./routes/resource-requests');
+      app.use('/dashboard/api/resource-requests', ensureAuthenticated, resourceRequestsRouter);
+    } catch (e) {
+      console.warn('[Init] resource-requests routes not mounted:', e?.message || e);
+    }
+
+    // Mount admin API routes (behind auth, admin check in router)
+    try {
+      const adminRouter = require('./routes/admin');
+      app.use('/dashboard/api/admin', ensureAuthenticated, adminRouter);
+    } catch (e) {
+      console.warn('[Init] admin routes not mounted:', e?.message || e);
+    }
+
     // Mount API routes for server status and metrics (public)
     try {
       const serversApiRouter = require('./routes/servers-api');
@@ -630,6 +646,25 @@ const ensureAuthenticated = (req, res, next) =>
       });
     } catch (e) {
       console.warn('[Init] container-reminder service not started:', e?.message || e);
+    }
+
+    // Initialize database schema for resource management
+    try {
+      const { initializeSchema, expireOldRequests } = require('./services/db-init');
+      await initializeSchema();
+      await expireOldRequests();
+      console.log('[Init] Database schema initialized');
+    } catch (e) {
+      console.warn('[Init] Database schema initialization failed:', e?.message || e);
+    }
+
+    // Start metrics collection service
+    try {
+      const metricsCollector = require('./services/metrics-collector');
+      metricsCollector.start();
+      console.log('[Init] Metrics collector started');
+    } catch (e) {
+      console.warn('[Init] metrics-collector service not started:', e?.message || e);
     }
 
     // Start

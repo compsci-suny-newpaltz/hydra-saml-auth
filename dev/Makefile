@@ -1,6 +1,7 @@
 # Hydra SAML Auth - Development Makefile
 
-.PHONY: help setup start stop restart logs clean reset shell test rm-students
+.PHONY: help setup start stop restart logs clean reset shell test rm-students \
+	k8s-setup k8s-start k8s-stop k8s-logs k8s-clean k8s-shell k8s-status
 
 # Default target
 help:
@@ -19,6 +20,16 @@ help:
 	@echo "make reset     - Full reset (removes volumes too)"
 	@echo "make test-saml - Test SAML authentication flow"
 	@echo "make rm-students - Force remove all student-* containers"
+	@echo ""
+	@echo "Kubernetes (RKE2/k3d) Commands:"
+	@echo "======================================"
+	@echo "make k8s-setup   - Create k3d development cluster"
+	@echo "make k8s-start   - Deploy manifests to k3d cluster"
+	@echo "make k8s-stop    - Scale down deployments"
+	@echo "make k8s-logs    - View hydra-auth pod logs"
+	@echo "make k8s-shell   - Shell into hydra-auth pod"
+	@echo "make k8s-status  - Show cluster status"
+	@echo "make k8s-clean   - Delete k3d cluster"
 
 # Cross-platform sleep command: use Windows timeout when running on Windows
 ifeq ($(OS),Windows_NT)
@@ -136,3 +147,100 @@ health:
 	@curl -s -o /dev/null -w "OpenWebUI: %{http_code}\n" http://localhost:3000 || echo "OpenWebUI: DOWN"
 	@curl -s -o /dev/null -w "Mock SAML: %{http_code}\n" http://localhost:8080 || echo "Mock SAML: DOWN"
 	@curl -s -o /dev/null -w "Middleman: %{http_code}\n" http://localhost:7070/openwebui/health || echo "Middleman: DOWN"
+
+# =============================================================================
+# Kubernetes (RKE2/k3d) Development Targets
+# =============================================================================
+
+K3D_CLUSTER_NAME := hydra-dev
+K8S_NAMESPACE := hydra-system
+K8S_STUDENTS_NS := hydra-students
+
+# Create k3d cluster for local development
+k8s-setup:
+	@echo "Creating k3d cluster '$(K3D_CLUSTER_NAME)'..."
+	@k3d cluster create $(K3D_CLUSTER_NAME) \
+		--config ../k8s/dev/k3d-config.yaml \
+		|| echo "Cluster may already exist, trying to start..."
+	@k3d cluster start $(K3D_CLUSTER_NAME) 2>/dev/null || true
+	@echo "Installing Traefik CRDs..."
+	@kubectl apply -f https://raw.githubusercontent.com/traefik/traefik/v2.11/docs/content/reference/dynamic-configuration/kubernetes-crd-definition-v1.yml
+	@echo "Applying base manifests..."
+	@kubectl apply -f ../k8s/base/namespace.yaml
+	@kubectl apply -f ../k8s/base/rbac/
+	@kubectl apply -f ../k8s/base/storage/
+	@echo ""
+	@echo "k3d cluster '$(K3D_CLUSTER_NAME)' is ready!"
+	@echo "Run 'make k8s-start' to deploy services."
+
+# Deploy/update manifests to k3d cluster
+k8s-start:
+	@echo "Building hydra-saml-auth image..."
+	@docker build -t hydra-saml-auth:dev -f Dockerfile.hydra ..
+	@echo "Importing image to k3d..."
+	@k3d image import hydra-saml-auth:dev -c $(K3D_CLUSTER_NAME)
+	@echo "Applying component manifests..."
+	@kubectl apply -f ../k8s/components/traefik/
+	@kubectl apply -f ../k8s/components/hydra-auth/
+	@kubectl apply -f ../k8s/dev/mock-services/
+	@echo ""
+	@echo "Waiting for pods to be ready..."
+	@kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=hydra -n $(K8S_NAMESPACE) --timeout=120s || true
+	@echo ""
+	@echo "Services deployed! Access at:"
+	@echo "  - Hydra:   http://localhost:6969"
+	@echo "  - Traefik: http://localhost:8081"
+
+# Stop services (scale to 0)
+k8s-stop:
+	@echo "Scaling down deployments..."
+	@kubectl scale deployment --all --replicas=0 -n $(K8S_NAMESPACE) || true
+	@kubectl scale deployment --all --replicas=0 -n $(K8S_STUDENTS_NS) || true
+
+# View logs
+k8s-logs:
+	@kubectl logs -f -l app.kubernetes.io/name=hydra -n $(K8S_NAMESPACE)
+
+k8s-logs-traefik:
+	@kubectl logs -f -l app.kubernetes.io/name=traefik -n $(K8S_NAMESPACE)
+
+# Shell into hydra pod
+k8s-shell:
+	@kubectl exec -it $$(kubectl get pod -l app.kubernetes.io/name=hydra -n $(K8S_NAMESPACE) -o jsonpath='{.items[0].metadata.name}') -n $(K8S_NAMESPACE) -- /bin/bash
+
+# Show cluster status
+k8s-status:
+	@echo "=== Cluster Info ==="
+	@kubectl cluster-info
+	@echo ""
+	@echo "=== Nodes ==="
+	@kubectl get nodes
+	@echo ""
+	@echo "=== Namespaces ==="
+	@kubectl get ns
+	@echo ""
+	@echo "=== Pods (hydra-system) ==="
+	@kubectl get pods -n $(K8S_NAMESPACE)
+	@echo ""
+	@echo "=== Pods (hydra-students) ==="
+	@kubectl get pods -n $(K8S_STUDENTS_NS) 2>/dev/null || echo "No student pods"
+	@echo ""
+	@echo "=== Services ==="
+	@kubectl get svc -A | grep -E "hydra|traefik"
+
+# Delete k3d cluster
+k8s-clean:
+	@echo "Deleting k3d cluster '$(K3D_CLUSTER_NAME)'..."
+	@k3d cluster delete $(K3D_CLUSTER_NAME)
+	@echo "Cluster deleted."
+
+# Full k8s reset
+k8s-reset: k8s-clean k8s-setup k8s-start
+
+# Apply only base manifests (for testing)
+k8s-apply-base:
+	@kubectl apply -f ../k8s/base/
+
+# Apply GPU manifests (for production nodes)
+k8s-apply-gpu:
+	@kubectl apply -f ../k8s/gpu/

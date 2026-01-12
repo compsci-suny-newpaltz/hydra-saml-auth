@@ -2,8 +2,13 @@
 const express = require('express');
 const router = express.Router();
 
-// TODO: Import metrics collector when implemented
-// const metricsCollector = require('../services/metrics-collector');
+// Import metrics collector
+let metricsCollector;
+try {
+  metricsCollector = require('../services/metrics-collector');
+} catch (e) {
+  console.warn('[servers-api] Metrics collector not available, using mock data');
+}
 
 /**
  * GET /api/servers/status
@@ -12,14 +17,23 @@ const router = express.Router();
  */
 router.get('/status', async (req, res) => {
   try {
-    // TODO: Replace with real metrics from collector
-    // const metrics = await metricsCollector.getLatestMetrics();
+    let serverData;
 
-    // For now, return mock data that simulates the cluster state
-    const mockData = generateMockServerData();
+    // Try to get real metrics from collector
+    if (metricsCollector) {
+      const metrics = metricsCollector.getMetrics();
+      if (metrics && metrics.lastUpdated) {
+        serverData = formatCollectedMetrics(metrics);
+      }
+    }
+
+    // Fallback to mock data if no real metrics
+    if (!serverData) {
+      serverData = generateMockServerData();
+    }
 
     res.json({
-      servers: mockData,
+      servers: serverData,
       generated_at: new Date().toISOString()
     });
   } catch (error) {
@@ -103,6 +117,82 @@ router.get('/:name/metrics', async (req, res) => {
     res.status(500).json({ error: 'Failed to retrieve server metrics' });
   }
 });
+
+/**
+ * Format metrics from the collector into API response format
+ */
+function formatCollectedMetrics(metrics) {
+  const result = {};
+
+  // Format Hydra (control plane - no GPUs)
+  if (metrics.hydra) {
+    const h = metrics.hydra;
+    result.hydra = {
+      status: h.status || 'online',
+      role: 'control-plane',
+      cpu_percent: h.system?.cpu_percent || 0,
+      ram_used_gb: h.system?.ram_used_gb || 0,
+      ram_total_gb: h.system?.ram_total_gb || 251,
+      disk_used_gb: h.system?.disk_used_gb || 0,
+      disk_total_gb: h.system?.disk_total_gb || 21000,
+      containers_running: h.containers?.running || 0,
+      zfs_status: h.zfs_status || 'ONLINE',
+      last_updated: h.timestamp || new Date().toISOString()
+    };
+  }
+
+  // Format Chimera (inference node with GPUs)
+  if (metrics.chimera) {
+    const c = metrics.chimera;
+    result.chimera = {
+      status: c.status || 'online',
+      role: 'inference',
+      gpus: (c.gpus || []).map(gpu => ({
+        index: gpu.index,
+        name: gpu.name,
+        util: gpu.utilization_percent,
+        vram_used: gpu.memory_used_gb,
+        vram_total: gpu.memory_total_gb,
+        temp: gpu.temperature_c
+      })),
+      cpu_percent: c.system?.cpu_percent || 0,
+      ram_used_gb: c.system?.ram_used_gb || 0,
+      ram_total_gb: c.system?.ram_total_gb || 251,
+      containers_running: c.containers?.running || 0,
+      queue_depth: c.queue?.pending || 0,
+      avg_wait_minutes: c.queue?.estimated_wait_minutes || 0,
+      last_updated: c.timestamp || new Date().toISOString()
+    };
+  }
+
+  // Format Cerberus (training node with GPUs)
+  if (metrics.cerberus) {
+    const cb = metrics.cerberus;
+    result.cerberus = {
+      status: cb.status || 'online',
+      role: 'training',
+      gpus: (cb.gpus || []).map(gpu => ({
+        index: gpu.index,
+        name: gpu.name,
+        util: gpu.utilization_percent,
+        vram_used: gpu.memory_used_gb,
+        vram_total: gpu.memory_total_gb,
+        temp: gpu.temperature_c
+      })),
+      cpu_percent: cb.system?.cpu_percent || 0,
+      ram_used_gb: cb.system?.ram_used_gb || 0,
+      ram_total_gb: cb.system?.ram_total_gb || 64,
+      containers_running: cb.containers?.running || 0,
+      queue_depth: cb.queue?.pending || 0,
+      training_job: cb.active_training_job?.name || null,
+      job_progress: cb.active_training_job?.progress_percent || 0,
+      job_eta: cb.active_training_job ? `~${Math.floor(cb.active_training_job.eta_minutes / 60)}h ${cb.active_training_job.eta_minutes % 60}m` : null,
+      last_updated: cb.timestamp || new Date().toISOString()
+    };
+  }
+
+  return result;
+}
 
 /**
  * Generate realistic mock server data

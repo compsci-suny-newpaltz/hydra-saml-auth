@@ -114,8 +114,10 @@ services:
       - ../views:/app/views:ro
       - ../routes:/app/routes:ro
       - ../public:/app/public:ro
+      - ../config:/app/config:ro
       - ./jwt-keys:/app/jwt-keys
       - ./traefik-dynamic:/etc/traefik/dynamic
+      - ./shared:/srv/shared
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.hydra.rule=Host(`hydra.local`)"
@@ -186,6 +188,48 @@ services:
       - n8n-dev:/home/node/.n8n
     networks:
       - hydra-dev-net
+
+  # Mock Chimera metrics agent (simulates GPU node)
+  mock-chimera:
+    build:
+      context: ..
+      dockerfile: dev/Dockerfile.mock-metrics
+    container_name: mock-chimera-dev
+    environment:
+      - NODE_NAME=chimera
+      - NODE_ROLE=inference
+      - GPU_COUNT=3
+      - GPU_MODEL=RTX 3090
+      - GPU_VRAM=24
+      - RAM_TOTAL=251
+      - DISK_TOTAL=3500
+      - PORT=9100
+    ports:
+      - "9101:9100"
+    networks:
+      hydra-dev-net:
+        ipv4_address: 172.25.0.150
+
+  # Mock Cerberus metrics agent (simulates GPU training node)
+  mock-cerberus:
+    build:
+      context: ..
+      dockerfile: dev/Dockerfile.mock-metrics
+    container_name: mock-cerberus-dev
+    environment:
+      - NODE_NAME=cerberus
+      - NODE_ROLE=training
+      - GPU_COUNT=2
+      - GPU_MODEL=RTX 5090
+      - GPU_VRAM=32
+      - RAM_TOTAL=64
+      - DISK_TOTAL=5300
+      - PORT=9100
+    ports:
+      - "9102:9100"
+    networks:
+      hydra-dev-net:
+        ipv4_address: 172.25.0.242
 
 networks:
   hydra-dev-net:

@@ -68,8 +68,9 @@ RUN install -m 0755 -d /etc/apt/keyrings && \
         docker-compose-plugin && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-# Create student user
-RUN useradd -m -s /bin/bash -u 1000 student && \
+# Create student user with docker group access
+RUN groupadd -f docker && \
+    useradd -m -s /bin/bash -u 1000 student && \
     echo "student ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers && \
     usermod -aG docker student
 
@@ -137,9 +138,37 @@ COPY supervisor.d/ /home/student/supervisor.d/
 USER root
 
 # Setup /etc/skel for fresh volumes and supervisor config
+# Copy settings AND extensions to skel so they persist on mounted volumes
 RUN mkdir -p /etc/skel/.local/share/code-server/User && \
     cp /tmp/default-settings.json /etc/skel/.local/share/code-server/User/settings.json && \
+    # Copy installed extensions to skel
+    cp -r /home/student/.local/share/code-server/extensions /etc/skel/.local/share/code-server/ && \
     rm -rf /tmp/*
+
+# Install CUH63 tools (lcc compiler, assembler, examples)
+COPY cuh63.zip /tmp/cuh63.zip
+RUN apt-get update && apt-get install -y --no-install-recommends unzip && \
+    rm -rf /var/lib/apt/lists/* && \
+    # Extract to system-wide location
+    mkdir -p /opt/cuh63 && \
+    unzip -q /tmp/cuh63.zip -d /opt/cuh63 && \
+    # Move contents up if nested in folder
+    if [ -d "/opt/cuh63/cuh63Linux" ]; then \
+        mv /opt/cuh63/cuh63Linux/* /opt/cuh63/ && \
+        rmdir /opt/cuh63/cuh63Linux; \
+    fi && \
+    # Make binaries executable
+    chmod +x /opt/cuh63/b /opt/cuh63/basic /opt/cuh63/comment 2>/dev/null || true && \
+    # Create symlinks in /usr/local/bin for PATH access
+    ln -sf /opt/cuh63/b /usr/local/bin/lcc-b && \
+    ln -sf /opt/cuh63/basic /usr/local/bin/lcc-basic && \
+    ln -sf /opt/cuh63/comment /usr/local/bin/lcc-comment && \
+    # Also copy to /etc/skel so users get it in home directory
+    mkdir -p /etc/skel/cuh63 && \
+    cp -r /opt/cuh63/* /etc/skel/cuh63/ && \
+    chown -R root:root /etc/skel/cuh63 && \
+    chmod -R 755 /etc/skel/cuh63 && \
+    rm /tmp/cuh63.zip
 
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY entrypoint.sh /entrypoint.sh

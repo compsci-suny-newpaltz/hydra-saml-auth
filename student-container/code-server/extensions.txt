@@ -28,14 +28,11 @@ ms-azuretools.vscode-docker
 # Vue (Volar) - Vue 3 language support (~20-25MB)
 Vue.volar
 
-# Database Client - SQL viewer, query runner (~15-25MB)
+# Database Client - SQL viewer, query runner, supports MySQL/PostgreSQL/SQLite/etc (~15-25MB)
 cweijan.vscode-database-client2
 
 # PHP Intelephense - PHP IntelliSense (~15-20MB)
 bmewburn.vscode-intelephense-client
-
-# SQLTools - multi-database support (~10-15MB)
-mtxr.sqltools
 
 # Hex Editor - view/edit binary files in hex (~10-15MB)
 ms-vscode.hexeditor
@@ -103,12 +100,6 @@ dsznajder.es7-react-js-snippets
 
 # Path Intellisense (~200KB)
 christian-kohler.path-intellisense
-
-# SQLTools MySQL Driver (~200KB)
-mtxr.sqltools-driver-mysql
-
-# SQLTools SQLite Driver (~200KB)
-mtxr.sqltools-driver-sqlite
 
 # Hexdump - alternative hex viewer (~100KB)
 slevesque.vscode-hexdump
