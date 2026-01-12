@@ -1,0 +1,526 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{fancyhdr}
+\usepackage{enumitem}
+\usepackage{float}
+\usepackage{mdframed}
+\usepackage{tikz}
+\usepackage{graphicx}
+\usetikzlibrary{shapes,arrows,positioning,fit,backgrounds}
+
+\geometry{margin=1in}
+
+\definecolor{hydra-blue}{RGB}{5,32,73}
+\definecolor{code-bg}{RGB}{248,248,248}
+\definecolor{warning-bg}{RGB}{255,243,205}
+\definecolor{success-bg}{RGB}{212,237,218}
+\definecolor{info-bg}{RGB}{217,237,247}
+
+\hypersetup{colorlinks=true,linkcolor=hydra-blue,urlcolor=blue}
+
+\lstdefinestyle{bash}{backgroundcolor=\color{code-bg},basicstyle=\ttfamily\small,breaklines=true,frame=single,numbers=none}
+\lstdefinestyle{env}{backgroundcolor=\color{code-bg},basicstyle=\ttfamily\small,breaklines=true,frame=single,numbers=none}
+
+\newmdenv[backgroundcolor=warning-bg,linewidth=0pt,innerleftmargin=10pt,innerrightmargin=10pt,innertopmargin=10pt,innerbottommargin=10pt]{warningbox}
+\newmdenv[backgroundcolor=success-bg,linewidth=0pt,innerleftmargin=10pt,innerrightmargin=10pt,innertopmargin=10pt,innerbottommargin=10pt]{successbox}
+\newmdenv[backgroundcolor=info-bg,linewidth=0pt,innerleftmargin=10pt,innerrightmargin=10pt,innertopmargin=10pt,innerbottommargin=10pt]{infobox}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\textbf{Hydra Infrastructure}}
+\fancyhead[R]{\textbf{Installation Guide}}
+\fancyfoot[C]{\thepage}
+\setlength{\headheight}{14pt}
+
+\title{\textbf{Hydra Installation \& Setup Guide}\\[0.5em]\large For System Administrators}
+\author{Computer Science Department\\SUNY New Paltz}
+\date{Last Updated: January 2025}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+\section{Prerequisites}
+
+\subsection{System Requirements}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Component} & \textbf{Requirement} \\
+\midrule
+Operating System & Ubuntu 22.04 LTS (recommended) \\
+Docker & 24.0+ with Compose V2 \\
+RAM & Minimum 8GB (16GB+ recommended) \\
+Storage & 100GB+ SSD \\
+Network & Static IP, ports 80/443 open \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Required Access}
+\begin{itemize}
+    \item Azure AD admin access for SAML Enterprise Application setup
+    \item DNS control for \texttt{hydra.yourdomain.edu}
+    \item TLS certificate (Let's Encrypt or institutional cert)
+    \item SSH access to the host server
+\end{itemize}
+
+\subsection{Software Dependencies}
+\begin{lstlisting}[style=bash]
+# Install Docker
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER
+
+# Verify Docker Compose V2
+docker compose version
+# Should show: Docker Compose version v2.x.x
+
+# Install useful tools
+sudo apt install -y git curl jq sqlite3
+\end{lstlisting}
+
+\section{Installation Steps}
+
+\subsection{Step 1: Clone Repository}
+\begin{lstlisting}[style=bash]
+git clone https://github.com/your-org/hydra-saml-auth.git
+cd hydra-saml-auth
+\end{lstlisting}
+
+\subsection{Step 2: Build Student Container Image}
+
+\begin{lstlisting}[style=bash]
+cd student-container
+docker build -t hydra-student-container:latest .
+cd ..
+\end{lstlisting}
+
+\begin{infobox}
+This image includes: Ubuntu 22.04, Node.js, Python 3.11+, Java 21, Docker-in-Docker, code-server, and Jupyter.
+\end{infobox}
+
+\subsection{Step 3: Configure Environment}
+
+Create \texttt{.env} file in the project root:
+
+\begin{lstlisting}[style=env]
+# === Core Settings ===
+PORT=6969
+BASE_URL=https://hydra.yourdomain.edu
+COOKIE_DOMAIN=.yourdomain.edu
+
+# === SAML Configuration ===
+METADATA_URL=https://login.microsoftonline.com/YOUR_TENANT/federationmetadata/2007-06/federationmetadata.xml
+SAML_SP_ENTITY_ID=hydra-auth
+SAML_CALLBACK_URL=https://hydra.yourdomain.edu/auth/callback
+
+# === Database ===
+DB_PATH=/app/data/webui.db
+
+# === JWT Settings ===
+JWT_TTL_SECONDS=86400
+JWT_KEY_ID=hydra-key-1
+JWT_PRIVATE_KEY_FILE=/app/certs/jwt-private.pem
+JWT_PUBLIC_KEY_FILE=/app/certs/jwt-public.pem
+
+# === Student Containers ===
+PUBLIC_STUDENTS_BASE=https://hydra.yourdomain.edu/students
+\end{lstlisting}
+
+\subsection{Step 4: Generate JWT Keys}
+
+\begin{lstlisting}[style=bash]
+mkdir -p certs
+openssl genrsa -out certs/jwt-private.pem 2048
+openssl rsa -in certs/jwt-private.pem -pubout -out certs/jwt-public.pem
+\end{lstlisting}
+
+\subsection{Step 5: Configure Azure AD}
+
+\begin{center}
+\begin{tikzpicture}[
+    node distance=0.7cm,
+    stepbox/.style={rectangle, draw, fill=blue!5, minimum width=10cm, minimum height=0.8cm, align=left, font=\small}
+]
+\node[stepbox] (s1) {1. Go to Azure Portal > Azure Active Directory > Enterprise Applications};
+\node[stepbox, below=of s1] (s2) {2. Click "New application" > "Create your own application"};
+\node[stepbox, below=of s2] (s3) {3. Name: "Hydra Auth", select "Non-gallery application"};
+\node[stepbox, below=of s3] (s4) {4. Go to Single sign-on > SAML};
+\node[stepbox, below=of s4] (s5) {5. Set Identifier (Entity ID): hydra-auth};
+\node[stepbox, below=of s5] (s6) {6. Set Reply URL: https://hydra.yourdomain.edu/auth/callback};
+\node[stepbox, below=of s6] (s7) {7. Download Federation Metadata XML, note the URL};
+\node[stepbox, below=of s7] (s8) {8. Assign users/groups who should have access};
+\end{tikzpicture}
+\end{center}
+
+\begin{warningbox}
+\textbf{Critical:} The Entity ID in Azure must \textbf{exactly match} \texttt{SAML\_SP\_ENTITY\_ID} in your \texttt{.env} file.
+\end{warningbox}
+
+\subsection{Step 6: Configure Traefik}
+
+Ensure \texttt{docker-compose.yaml} has proper Traefik configuration:
+
+\begin{lstlisting}[style=bash]
+# Key Traefik labels for hydra-saml-auth service:
+labels:
+  - "traefik.enable=true"
+  - "traefik.http.routers.hydra.rule=Host(`hydra.yourdomain.edu`)"
+  - "traefik.http.routers.hydra.entrypoints=websecure"
+  - "traefik.http.routers.hydra.tls=true"
+  - "traefik.http.services.hydra.loadbalancer.server.port=6969"
+\end{lstlisting}
+
+\subsection{Step 7: Start Services}
+
+\begin{lstlisting}[style=bash]
+# Build and start all services
+docker compose build
+docker compose up -d
+
+# Verify services are running
+docker compose ps
+
+# Check logs
+docker compose logs -f hydra-saml-auth
+\end{lstlisting}
+
+\subsection{Step 8: Verify Installation}
+
+\begin{lstlisting}[style=bash]
+# Test HTTPS access
+curl -I https://hydra.yourdomain.edu/
+
+# Should redirect to Azure AD login (302 to login.microsoftonline.com)
+
+# Check JWKS endpoint
+curl https://hydra.yourdomain.edu/.well-known/jwks.json
+\end{lstlisting}
+
+\section{Post-Installation Setup}
+
+\subsection{Create Admin User}
+
+After first login via SAML, promote a user to admin:
+
+\begin{lstlisting}[style=bash]
+# Access database
+sqlite3 /app/data/webui.db
+
+# Find user ID
+SELECT id, email, role FROM users WHERE email LIKE '%admin%';
+
+# Set as admin
+UPDATE users SET role = 'admin' WHERE email = 'admin@yourdomain.edu';
+\end{lstlisting}
+
+\subsection{Test Container Creation}
+
+\begin{enumerate}
+    \item Log in to \texttt{https://hydra.yourdomain.edu/dashboard}
+    \item Navigate to "Containers" tab
+    \item Click "Initialize Container"
+    \item Verify VS Code and Jupyter are accessible
+\end{enumerate}
+
+\subsection{Configure Backup Cron}
+
+\begin{lstlisting}[style=bash]
+# Add to root crontab
+crontab -e
+
+# Daily database backup at 2 AM
+0 2 * * * docker exec hydra-saml-auth sqlite3 /app/data/webui.db ".backup '/backups/hydra-$(date +\%Y\%m\%d).db'"
+
+# Weekly cleanup of old backups
+0 3 * * 0 find /backups -name "hydra-*.db" -mtime +30 -delete
+\end{lstlisting}
+
+\section{Network Architecture}
+
+\subsection{Deployment Diagram}
+
+\begin{center}
+\begin{tikzpicture}[
+    node distance=1.2cm,
+    ext/.style={rectangle, draw, fill=red!10, minimum width=2.5cm, minimum height=1cm, align=center},
+    proxy/.style={rectangle, draw, fill=yellow!20, minimum width=3cm, minimum height=1cm, align=center},
+    svc/.style={rectangle, draw, fill=green!10, minimum width=2.5cm, minimum height=1cm, align=center},
+    net/.style={rectangle, draw, dashed, fill=gray!5, minimum width=9cm, minimum height=3cm},
+    arrow/.style={->, thick}
+]
+
+% External
+\node[ext] (internet) {Internet\\Users};
+\node[ext, right=4cm of internet] (azure) {Azure AD};
+
+% Proxy layer
+\node[proxy, below=2cm of internet] (traefik) {Traefik\\:80, :443};
+
+% Internal network
+\node[net, below=2.5cm of traefik] (internal) {};
+\node[above] at (internal.north) {\texttt{hydra\_students\_net}};
+
+% Services inside network
+\node[svc] at ([yshift=0.5cm]internal.center) (hydra) {hydra-saml-auth\\:6969};
+\node[svc, left=1cm of hydra] (webui) {OpenWebUI\\:3000};
+\node[svc, right=1cm of hydra] (students) {Student\\Containers};
+
+% Arrows
+\draw[arrow] (internet) -- node[left] {HTTPS} (traefik);
+\draw[arrow] (internet) -- node[above] {SAML} (azure);
+\draw[arrow] (azure) -- (traefik);
+\draw[arrow] (traefik) -- (hydra);
+\draw[arrow] (traefik) -- (webui);
+\draw[arrow] (traefik) -- (students);
+\draw[arrow, dashed] (hydra) -- node[below, font=\tiny] {creates} (students);
+
+\end{tikzpicture}
+\end{center}
+
+\subsection{Port Mapping}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{llll}
+\toprule
+\textbf{Service} & \textbf{Internal} & \textbf{External} & \textbf{Protocol} \\
+\midrule
+Traefik & - & 80, 443 & HTTP/HTTPS \\
+hydra-saml-auth & 6969 & via Traefik & HTTP \\
+OpenWebUI & 3000 & via Traefik & HTTP \\
+Student VS Code & 8443 & /students/\{user\}/vscode & HTTP \\
+Student Jupyter & 8888 & /students/\{user\}/jupyter & HTTP \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Security Configuration}
+
+\subsection{TLS Certificates}
+
+For Let's Encrypt (recommended):
+\begin{lstlisting}[style=bash]
+# Traefik handles automatic certificate management
+# Add to docker-compose.yaml traefik command:
+command:
+  - "--certificatesresolvers.letsencrypt.acme.email=admin@yourdomain.edu"
+  - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+  - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+\end{lstlisting}
+
+For institutional certificates:
+\begin{lstlisting}[style=bash]
+# Mount certificates in Traefik
+volumes:
+  - ./certs/cert.pem:/certs/cert.pem:ro
+  - ./certs/key.pem:/certs/key.pem:ro
+
+# Configure in dynamic config
+tls:
+  certificates:
+    - certFile: /certs/cert.pem
+      keyFile: /certs/key.pem
+\end{lstlisting}
+
+\subsection{Container Security}
+
+\begin{warningbox}
+Student containers run in \textbf{privileged mode} by default to enable Docker-in-Docker. This grants significant access. Consider:
+\begin{itemize}
+    \item Restricting to trusted users only
+    \item Monitoring container activity
+    \item Implementing resource quotas
+\end{itemize}
+\end{warningbox}
+
+\section{Useful Aliases}
+
+Add to \texttt{\textasciitilde/.bashrc}:
+
+\begin{lstlisting}[style=bash]
+# ===== HYDRA MANAGEMENT ALIASES =====
+
+# Docker shortcuts
+alias dps='docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"'
+alias dlogs='docker compose logs -f'
+alias dexec='docker exec -it'
+
+# Hydra-specific
+alias hydra-logs='docker compose logs -f hydra-saml-auth'
+alias hydra-restart='docker compose restart hydra-saml-auth'
+alias hydra-rebuild='docker compose build hydra-saml-auth && docker compose up -d hydra-saml-auth'
+
+# Student container management
+alias students='docker ps --filter "name=student-" --format "table {{.Names}}\t{{.Status}}"'
+alias student-logs='docker logs -f'
+alias student-shell='docker exec -it'
+alias student-stop='docker stop'
+alias student-rm='docker rm -f'
+
+# Find student by partial name
+findstudent() {
+    docker ps --filter "name=student-" --format "{{.Names}}" | grep -i "$1"
+}
+
+# Get student container stats
+student-stats() {
+    docker stats --no-stream --filter "name=student-"
+}
+
+# Backup database
+backup-db() {
+    docker exec hydra-saml-auth sqlite3 /app/data/webui.db ".backup '/backups/hydra-$(date +%Y%m%d-%H%M%S).db'"
+    echo "Backup created: hydra-$(date +%Y%m%d-%H%M%S).db"
+}
+
+# Quick health check
+hydra-health() {
+    echo "=== Services ==="
+    docker compose ps
+    echo ""
+    echo "=== Student Containers ==="
+    docker ps --filter "name=student-" --format "table {{.Names}}\t{{.Status}}\t{{.RunningFor}}"
+    echo ""
+    echo "=== Resource Usage ==="
+    docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}" | head -10
+}
+\end{lstlisting}
+
+Apply changes:
+\begin{lstlisting}[style=bash]
+source ~/.bashrc
+\end{lstlisting}
+
+\section{Monitoring}
+
+\subsection{Log Locations}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Component} & \textbf{Command} \\
+\midrule
+Main service & \texttt{docker compose logs hydra-saml-auth} \\
+Traefik & \texttt{docker compose logs traefik} \\
+Student container & \texttt{docker logs student-<username>} \\
+All services & \texttt{docker compose logs -f} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Health Endpoints}
+
+\begin{lstlisting}[style=bash]
+# Check main service
+curl https://hydra.yourdomain.edu/health
+
+# Check JWKS (JWT verification)
+curl https://hydra.yourdomain.edu/.well-known/jwks.json
+
+# Check Traefik dashboard (if enabled)
+curl http://localhost:8080/api/overview
+\end{lstlisting}
+
+\section{Troubleshooting}
+
+\subsection{Common Issues}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{p{4cm}p{8cm}}
+\toprule
+\textbf{Issue} & \textbf{Solution} \\
+\midrule
+SAML login fails & Verify \texttt{METADATA\_URL} accessible, Entity ID matches exactly \\
+Student container 404 & Check container on \texttt{hydra\_students\_net}, Traefik running \\
+Container won't start & Verify \texttt{hydra-student-container:latest} image built \\
+Permission denied & Check Docker socket permissions, user in docker group \\
+Database locked & Restart service, check for multiple writers \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Debug Commands}
+
+\begin{lstlisting}[style=bash]
+# Check Docker networks
+docker network ls
+docker network inspect hydra_students_net
+
+# Verify image exists
+docker images | grep hydra-student-container
+
+# Check container networking
+docker exec student-<user> curl -I http://hydra-saml-auth:6969/
+
+# View Traefik routes
+docker exec traefik cat /etc/traefik/traefik.yml
+\end{lstlisting}
+
+\section{Upgrade Procedures}
+
+\subsection{Updating the Application}
+
+\begin{lstlisting}[style=bash]
+# Pull latest code
+git pull origin main
+
+# Rebuild and restart
+docker compose build hydra-saml-auth
+docker compose up -d hydra-saml-auth
+
+# Verify
+docker compose logs -f hydra-saml-auth
+\end{lstlisting}
+
+\subsection{Updating Student Container Image}
+
+\begin{lstlisting}[style=bash]
+cd student-container
+docker build -t hydra-student-container:latest .
+\end{lstlisting}
+
+\begin{infobox}
+Existing student containers continue using the old image. Students must delete and recreate their container to get the updated image.
+\end{infobox}
+
+\section{References}
+
+\begin{itemize}
+    \item Docker Documentation: \url{https://docs.docker.com/}
+    \item Docker Compose: \url{https://docs.docker.com/compose/}
+    \item Traefik Documentation: \url{https://doc.traefik.io/traefik/}
+    \item Azure AD SAML Setup: \url{https://docs.microsoft.com/en-us/azure/active-directory/develop/single-sign-on-saml-protocol}
+    \item passport-saml: \url{https://github.com/node-saml/passport-saml}
+    \item code-server: \url{https://coder.com/docs/code-server/latest}
+    \item Jupyter: \url{https://jupyter.org/documentation}
+    \item Let's Encrypt: \url{https://letsencrypt.org/docs/}
+\end{itemize}
+
+\begin{successbox}
+\textbf{Installation Complete!}
+
+After completing these steps:
+\begin{enumerate}
+    \item Visit \texttt{https://hydra.yourdomain.edu/login}
+    \item Authenticate via Azure AD
+    \item Navigate to the dashboard
+    \item Create a test container to verify the setup
+\end{enumerate}
+
+For ongoing management, refer to the \textbf{Hydra Infrastructure Management Guide}.
+\end{successbox}
+
+\end{document}
