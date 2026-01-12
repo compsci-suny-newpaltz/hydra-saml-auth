@@ -1,0 +1,71 @@
+# Hydra Cluster Inventory
+# Usage: ansible-playbook -i inventory.yml playbooks/site.yml
+
+all:
+  vars:
+    ansible_user: root
+    ansible_python_interpreter: /usr/bin/python3
+
+    # RKE2 Configuration
+    rke2_version: "v1.28.4+rke2r1"
+    rke2_channel: stable
+
+    # Cluster settings
+    cluster_domain: hydra.newpaltz.edu
+    cluster_cidr: "10.42.0.0/16"
+    service_cidr: "10.43.0.0/16"
+
+    # NFS settings for cross-node storage
+    nfs_server: "192.168.1.100"  # Hydra's IP
+    nfs_path: "/srv/hydra-nfs"
+
+  children:
+    # Control plane node
+    control_plane:
+      hosts:
+        hydra:
+          ansible_host: 192.168.1.100
+          node_role: control-plane
+          node_labels:
+            hydra.node-role: control-plane
+            hydra.gpu-enabled: "false"
+          rke2_type: server
+          # ZFS RAID-10 storage (6x7TB = 21TB usable)
+          storage_backend: zfs
+          storage_pool: hydra-pool
+          storage_path: /srv/student-volumes
+
+    # GPU worker nodes
+    gpu_nodes:
+      hosts:
+        chimera:
+          ansible_host: 192.168.1.150
+          node_role: inference
+          node_labels:
+            hydra.node-role: inference
+            hydra.gpu-enabled: "true"
+            nvidia.com/gpu.product: RTX-3090
+          rke2_type: agent
+          gpu_count: 3
+          gpu_model: "RTX 3090"
+          gpu_vram_gb: 72
+          nfs_mount: /mnt/hydra-nfs
+
+        cerberus:
+          ansible_host: 192.168.1.242
+          node_role: training
+          node_labels:
+            hydra.node-role: training
+            hydra.gpu-enabled: "true"
+            nvidia.com/gpu.product: RTX-5090
+          rke2_type: agent
+          gpu_count: 2
+          gpu_model: "RTX 5090"
+          gpu_vram_gb: 64
+          nfs_mount: /mnt/hydra-nfs
+
+    # All cluster nodes
+    k8s_cluster:
+      children:
+        control_plane:
+        gpu_nodes:
