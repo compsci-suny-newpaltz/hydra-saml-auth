@@ -1,0 +1,10 @@
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Simple mock metrics server
+COPY dev/mock-metrics-server.js ./server.js
+
+EXPOSE 9100
+
+CMD ["node", "server.js"]

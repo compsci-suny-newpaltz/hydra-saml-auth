@@ -4,11 +4,30 @@ const fs = require('fs').promises;
 const path = require('path');
 const yaml = require('js-yaml');
 
-const router = express.Router();
-const docker = new Docker({ socketPath: '/var/run/docker.sock' });
+// Resource configuration (replaces hardcoded values)
+const resourceConfig = require('../config/resources');
+// Runtime configuration for Docker/Kubernetes mode
+const runtimeConfig = require('../config/runtime');
 
-// Constants
-const STUDENT_IMAGE = 'hydra-student-container:latest';
+const router = express.Router();
+
+// Conditional Docker client - only initialize if in Docker mode
+let docker = null;
+if (runtimeConfig.isDocker()) {
+    docker = new Docker({ socketPath: runtimeConfig.docker.socketPath });
+}
+
+// K8s container service - only load if in K8s mode
+let k8sContainers = null;
+if (runtimeConfig.isKubernetes()) {
+    k8sContainers = require('../services/k8s-containers');
+    console.log('[containers] Running in Kubernetes mode');
+} else {
+    console.log('[containers] Running in Docker mode');
+}
+
+// Constants - now using config
+const STUDENT_IMAGE = resourceConfig.defaults.image;
 const MAIN_NETWORK = 'hydra_students_net';
 const CODE_SERVER_PORT = 8443;
 const JUPYTER_PORT = 8888;
@@ -18,10 +37,25 @@ const TRAEFIK_DYNAMIC_DIR = process.env.TRAEFIK_DYNAMIC_DIR || '/etc/traefik/dyn
 
 // Shared read-only directory for course materials, downloads, etc.
 // Students can view/download but cannot modify files on the host
+// Set SHARED_DIR_ENABLED=false to disable in dev environments
 const SHARED_DIR = process.env.SHARED_DIR || '/srv/shared';
 const SHARED_MOUNT_TARGET = '/shared';
+const SHARED_DIR_ENABLED = process.env.SHARED_DIR_ENABLED !== 'false';
 
-// Helper to ensure shared directory exists
+// Helper to check if shared directory should be mounted
+function shouldMountSharedDir() {
+    if (!SHARED_DIR_ENABLED) {
+        return false;
+    }
+    const fsSync = require('fs');
+    try {
+        return fsSync.existsSync(SHARED_DIR);
+    } catch (err) {
+        return false;
+    }
+}
+
+// Helper to ensure shared directory exists (best effort)
 async function ensureSharedDir() {
     const fsSync = require('fs');
     try {
@@ -177,10 +211,45 @@ router.post('/init', async (req, res) => {
         }
 
         const username = String(req.user.email).split('@')[0];
+        const host = process.env.HOSTNAME || 'hydra.newpaltz.edu';
+        const publicBase = (process.env.PUBLIC_STUDENTS_BASE || `https://${host}/students`).replace(/\/$/, '');
+
+        // ========== KUBERNETES MODE ==========
+        if (runtimeConfig.isKubernetes()) {
+            // Check if container already exists
+            const status = await k8sContainers.getContainerStatus(username);
+            if (status.exists) {
+                return res.json({
+                    success: true,
+                    message: 'Container already exists',
+                    name: `student-${username}`,
+                    state: status.status
+                });
+            }
+
+            // Create container using K8s service
+            const result = await k8sContainers.initContainer(username, req.user.email, {
+                preset: req.body.preset || 'conservative',
+                target_node: req.body.target_node || 'hydra',
+                storage_gb: req.body.storage_gb || resourceConfig.defaults.storage_gb,
+                memory_mb: req.body.memory_mb || resourceConfig.defaults.memory_mb,
+                cpus: req.body.cpus || resourceConfig.defaults.cpus,
+                gpu_count: req.body.gpu_count || 0
+            });
+
+            return res.json({
+                success: true,
+                name: result.name,
+                vscodeUrl: `${publicBase}/${username}/vscode/`,
+                jupyterUrl: `${publicBase}/${username}/jupyter/`,
+                password: result.password // Only returned on first creation
+            });
+        }
+
+        // ========== DOCKER MODE ==========
         const containerName = `student-${username}`;
         const volumeName = `hydra-vol-${username}`;
         const studentNetworkName = `hydra-student-${username}`;
-        const host = 'hydra.newpaltz.edu';
 
         // Check if container already exists
         const existing = await getStudentContainer(username);
@@ -200,7 +269,7 @@ router.post('/init', async (req, res) => {
         // Ensure volume exists
         await ensureVolume(volumeName, username);
 
-        // Ensure shared directory exists on host
+        // Try to ensure shared directory exists (best effort)
         await ensureSharedDir();
 
         // Default routes for code-server and jupyter
@@ -232,6 +301,25 @@ router.post('/init', async (req, res) => {
             }
         }
 
+        // Build mounts array - shared dir is optional
+        const mounts = [
+            {
+                Type: 'volume',
+                Source: volumeName,
+                Target: '/home/student'
+            }
+        ];
+
+        // Only add shared mount if enabled and directory exists
+        if (shouldMountSharedDir()) {
+            mounts.push({
+                Type: 'bind',
+                Source: SHARED_DIR,
+                Target: SHARED_MOUNT_TARGET,
+                ReadOnly: true
+            });
+        }
+
         // Create container
         const container = await docker.createContainer({
             name: containerName,
@@ -245,21 +333,9 @@ router.post('/init', async (req, res) => {
             HostConfig: {
                 NetworkMode: MAIN_NETWORK,
                 RestartPolicy: { Name: 'unless-stopped' },
-                Mounts: [
-                    {
-                        Type: 'volume',
-                        Source: volumeName,
-                        Target: '/home/student'
-                    },
-                    {
-                        Type: 'bind',
-                        Source: SHARED_DIR,
-                        Target: SHARED_MOUNT_TARGET,
-                        ReadOnly: true
-                    }
-                ],
-                Memory: 4 * 1024 * 1024 * 1024, // 4GB
-                NanoCpus: 2e9, // 2 CPUs
+                Mounts: mounts,
+                Memory: resourceConfig.memoryToBytes(resourceConfig.defaults.memory_gb),
+                NanoCpus: resourceConfig.cpusToNanoCpus(resourceConfig.defaults.cpus),
                 Privileged: true // For Docker-in-Docker
             }
         });
@@ -355,6 +431,22 @@ router.get('/status', async (req, res) => {
         }
 
         const username = String(req.user.email).split('@')[0];
+
+        // ========== KUBERNETES MODE ==========
+        if (runtimeConfig.isKubernetes()) {
+            const status = await k8sContainers.getContainerStatus(username);
+            return res.json({
+                success: true,
+                exists: status.exists,
+                state: status.status || 'not_created',
+                running: status.running || false,
+                startedAt: status.startedAt,
+                node: status.node,
+                restartCount: status.restartCount
+            });
+        }
+
+        // ========== DOCKER MODE ==========
         const result = await getStudentContainer(username);
 
         if (!result) {
@@ -1004,6 +1096,33 @@ router.post('/wipe', async (req, res) => {
         }
 
         const username = String(req.user.email).split('@')[0];
+
+        // ========== KUBERNETES MODE ==========
+        if (runtimeConfig.isKubernetes()) {
+            // Wipe all data and recreate
+            await k8sContainers.wipeContainer(username);
+
+            // Re-initialize container
+            const result = await k8sContainers.initContainer(username, req.user.email, {
+                preset: req.body.preset || 'conservative',
+                target_node: req.body.target_node || 'hydra',
+                storage_gb: req.body.storage_gb || resourceConfig.defaults.storage_gb
+            });
+
+            const host = process.env.HOSTNAME || 'hydra.newpaltz.edu';
+            const publicBase = (process.env.PUBLIC_STUDENTS_BASE || `https://${host}/students`).replace(/\/$/, '');
+
+            return res.json({
+                success: true,
+                message: 'Container wiped and recreated',
+                name: result.name,
+                vscodeUrl: `${publicBase}/${username}/vscode/`,
+                jupyterUrl: `${publicBase}/${username}/jupyter/`,
+                password: result.password
+            });
+        }
+
+        // ========== DOCKER MODE ==========
         const containerName = `student-${username}`;
         const volumeName = `hydra-vol-${username}`;
 
@@ -1038,7 +1157,7 @@ router.post('/wipe', async (req, res) => {
         // Ensure volume exists
         await ensureVolume(volumeName, username);
 
-        // Ensure shared directory exists on host
+        // Try to ensure shared directory exists (best effort)
         await ensureSharedDir();
 
         // Default routes for code-server and jupyter
@@ -1070,6 +1189,25 @@ router.post('/wipe', async (req, res) => {
             }
         }
 
+        // Build mounts array - shared dir is optional
+        const mounts = [
+            {
+                Type: 'volume',
+                Source: volumeName,
+                Target: '/home/student'
+            }
+        ];
+
+        // Only add shared mount if enabled and directory exists
+        if (shouldMountSharedDir()) {
+            mounts.push({
+                Type: 'bind',
+                Source: SHARED_DIR,
+                Target: SHARED_MOUNT_TARGET,
+                ReadOnly: true
+            });
+        }
+
         // Create container
         const newContainer = await docker.createContainer({
             name: containerName,
@@ -1083,21 +1221,9 @@ router.post('/wipe', async (req, res) => {
             HostConfig: {
                 NetworkMode: MAIN_NETWORK,
                 RestartPolicy: { Name: 'unless-stopped' },
-                Mounts: [
-                    {
-                        Type: 'volume',
-                        Source: volumeName,
-                        Target: '/home/student'
-                    },
-                    {
-                        Type: 'bind',
-                        Source: SHARED_DIR,
-                        Target: SHARED_MOUNT_TARGET,
-                        ReadOnly: true
-                    }
-                ],
-                Memory: 4 * 1024 * 1024 * 1024, // 4GB
-                NanoCpus: 2e9, // 2 CPUs
+                Mounts: mounts,
+                Memory: resourceConfig.memoryToBytes(resourceConfig.defaults.memory_gb),
+                NanoCpus: resourceConfig.cpusToNanoCpus(resourceConfig.defaults.cpus),
                 Privileged: true // For Docker-in-Docker
             }
         });
@@ -1129,6 +1255,21 @@ router.delete('/destroy', async (req, res) => {
         }
 
         const username = String(req.user.email).split('@')[0];
+
+        // Kubernetes mode - use K8s container service
+        if (runtimeConfig.isKubernetes()) {
+            try {
+                await k8sContainers.wipeContainer(username);
+                return res.json({ success: true, message: 'Container and data destroyed' });
+            } catch (err) {
+                if (err.statusCode === 404 || err.message?.includes('not found')) {
+                    return res.json({ success: true, message: 'Container does not exist' });
+                }
+                throw err;
+            }
+        }
+
+        // Docker mode - existing logic
         const result = await getStudentContainer(username);
 
         if (!result) {

@@ -10,5 +10,15 @@
   "workbench.colorTheme": "Default Dark+",
   "python.defaultInterpreterPath": "/usr/bin/python3",
   "git.autofetch": true,
-  "git.confirmSync": false
+  "git.confirmSync": false,
+  "lcc.toolsPath": "/opt/cuh63",
+  "lcc.showAssemblyOutput": true,
+  "files.associations": {
+    "*.a": "lcc-assembly",
+    "*.an": "lcc-assembly",
+    "*.c": "c",
+    "*.cn": "c",
+    "*.cpp": "cpp",
+    "*.cpn": "cpp"
+  }
 }
