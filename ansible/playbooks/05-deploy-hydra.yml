@@ -1,0 +1,133 @@
+# Deploy Hydra K8s manifests
+---
+- name: Deploy Hydra Stack to Kubernetes
+  hosts: control_plane
+  become: yes
+
+  vars:
+    k8s_manifests_dir: "{{ playbook_dir }}/../../k8s"
+    kubeconfig: /etc/rancher/rke2/rke2.yaml
+
+  tasks:
+    - name: Create temporary manifests directory
+      file:
+        path: /tmp/hydra-manifests
+        state: directory
+        mode: '0755'
+
+    - name: Copy K8s manifests to server
+      synchronize:
+        src: "{{ k8s_manifests_dir }}/"
+        dest: /tmp/hydra-manifests/
+        recursive: yes
+        delete: yes
+
+    # Apply base manifests
+    - name: Apply namespaces
+      shell: |
+        export KUBECONFIG={{ kubeconfig }}
+        kubectl apply -f /tmp/hydra-manifests/base/namespace.yaml
+      register: ns_result
+      changed_when: "'created' in ns_result.stdout or 'configured' in ns_result.stdout"
+
+    - name: Apply RBAC
+      shell: |
+        export KUBECONFIG={{ kubeconfig }}
+        kubectl apply -f /tmp/hydra-manifests/base/rbac/
+      register: rbac_result
+
+    - name: Apply storage classes
+      shell: |
+        export KUBECONFIG={{ kubeconfig }}
+        kubectl apply -f /tmp/hydra-manifests/base/storage/storage-classes.yaml
+      register: sc_result
+      ignore_errors: yes  # May already exist
+
+    # Install Traefik CRDs if needed
+    - name: Check if Traefik CRDs exist
+      shell: |
+        export KUBECONFIG={{ kubeconfig }}
+        kubectl get crd ingressroutes.traefik.io
+      register: traefik_crds
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Install Traefik CRDs
+      shell: |
+        export KUBECONFIG={{ kubeconfig }}
+        kubectl apply -f https://raw.githubusercontent.com/traefik/traefik/v2.10/docs/content/reference/dynamic-configuration/kubernetes-crd-definition-v1.yml
+      when: traefik_crds.rc != 0
+
+    # Deploy components
+    - name: Deploy Traefik
+      shell: |
+        export KUBECONFIG={{ kubeconfig }}
+        kubectl apply -f /tmp/hydra-manifests/components/traefik/
+      register: traefik_result
+
+    - name: Deploy Hydra Auth
+      shell: |
+        export KUBECONFIG={{ kubeconfig }}
+        kubectl apply -f /tmp/hydra-manifests/components/hydra-auth/
+      register: hydra_result
+
+    # Wait for deployments
+    - name: Wait for Traefik deployment
+      shell: |
+        export KUBECONFIG={{ kubeconfig }}
+        kubectl -n hydra-system wait --for=condition=Available deployment/traefik --timeout=180s
+      register: traefik_ready
+      retries: 3
+      delay: 20
+      until: traefik_ready.rc == 0
+
+    - name: Wait for Hydra Auth deployment
+      shell: |
+        export KUBECONFIG={{ kubeconfig }}
+        kubectl -n hydra-system wait --for=condition=Available deployment/hydra-auth --timeout=180s
+      register: hydra_ready
+      retries: 3
+      delay: 20
+      until: hydra_ready.rc == 0
+
+    # Verify deployment
+    - name: Get all pods
+      shell: |
+        export KUBECONFIG={{ kubeconfig }}
+        kubectl get pods -A -o wide
+      register: all_pods
+
+    - name: Display pod status
+      debug:
+        var: all_pods.stdout_lines
+
+    - name: Get services
+      shell: |
+        export KUBECONFIG={{ kubeconfig }}
+        kubectl get svc -A
+      register: all_services
+
+    - name: Display services
+      debug:
+        var: all_services.stdout_lines
+
+    - name: Deployment complete
+      debug:
+        msg: |
+          =============================================
+          Hydra RKE2 Cluster Deployment Complete!
+          =============================================
+
+          Control Plane: {{ ansible_host }}
+          Kubeconfig: {{ kubeconfig }}
+
+          Access:
+            - Hydra Dashboard: https://{{ cluster_domain }}
+            - kubectl: export KUBECONFIG={{ kubeconfig }}
+
+          Next steps:
+            1. Configure DNS for {{ cluster_domain }}
+            2. Setup TLS certificates (cert-manager recommended)
+            3. Configure SAML IdP settings
+            4. Test student container creation
+          =============================================

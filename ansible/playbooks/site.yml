@@ -1,0 +1,93 @@
+# Main site playbook - orchestrates full cluster setup
+#
+# ⚠️  WARNING: This playbook modifies production systems!
+#
+# Before running:
+# 1. Read the README.md carefully
+# 2. Update inventory.yml with correct IPs
+# 3. Run preflight backup: ansible-playbook -i inventory.yml playbooks/00-preflight-backup.yml
+# 4. Schedule maintenance window and notify users
+#
+# Usage: ansible-playbook -i inventory.yml playbooks/site.yml
+---
+- name: Hydra RKE2 Cluster Setup
+  hosts: all
+  gather_facts: yes
+
+  pre_tasks:
+    - name: Display warning banner
+      debug:
+        msg: |
+          ╔══════════════════════════════════════════════════════════════════╗
+          ║  ⚠️   HYDRA RKE2 CLUSTER DEPLOYMENT                              ║
+          ╠══════════════════════════════════════════════════════════════════╣
+          ║                                                                  ║
+          ║  This playbook will:                                             ║
+          ║  • Install RKE2 Kubernetes on all nodes                          ║
+          ║  • Configure GPU support on Chimera/Cerberus                     ║
+          ║  • Deploy Hydra application stack                                ║
+          ║                                                                  ║
+          ║  PREREQUISITES:                                                  ║
+          ║  ✓ Run 00-preflight-backup.yml FIRST                            ║
+          ║  ✓ Verify backup completed successfully                         ║
+          ║  ✓ Notify users of maintenance window                           ║
+          ║                                                                  ║
+          ╚══════════════════════════════════════════════════════════════════╝
+      run_once: true
+
+    - name: Confirm deployment
+      pause:
+        prompt: |
+
+          Have you:
+          1. Run 00-preflight-backup.yml? (check /var/backups/hydra-migration-*)
+          2. Notified students of maintenance window?
+          3. Verified NFS and ZFS are healthy?
+
+          Press ENTER to continue or Ctrl+C to abort
+      run_once: true
+
+    - name: Display target hosts
+      debug:
+        msg: "Setting up {{ inventory_hostname }} ({{ ansible_host }}) - Role: {{ node_role | default('unknown') }}"
+
+# Run playbooks in order
+- name: "[Step 1/5] Prepare all nodes"
+  import_playbook: 01-prepare-nodes.yml
+
+- name: "[Step 2/5] Setup RKE2 control plane"
+  import_playbook: 02-rke2-server.yml
+
+- name: "[Step 3/5] Setup RKE2 agents (GPU nodes)"
+  import_playbook: 03-rke2-agents.yml
+
+- name: "[Step 4/5] Configure GPU support"
+  import_playbook: 04-gpu-setup.yml
+
+- name: "[Step 5/5] Deploy Hydra stack"
+  import_playbook: 05-deploy-hydra.yml
+
+- name: Deployment Complete
+  hosts: control_plane
+  tasks:
+    - name: Final status
+      debug:
+        msg: |
+          ╔══════════════════════════════════════════════════════════════════╗
+          ║  ✅  HYDRA RKE2 CLUSTER DEPLOYMENT COMPLETE                      ║
+          ╠══════════════════════════════════════════════════════════════════╣
+          ║                                                                  ║
+          ║  Cluster Status:                                                 ║
+          ║  • Control Plane: {{ inventory_hostname }} ({{ ansible_host }})            ║
+          ║  • GPU Nodes: chimera, cerberus                                  ║
+          ║                                                                  ║
+          ║  Access:                                                         ║
+          ║  • Kubeconfig: ansible/kubeconfig-hydra.yaml                    ║
+          ║  • Dashboard: https://{{ cluster_domain }}                   ║
+          ║                                                                  ║
+          ║  Verify with:                                                    ║
+          ║    export KUBECONFIG=ansible/kubeconfig-hydra.yaml              ║
+          ║    kubectl get nodes                                             ║
+          ║    kubectl get pods -A                                           ║
+          ║                                                                  ║
+          ╚══════════════════════════════════════════════════════════════════╝

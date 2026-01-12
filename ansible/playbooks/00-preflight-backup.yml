@@ -1,0 +1,261 @@
+# CRITICAL: Run this BEFORE any other playbook
+# Creates backups of all critical data and validates current state
+---
+- name: Pre-flight Safety Checks and Backups
+  hosts: k8s_cluster
+  become: yes
+
+  vars:
+    backup_dir: "/var/backups/hydra-migration-{{ ansible_date_time.date }}"
+    abort_on_running_containers: true
+
+  tasks:
+    - name: Create backup directory
+      file:
+        path: "{{ backup_dir }}"
+        state: directory
+        mode: '0700'
+
+    - name: Record current system state
+      shell: |
+        echo "=== System State Backup ===" > {{ backup_dir }}/system-state.txt
+        echo "Date: $(date)" >> {{ backup_dir }}/system-state.txt
+        echo "Hostname: $(hostname)" >> {{ backup_dir }}/system-state.txt
+        echo "" >> {{ backup_dir }}/system-state.txt
+        echo "=== Running Services ===" >> {{ backup_dir }}/system-state.txt
+        systemctl list-units --type=service --state=running >> {{ backup_dir }}/system-state.txt
+        echo "" >> {{ backup_dir }}/system-state.txt
+        echo "=== Disk Usage ===" >> {{ backup_dir }}/system-state.txt
+        df -h >> {{ backup_dir }}/system-state.txt
+        echo "" >> {{ backup_dir }}/system-state.txt
+        echo "=== Memory ===" >> {{ backup_dir }}/system-state.txt
+        free -h >> {{ backup_dir }}/system-state.txt
+
+    # Check for existing RKE2 installation
+    - name: Check if RKE2 is already installed
+      stat:
+        path: /usr/local/bin/rke2
+      register: rke2_installed
+
+    - name: Check if RKE2 server is running
+      systemd:
+        name: rke2-server
+      register: rke2_server_status
+      ignore_errors: yes
+      when: rke2_installed.stat.exists
+
+    - name: Check if RKE2 agent is running
+      systemd:
+        name: rke2-agent
+      register: rke2_agent_status
+      ignore_errors: yes
+      when: rke2_installed.stat.exists
+
+    - name: Display RKE2 status
+      debug:
+        msg: |
+          RKE2 installed: {{ rke2_installed.stat.exists }}
+          RKE2 server running: {{ rke2_server_status.status.ActiveState | default('not installed') }}
+          RKE2 agent running: {{ rke2_agent_status.status.ActiveState | default('not installed') }}
+      when: rke2_installed.stat.exists
+
+    # Backup existing RKE2 configuration
+    - name: Backup RKE2 config if exists
+      archive:
+        path: /etc/rancher/rke2
+        dest: "{{ backup_dir }}/rke2-config.tar.gz"
+      when: rke2_installed.stat.exists
+      ignore_errors: yes
+
+    - name: Backup RKE2 node token if exists
+      copy:
+        src: /var/lib/rancher/rke2/server/node-token
+        dest: "{{ backup_dir }}/node-token.bak"
+        remote_src: yes
+        mode: '0600'
+      when: rke2_installed.stat.exists
+      ignore_errors: yes
+
+    # Check Docker status
+    - name: Check if Docker is installed
+      command: docker --version
+      register: docker_version
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Check running Docker containers
+      command: docker ps --format "{{ '{{' }}.Names{{ '}}' }}"
+      register: running_containers
+      ignore_errors: yes
+      changed_when: false
+      when: docker_version.rc == 0
+
+    - name: Display running containers
+      debug:
+        msg: "Running containers: {{ running_containers.stdout_lines | default([]) }}"
+      when: docker_version.rc == 0
+
+    - name: SAFETY CHECK - Abort if student containers running
+      fail:
+        msg: |
+          ABORT: Found running Docker containers!
+          Containers: {{ running_containers.stdout_lines }}
+
+          Before proceeding:
+          1. Notify students of maintenance window
+          2. Stop all student containers gracefully
+          3. Run: docker stop $(docker ps -q)
+          4. Re-run this playbook
+
+          Or set abort_on_running_containers=false to skip this check
+      when:
+        - docker_version.rc == 0
+        - running_containers.stdout_lines | length > 0
+        - abort_on_running_containers | bool
+        - "'hydra-saml-auth' not in running_containers.stdout"
+        - "'traefik' not in running_containers.stdout"
+
+    # Backup Docker volumes
+    - name: List Docker volumes
+      command: docker volume ls -q
+      register: docker_volumes
+      ignore_errors: yes
+      changed_when: false
+      when: docker_version.rc == 0
+
+    - name: Backup critical Docker volumes list
+      copy:
+        content: "{{ docker_volumes.stdout }}"
+        dest: "{{ backup_dir }}/docker-volumes.txt"
+      when: docker_version.rc == 0 and docker_volumes.stdout | length > 0
+
+- name: Backup Hydra control plane specific data
+  hosts: control_plane
+  become: yes
+
+  vars:
+    backup_dir: "/var/backups/hydra-migration-{{ ansible_date_time.date }}"
+
+  tasks:
+    # ZFS snapshot (non-destructive backup)
+    - name: Check if ZFS pool exists
+      command: zpool status {{ storage_pool | default('hydra-pool') }}
+      register: zfs_status
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Create ZFS snapshot of student volumes
+      command: zfs snapshot -r {{ storage_pool | default('hydra-pool') }}@pre-k8s-migration
+      when: zfs_status.rc == 0
+      ignore_errors: yes
+
+    - name: Record ZFS snapshots
+      shell: zfs list -t snapshot > {{ backup_dir }}/zfs-snapshots.txt
+      when: zfs_status.rc == 0
+      ignore_errors: yes
+
+    # Backup SQLite database
+    - name: Find SQLite database
+      find:
+        paths:
+          - /var/lib/openwebui
+          - /app/data
+          - "{{ playbook_dir }}/../../data"
+        patterns: "*.db"
+        recurse: yes
+      register: db_files
+      ignore_errors: yes
+
+    - name: Backup SQLite databases
+      copy:
+        src: "{{ item.path }}"
+        dest: "{{ backup_dir }}/{{ item.path | basename }}.bak"
+        remote_src: yes
+      loop: "{{ db_files.files | default([]) }}"
+      ignore_errors: yes
+
+    # Backup NFS exports
+    - name: Backup NFS exports config
+      copy:
+        src: /etc/exports
+        dest: "{{ backup_dir }}/exports.bak"
+        remote_src: yes
+      ignore_errors: yes
+
+    # Backup Traefik dynamic config
+    - name: Check for Traefik config
+      stat:
+        path: /etc/traefik/dynamic
+      register: traefik_config
+
+    - name: Backup Traefik dynamic config
+      archive:
+        path: /etc/traefik/dynamic
+        dest: "{{ backup_dir }}/traefik-dynamic.tar.gz"
+      when: traefik_config.stat.exists
+      ignore_errors: yes
+
+- name: Backup GPU node specific data
+  hosts: gpu_nodes
+  become: yes
+
+  vars:
+    backup_dir: "/var/backups/hydra-migration-{{ ansible_date_time.date }}"
+
+  tasks:
+    # Backup Ollama models list (not the models themselves - too large)
+    - name: List Ollama models
+      command: docker exec ollama ollama list
+      register: ollama_models
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Save Ollama models list
+      copy:
+        content: "{{ ollama_models.stdout | default('Ollama not running') }}"
+        dest: "{{ backup_dir }}/ollama-models.txt"
+      when: ollama_models.rc == 0
+
+    # Check NFS mount
+    - name: Verify NFS mount
+      command: mountpoint -q {{ nfs_mount | default('/mnt/hydra-nfs') }}
+      register: nfs_mounted
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Record NFS mount status
+      copy:
+        content: |
+          NFS Mount: {{ nfs_mount | default('/mnt/hydra-nfs') }}
+          Status: {{ 'mounted' if nfs_mounted.rc == 0 else 'NOT MOUNTED' }}
+        dest: "{{ backup_dir }}/nfs-status.txt"
+
+- name: Generate backup summary
+  hosts: k8s_cluster
+  become: yes
+
+  vars:
+    backup_dir: "/var/backups/hydra-migration-{{ ansible_date_time.date }}"
+
+  tasks:
+    - name: Create backup manifest
+      shell: |
+        echo "=== Backup Manifest ===" > {{ backup_dir }}/MANIFEST.txt
+        echo "Created: $(date)" >> {{ backup_dir }}/MANIFEST.txt
+        echo "Host: {{ inventory_hostname }}" >> {{ backup_dir }}/MANIFEST.txt
+        echo "" >> {{ backup_dir }}/MANIFEST.txt
+        echo "Files:" >> {{ backup_dir }}/MANIFEST.txt
+        ls -la {{ backup_dir }}/ >> {{ backup_dir }}/MANIFEST.txt
+
+    - name: Display backup location
+      debug:
+        msg: |
+          ✅ BACKUP COMPLETE
+
+          Backup location: {{ backup_dir }}
+
+          To restore ZFS snapshot (if needed):
+            zfs rollback {{ storage_pool | default('hydra-pool') }}@pre-k8s-migration
+
+          Proceed with migration? Run:
+            ansible-playbook -i inventory.yml playbooks/01-prepare-nodes.yml

@@ -1,0 +1,375 @@
+# Prepare all nodes with common packages and configuration
+# SAFE: Does not remove Docker, preserves existing mounts, careful with firewall
+---
+- name: Prepare all cluster nodes
+  hosts: k8s_cluster
+  become: yes
+
+  vars:
+    # Safety flags - set to false to skip potentially breaking changes
+    configure_firewall: false  # DISABLED by default - manual review recommended
+    configure_swap: true
+    configure_kernel: true
+
+  tasks:
+    # ============ PRE-FLIGHT CHECKS ============
+    - name: Verify we can connect
+      ping:
+
+    - name: Gather facts
+      setup:
+
+    - name: Display target info
+      debug:
+        msg: |
+          Host: {{ inventory_hostname }}
+          IP: {{ ansible_host }}
+          OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          Kernel: {{ ansible_kernel }}
+
+    - name: Check available disk space
+      shell: df -h / | tail -1 | awk '{print $4}'
+      register: disk_space
+      changed_when: false
+
+    - name: Warn if low disk space
+      debug:
+        msg: "⚠️  WARNING: Only {{ disk_space.stdout }} free on root filesystem"
+      when: "'G' not in disk_space.stdout or (disk_space.stdout | regex_replace('[^0-9.]', '') | float) < 10"
+
+    # ============ PACKAGE INSTALLATION ============
+    - name: Update apt cache (Debian/Ubuntu)
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+      when: ansible_os_family == "Debian"
+
+    - name: Install common packages
+      apt:
+        name:
+          - curl
+          - wget
+          - apt-transport-https
+          - ca-certificates
+          - gnupg
+          - lsb-release
+          - nfs-common
+          - open-iscsi
+          - jq
+          - htop
+          - iotop
+          - net-tools
+          - rsync
+        state: present
+      when: ansible_os_family == "Debian"
+
+    # ============ SWAP CONFIGURATION ============
+    - name: Check current swap status
+      command: swapon --show
+      register: swap_status
+      changed_when: false
+      ignore_errors: yes
+
+    - name: Disable swap (required for Kubernetes)
+      command: swapoff -a
+      when:
+        - configure_swap | bool
+        - swap_status.stdout | length > 0
+
+    - name: Comment out swap in fstab (don't delete - preserves ability to re-enable)
+      replace:
+        path: /etc/fstab
+        regexp: '^([^#].*\sswap\s)'
+        replace: '# \1'
+      when: configure_swap | bool
+
+    # ============ KERNEL MODULES ============
+    - name: Load required kernel modules
+      modprobe:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - br_netfilter
+        - overlay
+        - ip_tables
+        - iptable_nat
+      when: configure_kernel | bool
+
+    - name: Persist kernel modules
+      copy:
+        dest: /etc/modules-load.d/k8s.conf
+        content: |
+          # Kubernetes required modules
+          br_netfilter
+          overlay
+          ip_tables
+          iptable_nat
+        mode: '0644'
+      when: configure_kernel | bool
+
+    - name: Set sysctl parameters for Kubernetes
+      sysctl:
+        name: "{{ item.key }}"
+        value: "{{ item.value }}"
+        sysctl_file: /etc/sysctl.d/99-kubernetes.conf
+        reload: yes
+      loop:
+        - { key: 'net.bridge.bridge-nf-call-iptables', value: '1' }
+        - { key: 'net.bridge.bridge-nf-call-ip6tables', value: '1' }
+        - { key: 'net.ipv4.ip_forward', value: '1' }
+        - { key: 'vm.max_map_count', value: '262144' }
+      when: configure_kernel | bool
+
+    # ============ FIREWALL (DISABLED BY DEFAULT) ============
+    - name: Check if UFW is installed
+      command: which ufw
+      register: ufw_installed
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Display firewall warning
+      debug:
+        msg: |
+          ⚠️  FIREWALL CONFIGURATION SKIPPED (configure_firewall=false)
+
+          If you need to configure UFW manually, ensure these ports are open:
+          - 22    (SSH - CRITICAL!)
+          - 6443  (K8s API)
+          - 9345  (RKE2 supervisor)
+          - 10250 (Kubelet)
+          - 2379-2380 (etcd)
+          - 30000-32767 (NodePort range)
+      when:
+        - ufw_installed.rc == 0
+        - not (configure_firewall | bool)
+
+    - name: Configure firewall (only if explicitly enabled)
+      block:
+        - name: Ensure SSH is allowed FIRST (prevent lockout)
+          ufw:
+            rule: allow
+            port: '22'
+            proto: tcp
+
+        - name: Allow Kubernetes ports
+          ufw:
+            rule: allow
+            port: "{{ item }}"
+            proto: tcp
+          loop:
+            - '6443'
+            - '9345'
+            - '10250'
+            - '2379'
+            - '2380'
+
+        - name: Allow NodePort range
+          ufw:
+            rule: allow
+            port: '30000:32767'
+            proto: tcp
+
+        - name: Allow internal cluster traffic
+          ufw:
+            rule: allow
+            src: "{{ hostvars[item].ansible_host }}"
+          loop: "{{ groups['k8s_cluster'] }}"
+      when:
+        - ufw_installed.rc == 0
+        - configure_firewall | bool
+
+    # ============ HOSTNAME CONFIGURATION ============
+    - name: Set hostname
+      hostname:
+        name: "{{ inventory_hostname }}"
+
+    - name: Add cluster hosts to /etc/hosts
+      lineinfile:
+        path: /etc/hosts
+        line: "{{ hostvars[item].ansible_host }} {{ item }}"
+        state: present
+        create: yes
+      loop: "{{ groups['k8s_cluster'] }}"
+
+    # ============ DOCKER COEXISTENCE CHECK ============
+    - name: Check if Docker is running
+      systemd:
+        name: docker
+      register: docker_status
+      ignore_errors: yes
+
+    - name: Docker coexistence notice
+      debug:
+        msg: |
+          ℹ️  Docker detected and running on {{ inventory_hostname }}
+
+          RKE2 uses containerd (not Docker) but both can coexist.
+          Existing Docker containers will continue to run.
+
+          After K8s migration is complete, you can optionally:
+          1. Migrate Docker workloads to K8s
+          2. Keep Docker for development/testing
+          3. Remove Docker if no longer needed
+
+          NO ACTION TAKEN - Docker left untouched.
+      when: docker_status.status.ActiveState | default('') == 'active'
+
+# ============ NFS SETUP ON GPU NODES ============
+- name: Setup NFS mounts on GPU nodes
+  hosts: gpu_nodes
+  become: yes
+
+  tasks:
+    - name: Check if NFS mount directory exists
+      stat:
+        path: "{{ nfs_mount }}"
+      register: nfs_dir
+
+    - name: Create NFS mount directory
+      file:
+        path: "{{ nfs_mount }}"
+        state: directory
+        mode: '0755'
+      when: not nfs_dir.stat.exists
+
+    - name: Check if already mounted
+      command: mountpoint -q {{ nfs_mount }}
+      register: is_mounted
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Check NFS server is reachable
+      command: ping -c 1 {{ nfs_server }}
+      register: nfs_ping
+      ignore_errors: yes
+      changed_when: false
+      when: is_mounted.rc != 0
+
+    - name: Test NFS export availability
+      command: showmount -e {{ nfs_server }}
+      register: nfs_exports
+      ignore_errors: yes
+      changed_when: false
+      when:
+        - is_mounted.rc != 0
+        - nfs_ping.rc == 0
+
+    - name: Display NFS status
+      debug:
+        msg: |
+          NFS Mount: {{ nfs_mount }}
+          Currently mounted: {{ 'yes' if is_mounted.rc == 0 else 'no' }}
+          NFS Server reachable: {{ 'yes' if nfs_ping.rc | default(1) == 0 else 'no' }}
+
+    - name: Mount NFS share
+      mount:
+        path: "{{ nfs_mount }}"
+        src: "{{ nfs_server }}:{{ nfs_path }}"
+        fstype: nfs
+        opts: "rw,sync,hard,intr,nofail"  # nofail prevents boot hang if NFS unavailable
+        state: mounted
+      when:
+        - is_mounted.rc != 0
+        - nfs_ping.rc == 0
+      ignore_errors: yes
+      register: nfs_mount_result
+
+    - name: NFS mount warning
+      debug:
+        msg: |
+          ⚠️  NFS mount failed or skipped
+
+          Please ensure:
+          1. NFS server ({{ nfs_server }}) is running
+          2. Export {{ nfs_path }} is configured in /etc/exports on {{ nfs_server }}
+          3. Firewall allows NFS traffic
+
+          Manual mount command:
+          mount -t nfs {{ nfs_server }}:{{ nfs_path }} {{ nfs_mount }}
+      when:
+        - is_mounted.rc != 0
+        - nfs_mount_result is defined
+        - nfs_mount_result.failed | default(false)
+
+# ============ ZFS SETUP ON CONTROL PLANE ============
+- name: Verify ZFS on control plane (DO NOT CREATE - data preservation)
+  hosts: control_plane
+  become: yes
+
+  tasks:
+    - name: Check if ZFS is installed
+      command: which zfs
+      register: zfs_installed
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Install ZFS utilities if missing
+      apt:
+        name:
+          - zfsutils-linux
+        state: present
+      when:
+        - ansible_os_family == "Debian"
+        - zfs_installed.rc != 0
+        - storage_backend | default('') == "zfs"
+
+    - name: Check if ZFS pool exists
+      command: zpool status {{ storage_pool | default('hydra-pool') }}
+      register: zpool_status
+      ignore_errors: yes
+      changed_when: false
+      when: storage_backend | default('') == "zfs"
+
+    - name: Display ZFS status
+      debug:
+        msg: |
+          ZFS Pool: {{ storage_pool | default('hydra-pool') }}
+          Status: {{ 'EXISTS' if zpool_status.rc == 0 else 'NOT FOUND' }}
+
+          {% if zpool_status.rc != 0 %}
+          ⚠️  ZFS pool not found. This playbook will NOT create it automatically
+          to prevent data loss. Please create manually:
+
+            zpool create {{ storage_pool | default('hydra-pool') }} raidz2 /dev/sdX /dev/sdY ...
+
+          Or if pool exists with different name, update inventory.yml
+          {% endif %}
+      when: storage_backend | default('') == "zfs"
+
+    - name: Verify student volumes directory exists
+      file:
+        path: "{{ storage_path }}"
+        state: directory
+        mode: '0755'
+        owner: root
+        group: root
+
+    - name: Check student volumes directory contents
+      find:
+        paths: "{{ storage_path }}"
+        file_type: directory
+      register: student_volumes
+      when: storage_path is defined
+
+    - name: Display student data status
+      debug:
+        msg: |
+          Student volumes path: {{ storage_path }}
+          Existing student directories: {{ student_volumes.matched | default(0) }}
+
+          {% if student_volumes.matched | default(0) > 0 %}
+          ✅ Found existing student data - will be preserved
+          {% endif %}
+      when: storage_path is defined
+
+- name: Node preparation complete
+  hosts: k8s_cluster
+  tasks:
+    - name: Summary
+      debug:
+        msg: |
+          ✅ Node {{ inventory_hostname }} prepared
+
+          Next steps:
+          1. Run 02-rke2-server.yml on control plane
+          2. Run 03-rke2-agents.yml on GPU nodes

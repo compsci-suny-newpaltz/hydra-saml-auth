@@ -1,0 +1,93 @@
+# Setup RKE2 agents on GPU worker nodes
+---
+- name: Setup RKE2 Agents on GPU Nodes
+  hosts: gpu_nodes
+  become: yes
+
+  vars:
+    rke2_config_dir: /etc/rancher/rke2
+    control_plane_host: "{{ hostvars[groups['control_plane'][0]].ansible_host }}"
+    node_token: "{{ hostvars[groups['control_plane'][0]].rke2_node_token }}"
+
+  tasks:
+    - name: Verify node token is available
+      fail:
+        msg: "Node token not available. Run server playbook first."
+      when: node_token is not defined or node_token == ""
+
+    - name: Create RKE2 config directory
+      file:
+        path: "{{ rke2_config_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Configure RKE2 agent
+      copy:
+        dest: "{{ rke2_config_dir }}/config.yaml"
+        content: |
+          # RKE2 Agent Configuration for {{ inventory_hostname }}
+          server: https://{{ control_plane_host }}:9345
+          token: {{ node_token }}
+
+          # Node labels for scheduling
+          node-label:
+            - "hydra.node-role={{ node_role }}"
+            - "hydra.gpu-enabled=true"
+            - "nvidia.com/gpu.product={{ gpu_model | replace(' ', '-') }}"
+            - "hydra.gpu-count={{ gpu_count }}"
+
+          # GPU node taints (optional - require explicit tolerations)
+          # node-taint:
+          #   - "nvidia.com/gpu=true:NoSchedule"
+        mode: '0600'
+
+    - name: Download RKE2 installer
+      get_url:
+        url: https://get.rke2.io
+        dest: /tmp/rke2-install.sh
+        mode: '0755'
+
+    - name: Install RKE2 agent
+      shell: |
+        INSTALL_RKE2_CHANNEL={{ rke2_channel }} \
+        INSTALL_RKE2_VERSION={{ rke2_version }} \
+        INSTALL_RKE2_TYPE=agent \
+        /tmp/rke2-install.sh
+      args:
+        creates: /usr/local/bin/rke2
+
+    - name: Enable and start RKE2 agent
+      systemd:
+        name: rke2-agent
+        enabled: yes
+        state: started
+
+    - name: Wait for agent to connect
+      pause:
+        seconds: 30
+        prompt: "Waiting for agent to register with control plane..."
+
+- name: Verify agents joined cluster
+  hosts: control_plane
+  become: yes
+
+  tasks:
+    - name: Check all nodes are ready
+      shell: |
+        export KUBECONFIG=/etc/rancher/rke2/rke2.yaml
+        kubectl get nodes -o wide
+      register: nodes_output
+
+    - name: Display cluster nodes
+      debug:
+        var: nodes_output.stdout_lines
+
+    - name: Wait for GPU nodes to be ready
+      shell: |
+        export KUBECONFIG=/etc/rancher/rke2/rke2.yaml
+        kubectl wait --for=condition=Ready node/{{ item }} --timeout=300s
+      loop: "{{ groups['gpu_nodes'] }}"
+      register: gpu_nodes_ready
+      retries: 5
+      delay: 30
+      until: gpu_nodes_ready.rc == 0

@@ -1,0 +1,82 @@
+# Setup NVIDIA GPU support on GPU nodes
+---
+- name: Install NVIDIA drivers and container toolkit on GPU nodes
+  hosts: gpu_nodes
+  become: yes
+
+  tasks:
+    - name: Add NVIDIA package signing key
+      apt_key:
+        url: https://nvidia.github.io/libnvidia-container/gpgkey
+        state: present
+
+    - name: Add NVIDIA container toolkit repository
+      apt_repository:
+        repo: "deb https://nvidia.github.io/libnvidia-container/stable/deb/$(ARCH) /"
+        state: present
+        filename: nvidia-container-toolkit
+
+    - name: Install NVIDIA container toolkit
+      apt:
+        name:
+          - nvidia-container-toolkit
+        state: present
+        update_cache: yes
+
+    - name: Configure containerd for NVIDIA runtime
+      shell: |
+        nvidia-ctk runtime configure --runtime=containerd --config=/var/lib/rancher/rke2/agent/etc/containerd/config.toml
+      notify: Restart RKE2 agent
+
+    - name: Verify NVIDIA driver is loaded
+      command: nvidia-smi
+      register: nvidia_smi
+      changed_when: false
+
+    - name: Display GPU info
+      debug:
+        var: nvidia_smi.stdout_lines
+
+  handlers:
+    - name: Restart RKE2 agent
+      systemd:
+        name: rke2-agent
+        state: restarted
+
+- name: Deploy NVIDIA device plugin to cluster
+  hosts: control_plane
+  become: yes
+
+  vars:
+    k8s_manifests_dir: "{{ playbook_dir }}/../../k8s"
+
+  tasks:
+    - name: Copy NVIDIA device plugin manifest
+      copy:
+        src: "{{ k8s_manifests_dir }}/gpu/nvidia-device-plugin.yaml"
+        dest: /tmp/nvidia-device-plugin.yaml
+
+    - name: Apply NVIDIA device plugin
+      shell: |
+        export KUBECONFIG=/etc/rancher/rke2/rke2.yaml
+        kubectl apply -f /tmp/nvidia-device-plugin.yaml
+
+    - name: Wait for device plugin to be ready
+      shell: |
+        export KUBECONFIG=/etc/rancher/rke2/rke2.yaml
+        kubectl -n kube-system wait --for=condition=Ready pod -l name=nvidia-device-plugin-ds --timeout=120s
+      register: device_plugin_ready
+      retries: 5
+      delay: 20
+      until: device_plugin_ready.rc == 0
+      ignore_errors: yes
+
+    - name: Verify GPU resources are advertised
+      shell: |
+        export KUBECONFIG=/etc/rancher/rke2/rke2.yaml
+        kubectl get nodes -o json | jq '.items[] | {name: .metadata.name, gpus: .status.capacity["nvidia.com/gpu"]}'
+      register: gpu_resources
+
+    - name: Display GPU resources per node
+      debug:
+        var: gpu_resources.stdout_lines
