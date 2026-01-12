@@ -1,0 +1,57 @@
+# k3d cluster configuration for Hydra development
+# Usage: k3d cluster create --config k3d-config.yaml
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+metadata:
+  name: hydra-dev
+servers: 1
+agents: 2
+image: rancher/k3s:v1.28.4-k3s1
+ports:
+  # HTTP traffic
+  - port: 80:80
+    nodeFilters:
+      - loadbalancer
+  # HTTPS traffic
+  - port: 443:443
+    nodeFilters:
+      - loadbalancer
+  # Hydra auth service
+  - port: 6969:6969
+    nodeFilters:
+      - loadbalancer
+  # Traefik dashboard
+  - port: 8081:8080
+    nodeFilters:
+      - loadbalancer
+registries:
+  create:
+    name: hydra-registry.localhost
+    host: "0.0.0.0"
+    hostPort: "5000"
+options:
+  k3d:
+    wait: true
+    timeout: "180s"
+  k3s:
+    extraArgs:
+      # Disable built-in traefik (we'll deploy our own)
+      - arg: --disable=traefik
+        nodeFilters:
+          - server:*
+      # Disable servicelb (use NodePort instead)
+      - arg: --disable=servicelb
+        nodeFilters:
+          - server:*
+  kubeconfig:
+    updateDefaultKubeconfig: true
+    switchCurrentContext: true
+volumes:
+  # Mount shared directory for course materials
+  - volume: ./shared:/shared
+    nodeFilters:
+      - all
+  # Mount JWT keys directory
+  - volume: ./jwt-keys:/app/jwt-keys
+    nodeFilters:
+      - server:*

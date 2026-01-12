@@ -1,0 +1,59 @@
+# Mock SAML IdP for local development
+# Uses SimpleSAMLphp for testing authentication flows
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mock-saml-idp
+  namespace: hydra-system
+  labels:
+    app.kubernetes.io/name: mock-saml-idp
+    app.kubernetes.io/component: dev-mock
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mock-saml-idp
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mock-saml-idp
+    spec:
+      containers:
+        - name: saml-idp
+          image: kristophjunge/test-saml-idp:1.15
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: https
+              containerPort: 8443
+          env:
+            - name: SIMPLESAMLPHP_SP_ENTITY_ID
+              value: "http://localhost:6969"
+            - name: SIMPLESAMLPHP_SP_ASSERTION_CONSUMER_SERVICE
+              value: "http://localhost:6969/login/callback"
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mock-saml-idp
+  namespace: hydra-system
+  labels:
+    app.kubernetes.io/name: mock-saml-idp
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+    - name: https
+      port: 8443
+      targetPort: 8443
+  selector:
+    app.kubernetes.io/name: mock-saml-idp

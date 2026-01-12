@@ -1,0 +1,40 @@
+# Hydra SAML Auth ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hydra-auth-config
+  namespace: hydra-system
+  labels:
+    app.kubernetes.io/name: hydra
+    app.kubernetes.io/component: auth
+data:
+  BASE_URL: "http://hydra.local"
+
+  # SAML Configuration
+  SAML_SP_ENTITY_ID: "hydra.local"
+  SAML_CALLBACK_PATH: "/login/callback"
+
+  # JWT Settings
+  JWT_TTL_SECONDS: "900"
+  JWT_AUDIENCE: "npsites"
+  JWT_KEY_ID: "hydra-key-1"
+  JWT_PRIVATE_KEY_FILE: "/app/jwt-keys/private.pem"
+  JWT_PUBLIC_KEY_FILE: "/app/jwt-keys/public.pem"
+
+  # Cookie Settings
+  COOKIE_DOMAIN: ".hydra.local"
+
+  # Student Container Settings
+  STUDENT_IMAGE: "hydra-student-container:latest"
+  PUBLIC_STUDENTS_BASE: "http://hydra.local/students"
+
+  # Database
+  DB_PATH: "/app/data/hydra.db"
+
+  # Kubernetes Settings
+  K8S_NAMESPACE: "hydra-students"
+  K8S_SYSTEM_NAMESPACE: "hydra-system"
+
+  # Node Configuration
+  CHIMERA_HOST: "chimera"
+  CERBERUS_HOST: "cerberus"

@@ -1,0 +1,86 @@
+# Student IngressRoute Template
+# Created dynamically by k8s-containers.js for each student
+# Variables: ${USERNAME}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: student-${USERNAME}
+  namespace: hydra-students
+  labels:
+    app.kubernetes.io/name: student-route
+    app.kubernetes.io/instance: ${USERNAME}
+    app.kubernetes.io/managed-by: hydra-auth
+    hydra.owner: ${USERNAME}
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    # VS Code Server route
+    - match: PathPrefix(`/students/${USERNAME}/vscode`)
+      kind: Rule
+      services:
+        - name: student-${USERNAME}
+          port: 8443
+      middlewares:
+        - name: hydra-forward-auth
+          namespace: hydra-system
+        - name: strip-prefix-${USERNAME}
+    # Jupyter route
+    - match: PathPrefix(`/students/${USERNAME}/jupyter`)
+      kind: Rule
+      services:
+        - name: student-${USERNAME}
+          port: 8888
+      middlewares:
+        - name: hydra-forward-auth
+          namespace: hydra-system
+        - name: strip-prefix-${USERNAME}
+    # Supervisor route (admin only)
+    - match: PathPrefix(`/students/${USERNAME}/supervisor`)
+      kind: Rule
+      services:
+        - name: student-${USERNAME}
+          port: 9001
+      middlewares:
+        - name: hydra-forward-auth
+          namespace: hydra-system
+        - name: strip-prefix-${USERNAME}
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: strip-prefix-${USERNAME}
+  namespace: hydra-students
+spec:
+  stripPrefix:
+    prefixes:
+      - /students/${USERNAME}/vscode
+      - /students/${USERNAME}/jupyter
+      - /students/${USERNAME}/supervisor
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: student-${USERNAME}
+  namespace: hydra-students
+  labels:
+    app.kubernetes.io/name: student-service
+    app.kubernetes.io/instance: ${USERNAME}
+    hydra.owner: ${USERNAME}
+spec:
+  type: ClusterIP
+  ports:
+    - name: vscode
+      port: 8443
+      targetPort: vscode
+    - name: jupyter
+      port: 8888
+      targetPort: jupyter
+    - name: supervisor
+      port: 9001
+      targetPort: supervisor
+  selector:
+    app.kubernetes.io/name: student-container
+    app.kubernetes.io/instance: ${USERNAME}

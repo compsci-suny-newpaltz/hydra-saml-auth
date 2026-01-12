@@ -1,0 +1,54 @@
+# Hydra RBAC Roles
+---
+# Role for managing student pods in hydra-students namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: student-pod-manager
+  namespace: hydra-students
+rules:
+  # Pod management
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "pods/exec", "pods/attach"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # PVC management for student volumes
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Service management for student services
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # ConfigMaps for student configurations
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Secrets for student credentials
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Traefik IngressRoute CRDs
+  - apiGroups: ["traefik.io", "traefik.containo.us"]
+    resources: ["ingressroutes", "middlewares", "ingressroutetcps", "ingressrouteudps"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+# Role for hydra-auth in hydra-system namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: hydra-auth-role
+  namespace: hydra-system
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets"]
+    verbs: ["get", "list", "watch"]
+---
+# ClusterRole for reading nodes (for GPU scheduling info)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: hydra-node-reader
+rules:
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]

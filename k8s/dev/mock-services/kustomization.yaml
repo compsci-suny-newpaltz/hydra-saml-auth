@@ -1,0 +1,13 @@
+# Kustomization for dev mock services
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: hydra-system
+
+resources:
+  - mock-saml-idp.yaml
+  - mock-metrics.yaml
+
+commonLabels:
+  environment: development
+  app.kubernetes.io/part-of: hydra

@@ -1,0 +1,42 @@
+# Traefik Services
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: traefik
+  namespace: hydra-system
+  labels:
+    app.kubernetes.io/name: traefik
+spec:
+  type: NodePort
+  ports:
+    - name: web
+      port: 80
+      targetPort: web
+      nodePort: 30080
+    - name: websecure
+      port: 443
+      targetPort: websecure
+      nodePort: 30443
+    - name: hydra
+      port: 6969
+      targetPort: hydra
+      nodePort: 30969
+  selector:
+    app.kubernetes.io/name: traefik
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: traefik-dashboard
+  namespace: hydra-system
+  labels:
+    app.kubernetes.io/name: traefik
+spec:
+  type: ClusterIP
+  ports:
+    - name: dashboard
+      port: 8080
+      targetPort: dashboard
+  selector:
+    app.kubernetes.io/name: traefik

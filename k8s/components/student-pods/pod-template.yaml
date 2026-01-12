@@ -1,0 +1,100 @@
+# Student Pod Template
+# This is a reference template - actual pods are created dynamically by k8s-containers.js
+# Variables: ${USERNAME}, ${EMAIL}, ${STUDENT_IMAGE}, ${MEMORY_REQUEST}, ${MEMORY_LIMIT},
+#            ${CPU_REQUEST}, ${CPU_LIMIT}, ${GPU_COUNT}, ${STORAGE_GB}, ${NODE_ROLE}
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: student-${USERNAME}
+  namespace: hydra-students
+  labels:
+    app.kubernetes.io/name: student-container
+    app.kubernetes.io/instance: ${USERNAME}
+    app.kubernetes.io/managed-by: hydra-auth
+    hydra.owner: ${USERNAME}
+  annotations:
+    hydra.created-at: ${CREATED_AT}
+    hydra.owner-email: ${EMAIL}
+    hydra.preset: ${PRESET}
+spec:
+  serviceAccountName: student-workload
+  # Security context - NO privileged access
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  # Node selection based on target (hydra, chimera, cerberus)
+  nodeSelector:
+    hydra.node-role: ${NODE_ROLE}
+  # GPU tolerations (only applied for GPU workloads)
+  tolerations:
+    - key: "nvidia.com/gpu"
+      operator: "Exists"
+      effect: "NoSchedule"
+  containers:
+    - name: student
+      image: ${STUDENT_IMAGE}
+      imagePullPolicy: IfNotPresent
+      env:
+        - name: USERNAME
+          value: "${USERNAME}"
+        - name: USER_EMAIL
+          value: "${EMAIL}"
+        - name: HOME
+          value: "/home/student"
+        - name: PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: student-${USERNAME}-creds
+              key: password
+      ports:
+        - name: vscode
+          containerPort: 8443
+          protocol: TCP
+        - name: jupyter
+          containerPort: 8888
+          protocol: TCP
+        - name: supervisor
+          containerPort: 9001
+          protocol: TCP
+      resources:
+        requests:
+          memory: "${MEMORY_REQUEST}"
+          cpu: "${CPU_REQUEST}"
+        limits:
+          memory: "${MEMORY_LIMIT}"
+          cpu: "${CPU_LIMIT}"
+          # GPU limit - only included when GPU_COUNT > 0
+          # nvidia.com/gpu: "${GPU_COUNT}"
+      volumeMounts:
+        - name: home
+          mountPath: /home/student
+        - name: shared
+          mountPath: /shared
+          readOnly: true
+      # Security - NO privilege escalation
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: false
+        capabilities:
+          drop:
+            - ALL
+          # Only add specific capabilities if needed
+          # add:
+          #   - NET_BIND_SERVICE
+  volumes:
+    - name: home
+      persistentVolumeClaim:
+        claimName: hydra-vol-${USERNAME}
+    - name: shared
+      nfs:
+        server: hydra.internal
+        path: /tank/shared
+        readOnly: true
+  restartPolicy: Always
+  # Termination grace period
+  terminationGracePeriodSeconds: 30
