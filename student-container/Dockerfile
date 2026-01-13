@@ -115,7 +115,7 @@ RUN while IFS= read -r ext || [ -n "$ext" ]; do \
 # Copy pre-built LCC extension from builder stage and install
 COPY --from=lcc-builder /lcc-tools.vsix /tmp/lcc-tools.vsix
 RUN code-server --install-extension /tmp/lcc-tools.vsix && \
-    rm /tmp/lcc-tools.vsix
+    rm -f /tmp/lcc-tools.vsix || true
 
 # Setup code-server settings
 RUN mkdir -p /home/student/.local/share/code-server/User && \
