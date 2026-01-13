@@ -350,8 +350,6 @@ router.post('/init', async (req, res) => {
         // Write Traefik config file for routing
         await writeTraefikConfig(username, defaultRoutes);
 
-        const publicBase = (process.env.PUBLIC_STUDENTS_BASE || `https://${host}/students`).replace(/\/$/, '');
-
         return res.json({
             success: true,
             name: containerName,

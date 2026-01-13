@@ -17,7 +17,7 @@ RUN npm ci --omit=dev
 
 # Copy only necessary files
 COPY db.js ./db.js
-COPY openwebui_middleman ./openwebui_middleman
+COPY legacy/openwebui_middleman ./openwebui_middleman
 
 # Set static IP for this container in compose
 ENV DB_PATH=/app/data/webui.db \
