@@ -1,32 +1,197 @@
 # Hydra SAML Auth - Local Development Environment
 
-This development setup provides a complete local environment that emulates the production Hydra SAML Auth system, including all dependencies and services.
+---
+
+## START HERE
+
+This guide walks you through the complete Hydra development and deployment pipeline. Follow these stages in order.
+
+### Deployment Stages Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                           HYDRA DEPLOYMENT PIPELINE                                      │
+├───────────────────────┬─────────────────────────┬───────────────────────────────────────┤
+│       STAGE 1         │        STAGE 2          │            STAGE 3                    │
+│     Docker Dev        │       K8s Dev           │          Production                   │
+│   (You Are Here)      │     (Local k3d)         │     (RKE2 Multi-Node)                 │
+├───────────────────────┼─────────────────────────┼───────────────────────────────────────┤
+│                       │                         │                                       │
+│  docker-compose.yml   │   k3d cluster           │   RKE2 cluster on bare metal          │
+│  Mock SAML IdP        │   Real K8s manifests    │   Azure AD SAML                       │
+│  SQLite local         │   ConfigMaps/Secrets    │   Production SSL                      │
+│  No GPU               │   No GPU                │   Multi-GPU (Chimera/Cerberus)        │
+│                       │                         │                                       │
+├───────────────────────┼─────────────────────────┼───────────────────────────────────────┤
+│  cd dev/              │  ./k8s-dev-setup.sh     │  cd ../ansible                        │
+│  make nuke            │    create               │  ansible-playbook                     │
+│    (or)               │                         │    playbooks/site.yml                 │
+│  make setup && start  │                         │                                       │
+└───────────────────────┴─────────────────────────┴───────────────────────────────────────┘
+```
+
+### Quick Start Commands
+
+```bash
+# STAGE 1: Docker Development (start here)
+cd dev/
+make nuke          # Complete reset + rebuild (recommended for first setup)
+# OR
+make setup         # Generate JWT keys, setup hosts, pull images
+make start         # Start all services
+make health        # Verify everything is running
+
+# STAGE 2: Kubernetes Development (after Docker works)
+./k8s-dev-setup.sh create    # Bootstrap k3d cluster
+./k8s-dev-setup.sh status    # Check cluster health
+./k8s-dev-setup.sh destroy   # Tear down cluster
+
+# STAGE 3: Production (after K8s validation)
+cd ../ansible
+ansible-playbook -i inventory.yml playbooks/site.yml
+```
+
+---
 
 ## Architecture Overview
 
+### Current Docker Development Architecture
+
 ```
-┌─────────────────────────────────────────────────────────┐
-│                     Local Machine                        │
-├───────────────────────────────────────────────────────────┤
-│                                                           │
-│  ┌──────────────┐    ┌──────────────┐    ┌────────────┐ │
-│  │ Mock SAML IdP│◄───│ Hydra Auth   │───►│ OpenWebUI  │ │
-│  │  Port: 8080  │    │  Port: 6969  │    │ Port: 3000 │ │
-│  └──────────────┘    └──────▲───────┘    └─────▲──────┘ │
-│                             │                   │        │
-│                    ┌────────▼────────┐   ┌─────▼──────┐ │
-│                    │   Traefik       │   │ Middleman  │ │
-│                    │   Port: 80/443  │   │ Port: 7070 │ │
-│                    └─────────────────┘   └────────────┘ │
-│                                                          │
-│  ┌──────────────┐    ┌──────────────┐    ┌────────────┐ │
-│  │    Ollama    │    │     n8n      │    │  Student   │ │
-│  │  Port: 11434 │    │  Port: 5678  │    │ Containers │ │
-│  └──────────────┘    └──────────────┘    └────────────┘ │
-└───────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          Internet / Browser                                  │
+│                         http://hydra.local:6969                              │
+└────────────────────────────────────┬────────────────────────────────────────┘
+                                     │
+                                     ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                     Traefik Reverse Proxy (v2.11)                            │
+│                   Ports: 80 (web), 443 (secure), 8081 (dash)                 │
+│             Routes: /students/* → ForwardAuth → Student Containers           │
+└────────┬──────────────────────┬──────────────────────┬──────────────────────┘
+         │                      │                      │
+         ▼                      ▼                      ▼
+┌────────────────┐    ┌────────────────┐    ┌─────────────────────────────────┐
+│  Mock SAML IdP │    │  Hydra Auth    │    │     Student Containers          │
+│  Port: 8080    │◄───│  Port: 6969    │───►│  (created on-demand)            │
+│                │    │                │    │                                 │
+│  Test Users:   │    │  - Dashboard   │    │  - VS Code (:8443)              │
+│  user1/user1   │    │  - SAML SSO    │    │  - Jupyter (:8888)              │
+│  user2/user2   │    │  - JWT/JWKS    │    │  - Terminal access              │
+└────────────────┘    │  - Container   │    └─────────────────────────────────┘
+                      │    Lifecycle   │
+                      └───────┬────────┘
+                              │
+              ┌───────────────┼───────────────┐
+              │               │               │
+              ▼               ▼               ▼
+      ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
+      │  OpenWebUI   │ │  Middleman   │ │   n8n Dev    │
+      │  Port: 3000  │ │  Port: 7070  │ │  Port: 5678  │
+      │  (LLM Chat)  │ │  (DB API)    │ │  (Workflows) │
+      └──────────────┘ └──────────────┘ └──────────────┘
 ```
 
-## 🚀 Quick Start
+### Target Production Architecture (RKE2 Multi-Node)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                                    INTERNET                                              │
+│                           https://hydra.newpaltz.edu                                     │
+└──────────────────────────────────────┬──────────────────────────────────────────────────┘
+                                       │
+                                       ▼
+┌──────────────────────────────────────────────────────────────────────────────────────────┐
+│                              AZURE AD (SAML 2.0 IdP)                                     │
+│                       Enterprise Application: "Hydra Auth"                               │
+└──────────────────────────────────────┬──────────────────────────────────────────────────┘
+                                       │
+          ┌────────────────────────────┼────────────────────────────┐
+          │                            │                            │
+          ▼                            ▼                            ▼
+┌──────────────────────┐    ┌──────────────────────┐    ┌──────────────────────────────┐
+│       HYDRA          │    │       CHIMERA        │    │         CERBERUS             │
+│    Control Plane     │    │    GPU Inference     │    │       GPU Training           │
+│   192.168.1.100      │    │   192.168.1.150      │    │      192.168.1.242           │
+├──────────────────────┤    ├──────────────────────┤    ├──────────────────────────────┤
+│                      │    │                      │    │                              │
+│  RKE2 Server Node    │    │  RKE2 Agent Node     │    │  RKE2 Agent Node             │
+│                      │    │                      │    │                              │
+│  Services:           │    │  Services:           │    │  Services:                   │
+│  - Traefik Ingress   │    │  - Ollama (LLMs)     │    │  - Training Workloads        │
+│  - Hydra Auth        │    │  - OpenWebUI         │    │  - Batch Jobs                │
+│  - Student Containers│    │  - vLLM              │    │  - Model Fine-tuning         │
+│  - n8n Workflows     │    │                      │    │                              │
+│  - SQLite/Postgres   │    │  GPUs:               │    │  GPUs:                       │
+│                      │    │  - NVIDIA RTX 4090   │    │  - NVIDIA A100/H100          │
+│  Storage:            │    │  - CUDA 12.x         │    │  - High VRAM workloads       │
+│  - Longhorn (dist)   │    │                      │    │                              │
+│  - ZFS local         │    │                      │    │                              │
+└──────────────────────┘    └──────────────────────┘    └──────────────────────────────┘
+          │                            │                            │
+          └────────────────────────────┴────────────────────────────┘
+                                       │
+                              RKE2 Cluster Network
+                           (Flannel CNI / Calico)
+```
+
+### Request Flow Diagram
+
+```
+┌──────────────────────────────────────────────────────────────────────────────────────┐
+│                              AUTHENTICATION FLOW                                      │
+├──────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                      │
+│   User                    Traefik               Hydra Auth          SAML IdP         │
+│    │                         │                      │                   │            │
+│    │  GET /login             │                      │                   │            │
+│    │────────────────────────►│                      │                   │            │
+│    │                         │  forward             │                   │            │
+│    │                         │─────────────────────►│                   │            │
+│    │                         │                      │  SAML AuthnReq    │            │
+│    │◄────────────────────────┼──────────────────────┼──────────────────►│            │
+│    │         302 Redirect to IdP                    │                   │            │
+│    │                         │                      │                   │            │
+│    │  User authenticates at IdP                     │                   │            │
+│    │────────────────────────────────────────────────────────────────────►│            │
+│    │                         │                      │                   │            │
+│    │◄────────────────────────┼──────────────────────┼───────────────────│            │
+│    │  POST /login/callback (SAML Response)          │                   │            │
+│    │────────────────────────►│─────────────────────►│                   │            │
+│    │                         │                      │  Validate SAML    │            │
+│    │                         │                      │  Create Session   │            │
+│    │                         │                      │  Issue JWT        │            │
+│    │◄────────────────────────┼──────────────────────│                   │            │
+│    │  Set-Cookie: hydra_session=<JWT>               │                   │            │
+│    │  302 Redirect to /dashboard                    │                   │            │
+│                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────────────┐
+│                           STUDENT CONTAINER ACCESS FLOW                               │
+├──────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                      │
+│   User                    Traefik               Hydra Auth        Student Container  │
+│    │                         │                      │                   │            │
+│    │  GET /students/jdoe/vscode                     │                   │            │
+│    │────────────────────────►│                      │                   │            │
+│    │                         │  ForwardAuth         │                   │            │
+│    │                         │─────────────────────►│                   │            │
+│    │                         │                      │  Verify JWT       │            │
+│    │                         │                      │  Check ownership  │            │
+│    │                         │◄─────────────────────│  200 OK + headers │            │
+│    │                         │                      │                   │            │
+│    │                         │  Forward to container│                   │            │
+│    │                         │─────────────────────────────────────────►│            │
+│    │◄────────────────────────┼──────────────────────────────────────────│            │
+│    │  VS Code / Jupyter response                    │                   │            │
+│                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Quick Start
 
 ### Prerequisites
 - Docker & Docker Compose
@@ -71,7 +236,9 @@ docker compose -f docker-compose.dev.yml up -d
 - Traefik Dashboard: http://localhost:8081
 - n8n: http://localhost:5678
 
-## 🔐 Authentication (Mock SAML)
+---
+
+## Authentication (Mock SAML)
 
 The development environment uses a mock SAML IdP instead of Azure AD.
 
@@ -87,7 +254,9 @@ The development environment uses a mock SAML IdP instead of Azure AD.
 3. Login with test credentials
 4. Return to dashboard with session
 
-## 🏗️ Service Configuration
+---
+
+## Service Configuration
 
 ### Environment Variables
 All configuration is in `.env.dev`:
@@ -95,6 +264,7 @@ All configuration is in `.env.dev`:
 - `METADATA_URL`: Points to mock SAML IdP
 - `OPENWEBUI_API_BASE`: Points to middleman container
 - `COOKIE_DOMAIN`: Set to .hydra.local
+- `STUDENT_IMAGE`: Container image for students (default: jupyter/minimal-notebook:latest)
 
 ### Network Configuration
 - **hydra-dev-net**: Main network for all services (172.20.0.0/16)
@@ -102,12 +272,14 @@ All configuration is in `.env.dev`:
 
 ### Host Aliases
 The setup script adds these to `/etc/hosts`:
-- hydra.local → 127.0.0.1
-- gpt.hydra.local → 127.0.0.1
-- n8n.hydra.local → 127.0.0.1
-- traefik.hydra.local → 127.0.0.1
+- hydra.local -> 127.0.0.1
+- gpt.hydra.local -> 127.0.0.1
+- n8n.hydra.local -> 127.0.0.1
+- traefik.hydra.local -> 127.0.0.1
 
-## 📦 Service Details
+---
+
+## Service Details
 
 ### Hydra SAML Auth (Main Service)
 - **Port**: 6969
@@ -135,11 +307,14 @@ The setup script adds these to `/etc/hosts`:
 - **Purpose**: Routes student containers
 - **Dashboard**: http://localhost:8081
 
-## 🛠️ Development Commands
+---
+
+## Development Commands
 
 ### Using Make:
 ```bash
 make help          # Show all commands
+make setup         # First-time setup (keys, hosts, images)
 make start         # Start services
 make stop          # Stop services
 make logs          # View all logs
@@ -148,8 +323,30 @@ make shell-hydra   # Shell into Hydra container
 make shell-db      # SQLite console
 make clean         # Stop and remove containers
 make reset         # Full reset including volumes
+make nuke          # COMPLETE destruction and rebuild
+make health        # Run health checks
 make test-saml     # Test SAML authentication
 ```
+
+### Nuke Mode (Complete Reset)
+
+When you need a completely fresh start to test reproducibility:
+
+```bash
+make nuke
+```
+
+This performs a 10-step complete destruction and rebuild:
+1. Stop all services
+2. Remove student containers
+3. Remove Docker volumes
+4. Remove built images
+5. Remove Docker networks
+6. Remove generated files (jwt-keys/, shared/)
+7. Prune Docker system
+8. Run setup (generate keys, update hosts)
+9. Build with --no-cache
+10. Start services + health checks
 
 ### Manual Docker Commands:
 ```bash
@@ -167,7 +364,85 @@ docker compose -f docker-compose.dev.yml up -d hydra-saml-auth
 docker compose -f docker-compose.dev.yml exec hydra-saml-auth bash
 ```
 
-## 🔧 Troubleshooting
+---
+
+## Kubernetes Development (Stage 2)
+
+After validating your changes in Docker, test them in a local Kubernetes cluster:
+
+### Prerequisites
+- k3d (https://k3d.io)
+- kubectl
+- Docker running
+
+### Commands
+```bash
+# Create k3d cluster with all manifests
+./k8s-dev-setup.sh create
+
+# Check cluster status
+./k8s-dev-setup.sh status
+
+# View hydra-auth logs
+./k8s-dev-setup.sh logs
+
+# Shell into hydra-auth pod
+./k8s-dev-setup.sh shell
+
+# Restart hydra-auth deployment
+./k8s-dev-setup.sh restart
+
+# Destroy cluster
+./k8s-dev-setup.sh destroy
+```
+
+### Access Points (k3d)
+- Hydra Dashboard: http://localhost:6969
+- Traefik Dashboard: http://localhost:8080
+
+### Useful kubectl Commands
+```bash
+kubectl get pods -n hydra-system
+kubectl get pods -n hydra-students
+kubectl logs -n hydra-system deploy/hydra-auth
+kubectl describe pod -n hydra-system <pod-name>
+```
+
+---
+
+## Production Deployment (Stage 3)
+
+For production deployment to the RKE2 cluster:
+
+### Prerequisites
+- Ansible installed on control machine
+- SSH access to all target nodes (Hydra, Chimera, Cerberus)
+- Inventory configured in `../ansible/inventory.yml`
+
+### Commands
+```bash
+cd ../ansible
+
+# Full cluster deployment
+ansible-playbook -i inventory.yml playbooks/site.yml
+
+# Deploy only to specific hosts
+ansible-playbook -i inventory.yml playbooks/site.yml --limit hydra
+
+# Check cluster status
+ansible -i inventory.yml all -m ping
+```
+
+### Node Roles
+| Node | IP | Role | Services |
+|------|-----|------|----------|
+| Hydra | 192.168.1.100 | RKE2 Server | Control plane, Traefik, Hydra Auth |
+| Chimera | 192.168.1.150 | RKE2 Agent | GPU inference (Ollama, vLLM) |
+| Cerberus | 192.168.1.242 | RKE2 Agent | GPU training workloads |
+
+---
+
+## Troubleshooting
 
 ### Common Issues:
 
@@ -188,9 +463,13 @@ docker compose -f docker-compose.dev.yml exec hydra-saml-auth bash
    - Ensure Docker socket is accessible
    - Check JWT keys permissions in jwt-keys/
 
-5. **Database connection issues**
-   - Verify OpenWebUI is running: `docker logs open-webui-dev`
-   - Check middleman logs: `docker logs openwebui-middleman-dev`
+5. **Database connection issues (SQLITE_MISUSE)**
+   - The middleman uses a singleton DB connection pattern
+   - Restart the middleman container: `docker compose restart openwebui-middleman`
+
+6. **Student container init fails**
+   - Check STUDENT_IMAGE in .env.dev is set correctly
+   - Pull the image: `docker pull jupyter/minimal-notebook:latest`
 
 ### Debug Mode:
 Enable detailed logging by setting in `.env.dev`:
@@ -199,7 +478,9 @@ NODE_ENV=development
 DEBUG=*
 ```
 
-## 🧪 Testing
+---
+
+## Testing
 
 ### Test SAML Flow:
 ```bash
@@ -228,7 +509,9 @@ curl http://hydra.local:6969/.well-known/jwks.json
 3. Start a Jupyter notebook
 4. Access at http://hydra.local/students/{username}/{project}
 
-## 📝 Development Workflow
+---
+
+## Development Workflow
 
 1. **Code Changes:**
    - Main app code: Edit files in parent directory
@@ -246,7 +529,9 @@ curl http://hydra.local:6969/.well-known/jwks.json
    - Update .env.dev if needed
    - Restart: `make restart`
 
-## 🔄 Differences from Production
+---
+
+## Differences from Production
 
 | Aspect | Production | Development |
 |--------|-----------|-------------|
@@ -257,23 +542,31 @@ curl http://hydra.local:6969/.well-known/jwks.json
 | Database | Remote SQLite | Local SQLite |
 | GPU Support | Nvidia GPUs | Disabled |
 | n8n | Full instance | Mock/minimal |
+| Orchestrator | Kubernetes (RKE2) | Docker (ORCHESTRATOR=docker) |
 
-## 📚 Additional Resources
+---
+
+## Additional Resources
 
 - [Main README](../README.md)
 - [Container Documentation](../docs/containers.md)
+- [Kubernetes Manifests](../k8s/)
+- [Ansible Playbooks](../ansible/)
 - [Mock SAML IdP Docs](https://github.com/kristophjunge/docker-test-saml-idp)
 - [OpenWebUI Docs](https://docs.openwebui.com)
 
-## 🤝 Contributing
+---
+
+## Contributing
 
 When developing:
-1. Test changes locally first
+1. Test changes locally with `make nuke` first
 2. Ensure all services start correctly
 3. Verify SAML flow works
 4. Test container management features
-5. Update this README if adding new services
+5. Validate in k3d cluster before production
+6. Update this README if adding new services
 
-## 📄 License
+## License
 
 Same as parent project (Apache-2.0 or as specified)

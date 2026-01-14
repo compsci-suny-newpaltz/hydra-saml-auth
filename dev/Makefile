@@ -1,7 +1,8 @@
 # Hydra SAML Auth - Development Makefile
 
-.PHONY: help setup start stop restart logs clean reset shell test rm-students \
-	k8s-setup k8s-start k8s-stop k8s-logs k8s-clean k8s-shell k8s-status
+.PHONY: help setup start stop restart logs clean reset nuke nuke-execute nuke-force shell test rm-students \
+	k8s-setup k8s-start k8s-stop k8s-logs k8s-clean k8s-shell k8s-status \
+	debug-saml test-api normalize-eol normalize-eol-windows
 
 # Default target
 help:
@@ -18,7 +19,10 @@ help:
 	@echo "make shell-db  - SQLite shell for OpenWebUI DB"
 	@echo "make clean     - Stop and remove containers"
 	@echo "make reset     - Full reset (removes volumes too)"
+	@echo "make nuke      - ☢️  COMPLETE DESTRUCTION: remove everything, rebuild fresh"
 	@echo "make test-saml - Test SAML authentication flow"
+	@echo "make test-api  - Run API endpoint tests"
+	@echo "make debug-saml - Interactive SAML debugging tool"
 	@echo "make rm-students - Force remove all student-* containers"
 	@echo ""
 	@echo "Kubernetes (RKE2/k3d) Commands:"
@@ -44,10 +48,10 @@ setup:
 	@./setup-dev.sh
 
 normalize-eol:
-	@bash ./dev/normalize-eol.sh
+	@bash ./normalize-eol.sh
 
 normalize-eol-windows:
-	@powershell -NoProfile -ExecutionPolicy Bypass -File ./dev/normalize-eol.ps1
+	@powershell -NoProfile -ExecutionPolicy Bypass -File ./normalize-eol.ps1
 
 # Start services
 start:
@@ -108,6 +112,132 @@ reset:
 	rm -rf jwt-keys/
 	@echo "Full reset complete. Run 'make setup' to reinitialize."
 
+# =============================================================================
+# NUKE MODE - Complete destruction and rebuild for reproducibility testing
+# =============================================================================
+# This simulates a fresh production deployment by:
+# 1. Stopping and removing ALL containers (including student containers)
+# 2. Removing ALL volumes (including student data volumes)
+# 3. Removing ALL built images
+# 4. Removing generated files (jwt-keys, traefik configs, mock-users.md)
+# 5. Removing Docker networks
+# 6. Pruning Docker system
+# 7. Running setup from scratch
+# 8. Rebuilding all images with --no-cache
+# 9. Starting all services
+# 10. Running health checks
+
+nuke:
+	@echo ""
+	@echo "╔══════════════════════════════════════════════════════════════════════╗"
+	@echo "║  ☢️   NUKE MODE - COMPLETE DESTRUCTION AND REBUILD                    ║"
+	@echo "╠══════════════════════════════════════════════════════════════════════╣"
+	@echo "║                                                                      ║"
+	@echo "║  This will DESTROY:                                                  ║"
+	@echo "║  • All running containers (including student-* containers)           ║"
+	@echo "║  • All Docker volumes (including student data)                       ║"
+	@echo "║  • All built images (dev-hydra-saml-auth, dev-openwebui-middleman)   ║"
+	@echo "║  • JWT keys, traefik configs, generated files                        ║"
+	@echo "║  • Docker networks for this project                                  ║"
+	@echo "║                                                                      ║"
+	@echo "║  Then REBUILD everything from scratch with --no-cache                ║"
+	@echo "║                                                                      ║"
+	@echo "╚══════════════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@read -p "Type 'NUKE' to confirm destruction: " confirm && [ "$$confirm" = "NUKE" ] || (echo "Aborted." && exit 1)
+	@$(MAKE) nuke-execute
+
+nuke-execute:
+	@echo ""
+	@echo "══════════════════════════════════════════════════════════════════════"
+	@echo "  [1/10] Stopping all compose services..."
+	@echo "══════════════════════════════════════════════════════════════════════"
+	-docker compose -f docker-compose.dev.yml down --remove-orphans 2>/dev/null || true
+	@echo ""
+	@echo "══════════════════════════════════════════════════════════════════════"
+	@echo "  [2/10] Removing student containers..."
+	@echo "══════════════════════════════════════════════════════════════════════"
+	-docker ps -a --format '{{.ID}} {{.Names}}' | awk '$$2 ~ /^student-/' | awk '{print $$1}' | xargs -r docker rm -f 2>/dev/null || true
+	@echo ""
+	@echo "══════════════════════════════════════════════════════════════════════"
+	@echo "  [3/10] Removing Docker volumes..."
+	@echo "══════════════════════════════════════════════════════════════════════"
+	-docker compose -f docker-compose.dev.yml down -v 2>/dev/null || true
+	-docker volume ls -q | grep -E "^dev_|^hydra-vol-|student-" | xargs -r docker volume rm -f 2>/dev/null || true
+	@echo ""
+	@echo "══════════════════════════════════════════════════════════════════════"
+	@echo "  [4/10] Removing built images..."
+	@echo "══════════════════════════════════════════════════════════════════════"
+	-docker rmi -f dev-hydra-saml-auth:latest 2>/dev/null || true
+	-docker rmi -f dev-openwebui-middleman:latest 2>/dev/null || true
+	-docker rmi -f dev-mock-chimera:latest 2>/dev/null || true
+	-docker rmi -f dev-mock-cerberus:latest 2>/dev/null || true
+	-docker rmi -f hydra-saml-auth:dev 2>/dev/null || true
+	@echo ""
+	@echo "══════════════════════════════════════════════════════════════════════"
+	@echo "  [5/10] Removing Docker networks..."
+	@echo "══════════════════════════════════════════════════════════════════════"
+	-docker network rm dev_hydra-dev-net 2>/dev/null || true
+	-docker network rm hydra_students_net 2>/dev/null || true
+	-docker network rm hydra-dev-net 2>/dev/null || true
+	@echo ""
+	@echo "══════════════════════════════════════════════════════════════════════"
+	@echo "  [6/10] Removing generated files..."
+	@echo "══════════════════════════════════════════════════════════════════════"
+	rm -rf jwt-keys/
+	rm -rf traefik-dynamic/*.yaml traefik-dynamic/*.yml 2>/dev/null || true
+	rm -f mock-users.md 2>/dev/null || true
+	rm -rf shared/* 2>/dev/null || true
+	@echo "  Removed: jwt-keys/, traefik-dynamic configs, mock-users.md"
+	@echo ""
+	@echo "══════════════════════════════════════════════════════════════════════"
+	@echo "  [7/10] Pruning Docker system (dangling images, build cache)..."
+	@echo "══════════════════════════════════════════════════════════════════════"
+	-docker system prune -f 2>/dev/null || true
+	@echo ""
+	@echo "══════════════════════════════════════════════════════════════════════"
+	@echo "  [8/10] Running setup (hosts, JWT keys, directories)..."
+	@echo "══════════════════════════════════════════════════════════════════════"
+	@chmod +x setup-dev.sh
+	@./setup-dev.sh --skip-hosts || (echo "Setup failed - you may need to run with sudo for hosts file" && exit 1)
+	@echo ""
+	@echo "══════════════════════════════════════════════════════════════════════"
+	@echo "  [9/10] Building all images with --no-cache..."
+	@echo "══════════════════════════════════════════════════════════════════════"
+	docker compose -f docker-compose.dev.yml build --no-cache
+	@echo ""
+	@echo "══════════════════════════════════════════════════════════════════════"
+	@echo "  [10/10] Starting all services..."
+	@echo "══════════════════════════════════════════════════════════════════════"
+	docker compose -f docker-compose.dev.yml up -d
+	@echo ""
+	@echo "Waiting for services to initialize..."
+	@sleep 10
+	@echo ""
+	@echo "══════════════════════════════════════════════════════════════════════"
+	@echo "  Running health checks..."
+	@echo "══════════════════════════════════════════════════════════════════════"
+	@$(MAKE) health
+	@$(MAKE) ps
+	@echo ""
+	@echo "╔══════════════════════════════════════════════════════════════════════╗"
+	@echo "║  ✅  NUKE COMPLETE - Fresh environment ready                         ║"
+	@echo "╠══════════════════════════════════════════════════════════════════════╣"
+	@echo "║                                                                      ║"
+	@echo "║  Services:                                                           ║"
+	@echo "║  • Dashboard:  http://hydra.local/dashboard                          ║"
+	@echo "║  • OpenWebUI:  http://gpt.hydra.local                                 ║"
+	@echo "║  • Mock SAML:  http://localhost:8080                                  ║"
+	@echo "║  • Traefik:    http://localhost:8081                                  ║"
+	@echo "║                                                                      ║"
+	@echo "║  Test credentials: user1 / user1pass                                 ║"
+	@echo "║                                                                      ║"
+	@echo "╚══════════════════════════════════════════════════════════════════════╝"
+
+# Nuke without confirmation (for CI/scripts)
+nuke-force:
+	@$(MAKE) nuke-execute
+
 # Remove all student containers (names start with student-)
 rm-students:
 	@echo "Removing student-* containers (if any)..."
@@ -131,6 +261,16 @@ test-saml:
 	@echo "3. Login with: user1 / user1pass"
 	@echo "4. You should be redirected back to dashboard"
 	@curl -I http://hydra.local:6969/login
+
+# Run API endpoint tests
+test-api:
+	@chmod +x test-api.sh
+	@./test-api.sh
+
+# Interactive SAML debugging tool
+debug-saml:
+	@chmod +x debug-saml.sh
+	@./debug-saml.sh
 
 # Pull latest images
 pull:

@@ -48,6 +48,124 @@
 \tableofcontents
 \newpage
 
+\section{Deployment Overview}
+
+This guide covers three deployment stages, from local development to production:
+
+\subsection{Deployment Pipeline}
+
+\begin{center}
+\begin{tikzpicture}[
+    node distance=0.3cm,
+    stage/.style={rectangle, draw, fill=blue!10, minimum width=4.5cm, minimum height=2.5cm, align=center, rounded corners},
+    arrow/.style={->, thick, >=stealth},
+    label/.style={font=\small\bfseries}
+]
+
+% Stage boxes
+\node[stage] (s1) {
+    \textbf{STAGE 1}\\[0.2em]
+    \textbf{Docker Dev}\\[0.5em]
+    \footnotesize docker-compose.yml\\
+    \footnotesize Mock SAML IdP\\
+    \footnotesize Local SQLite\\
+    \footnotesize No GPU
+};
+
+\node[stage, right=1.5cm of s1] (s2) {
+    \textbf{STAGE 2}\\[0.2em]
+    \textbf{K8s Dev (k3d)}\\[0.5em]
+    \footnotesize Real K8s manifests\\
+    \footnotesize ConfigMaps/Secrets\\
+    \footnotesize Local cluster\\
+    \footnotesize No GPU
+};
+
+\node[stage, right=1.5cm of s2] (s3) {
+    \textbf{STAGE 3}\\[0.2em]
+    \textbf{Production (RKE2)}\\[0.5em]
+    \footnotesize Multi-node cluster\\
+    \footnotesize Azure AD SAML\\
+    \footnotesize Production SSL\\
+    \footnotesize Multi-GPU nodes
+};
+
+% Arrows
+\draw[arrow] (s1) -- (s2);
+\draw[arrow] (s2) -- (s3);
+
+% Commands below
+\node[below=0.5cm of s1, font=\ttfamily\footnotesize] {cd dev/ \&\& make nuke};
+\node[below=0.5cm of s2, font=\ttfamily\footnotesize] {./k8s-dev-setup.sh create};
+\node[below=0.5cm of s3, font=\ttfamily\footnotesize] {ansible-playbook site.yml};
+
+\end{tikzpicture}
+\end{center}
+
+\subsection{Quick Start Commands}
+
+\begin{lstlisting}[style=bash]
+# STAGE 1: Docker Development (start here)
+cd dev/
+make nuke          # Complete reset + rebuild
+
+# STAGE 2: Kubernetes Development (after Docker works)
+./k8s-dev-setup.sh create
+
+# STAGE 3: Production (after K8s validation)
+cd ansible/
+ansible-playbook -i inventory.yml playbooks/site.yml
+\end{lstlisting}
+
+\begin{infobox}
+\textbf{Recommended Workflow:} Always validate changes in Stage 1 (Docker) before promoting to Stage 2 (k3d), and validate in Stage 2 before deploying to Stage 3 (Production).
+\end{infobox}
+
+\subsection{Multi-Node Production Architecture}
+
+\begin{center}
+\begin{tikzpicture}[
+    node distance=0.8cm,
+    server/.style={rectangle, draw, fill=green!10, minimum width=3.8cm, minimum height=2.2cm, align=center, rounded corners},
+    label/.style={font=\footnotesize}
+]
+
+\node[server] (hydra) {
+    \textbf{HYDRA}\\
+    \footnotesize Control Plane\\[0.3em]
+    \tiny RKE2 Server\\
+    \tiny Traefik Ingress\\
+    \tiny Hydra Auth\\
+    \tiny Student Containers
+};
+
+\node[server, right=0.8cm of hydra] (chimera) {
+    \textbf{CHIMERA}\\
+    \footnotesize GPU Inference\\[0.3em]
+    \tiny RKE2 Agent\\
+    \tiny Ollama / vLLM\\
+    \tiny OpenWebUI\\
+    \tiny RTX 4090 GPUs
+};
+
+\node[server, right=0.8cm of chimera] (cerberus) {
+    \textbf{CERBERUS}\\
+    \footnotesize GPU Training\\[0.3em]
+    \tiny RKE2 Agent\\
+    \tiny Training Jobs\\
+    \tiny Model Fine-tuning\\
+    \tiny A100/H100 GPUs
+};
+
+% Network line
+\draw[thick, dashed] ([yshift=-1.5cm]hydra.south west) -- ([yshift=-1.5cm]cerberus.south east);
+\node[below=1.8cm of chimera, font=\footnotesize] {RKE2 Cluster Network (Flannel/Calico CNI)};
+
+\end{tikzpicture}
+\end{center}
+
+\newpage
+
 \section{Prerequisites}
 
 \subsection{System Requirements}
