@@ -627,6 +627,9 @@ const ensureAuthenticated = (req, res, next) =>
 
     app.get('/login-failed', (_req, res) => res.status(401).send('Authentication failed.'));
 
+    // Health check endpoint for k8s probes
+    app.get('/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
+
     // Start background services
     try {
       const containerReminder = require('./services/container-reminder');
