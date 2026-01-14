@@ -61,9 +61,8 @@ app.post(`${base}/check-user`, async (req, res) => {
   } catch (error) {
     console.error('[openwebui_middleman] check-user error:', error);
     return res.status(500).json({ success: false, message: 'Error checking user status' });
-  } finally {
-    await db.close();
   }
+  // Note: Don't close db - singleton pattern in db.js keeps connection open
 });
 
 // POST /openwebui/api/create-account { email, name, password }
@@ -105,9 +104,8 @@ app.post(`${base}/create-account`, async (req, res) => {
     try { await db.run('ROLLBACK'); } catch { }
     console.error('[openwebui_middleman] create-account error:', error);
     return res.status(500).json({ success: false, message: 'Error creating account' });
-  } finally {
-    await db.close();
   }
+  // Note: Don't close db - singleton pattern in db.js keeps connection open
 });
 
 // POST /openwebui/api/change-password { email, password }
@@ -130,9 +128,8 @@ app.post(`${base}/change-password`, async (req, res) => {
   } catch (error) {
     console.error('[openwebui_middleman] change-password error:', error);
     return res.status(500).json({ success: false, message: 'Error updating password' });
-  } finally {
-    await db.close();
   }
+  // Note: Don't close db - singleton pattern in db.js keeps connection open
 });
 
 app.listen(PORT, '0.0.0.0', () => {

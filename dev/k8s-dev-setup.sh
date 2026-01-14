@@ -1,3 +1,4 @@
+
 #!/bin/bash
 # k8s-dev-setup.sh - Bootstrap k3d development cluster for Hydra
 # Usage: ./k8s-dev-setup.sh [create|destroy|status]
