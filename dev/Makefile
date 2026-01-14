@@ -309,6 +309,18 @@ k8s-setup:
 	@kubectl apply -f ../k8s/base/namespace.yaml
 	@kubectl apply -f ../k8s/base/rbac/
 	@kubectl apply -f ../k8s/base/storage/
+	@echo "Setting namespace security policy..."
+	@kubectl label namespace hydra-system pod-security.kubernetes.io/enforce=privileged --overwrite
+	@echo "Creating secrets..."
+	@kubectl create secret generic hydra-jwt-keys \
+		--from-file=private.pem=jwt-keys/private.pem \
+		--from-file=public.pem=jwt-keys/public.pem \
+		-n hydra-system 2>/dev/null || echo "JWT keys secret exists"
+	@kubectl create secret generic hydra-auth-secrets \
+		--from-literal=SESSION_SECRET=dev-session-secret \
+		--from-literal=OPENWEBUI_API_KEY=dev-api-key \
+		--from-literal=N8N_API_KEY=dev-n8n-key \
+		-n hydra-system 2>/dev/null || echo "Auth secrets exist"
 	@echo ""
 	@echo "k3d cluster '$(K3D_CLUSTER_NAME)' is ready!"
 	@echo "Run 'make k8s-start' to deploy services."
@@ -320,15 +332,23 @@ k8s-start:
 	@echo "Importing image to k3d..."
 	@k3d image import hydra-saml-auth:dev -c $(K3D_CLUSTER_NAME)
 	@echo "Applying component manifests..."
-	@kubectl apply -f ../k8s/components/traefik/
-	@kubectl apply -f ../k8s/components/hydra-auth/
-	@kubectl apply -f ../k8s/dev/mock-services/
+	@kubectl apply -f ../k8s/components/traefik/ 2>/dev/null || true
+	@kubectl apply -k ../k8s/dev/mock-services/
+	@kubectl apply -f ../k8s/components/hydra-auth/configmap.yaml
+	@kubectl apply -f ../k8s/components/hydra-auth/pvc.yaml
+	@kubectl apply -f ../k8s/components/hydra-auth/service.yaml
+	@echo "Patching configmap for mock SAML IdP..."
+	@kubectl patch configmap hydra-auth-config -n $(K8S_NAMESPACE) --type merge \
+		-p '{"data":{"METADATA_URL":"http://mock-saml-idp:8080/simplesaml/saml2/idp/metadata.php","CALLBACK_URL":"http://localhost:6969/login/callback"}}'
+	@echo "Deploying hydra-auth with dev image..."
+	@cat ../k8s/components/hydra-auth/deployment.yaml | sed 's/hydra-saml-auth:latest/hydra-saml-auth:dev/' | kubectl apply -f -
 	@echo ""
 	@echo "Waiting for pods to be ready..."
 	@kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=hydra -n $(K8S_NAMESPACE) --timeout=120s || true
+	@kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=traefik -n $(K8S_NAMESPACE) --timeout=60s || true
 	@echo ""
 	@echo "Services deployed! Access at:"
-	@echo "  - Hydra:   http://localhost:6969"
+	@echo "  - Hydra:   http://hydra.local (or http://localhost with Host: hydra.local header)"
 	@echo "  - Traefik: http://localhost:8081"
 
 # Stop services (scale to 0)
