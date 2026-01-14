@@ -46,12 +46,12 @@ options:
   kubeconfig:
     updateDefaultKubeconfig: true
     switchCurrentContext: true
-volumes:
-  # Mount shared directory for course materials
-  - volume: ./shared:/shared
-    nodeFilters:
-      - all
-  # Mount JWT keys directory
-  - volume: ./jwt-keys:/app/jwt-keys
-    nodeFilters:
-      - server:*
+# Note: Volume mounts require absolute paths in k3d
+# JWT keys and shared dirs are handled via ConfigMaps/Secrets in k8s
+# volumes:
+#   - volume: /absolute/path/to/shared:/shared
+#     nodeFilters:
+#       - all
+#   - volume: /absolute/path/to/jwt-keys:/app/jwt-keys
+#     nodeFilters:
+#       - server:*
