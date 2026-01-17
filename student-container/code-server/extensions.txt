@@ -69,8 +69,8 @@ vscjava.vscode-maven
 # Live Server - local dev server (~2-4MB)
 ritwickdey.liveserver
 
-# Error Lens - inline error display (~2-3MB)
-usernamehw.errorlens
+# Error Lens - REMOVED (too noisy for students)
+# usernamehw.errorlens
 
 # Better C++ Syntax - enhanced C/C++ syntax highlighting (~1-2MB)
 jeff-hykin.better-cpp-syntax

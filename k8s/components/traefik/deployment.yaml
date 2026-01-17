@@ -27,6 +27,7 @@ spec:
             - --api.insecure=true
             - --providers.kubernetescrd
             - --providers.kubernetescrd.namespaces=hydra-system,hydra-students
+            - --providers.kubernetescrd.allowCrossNamespace=true
             - --entrypoints.web.address=:80
             - --entrypoints.websecure.address=:443
             - --entrypoints.hydra.address=:6969
