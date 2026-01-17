@@ -121,14 +121,16 @@ RUN code-server --install-extension /tmp/lcc-tools.vsix && \
 RUN mkdir -p /home/student/.local/share/code-server/User && \
     cp /tmp/default-settings.json /home/student/.local/share/code-server/User/settings.json
 
-# Install Jupyter (with cache cleanup)
-RUN pip3 install --user --no-cache-dir \
+# Switch to root to install Jupyter system-wide
+USER root
+
+# Install Jupyter system-wide (not --user, so it works on mounted volumes)
+RUN pip3 install --no-cache-dir \
     jupyter \
     jupyterlab \
-    notebook && \
-    rm -rf /home/student/.cache/pip
+    notebook
 
-ENV PATH=/home/student/.local/bin:$PATH
+USER student
 
 # Create supervisor drop-in directory
 RUN mkdir -p /home/student/supervisor.d
@@ -138,14 +140,11 @@ COPY supervisor.d/ /home/student/supervisor.d/
 USER root
 
 # Setup /etc/skel for fresh volumes and supervisor config
-# Copy settings, extensions, AND pip binaries to skel so they persist on mounted volumes
+# Copy settings and extensions to skel so they persist on mounted volumes
 RUN mkdir -p /etc/skel/.local/share/code-server/User && \
     cp /tmp/default-settings.json /etc/skel/.local/share/code-server/User/settings.json && \
     # Copy installed extensions to skel
     cp -r /home/student/.local/share/code-server/extensions /etc/skel/.local/share/code-server/ && \
-    # Copy pip-installed binaries (jupyter, etc) to skel
-    cp -r /home/student/.local/bin /etc/skel/.local/ && \
-    cp -r /home/student/.local/lib /etc/skel/.local/ && \
     rm -rf /tmp/*
 
 # Install CUH63 tools (lcc compiler, assembler, examples)
