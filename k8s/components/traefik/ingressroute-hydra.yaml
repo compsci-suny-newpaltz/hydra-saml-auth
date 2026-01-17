@@ -47,3 +47,19 @@ spec:
       services:
         - name: api@internal
           kind: TraefikService
+---
+# Mock SAML IdP IngressRoute (dev only)
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: mock-saml-idp
+  namespace: hydra-system
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: Host(`mock-saml-idp`)
+      kind: Rule
+      services:
+        - name: mock-saml-idp
+          port: 8080

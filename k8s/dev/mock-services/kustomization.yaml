@@ -8,6 +8,7 @@ resources:
   - mock-saml-idp.yaml
   - mock-metrics.yaml
 
-commonLabels:
-  environment: development
-  app.kubernetes.io/part-of: hydra
+labels:
+  - pairs:
+      environment: development
+      app.kubernetes.io/part-of: hydra

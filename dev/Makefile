@@ -331,9 +331,16 @@ k8s-start:
 	@docker build -t hydra-saml-auth:dev -f Dockerfile.hydra ..
 	@echo "Importing image to k3d..."
 	@k3d image import hydra-saml-auth:dev -c $(K3D_CLUSTER_NAME)
-	@echo "Applying component manifests..."
-	@kubectl apply -f ../k8s/components/traefik/ 2>/dev/null || true
+	@echo "Ensuring namespaces exist..."
+	@kubectl apply -f ../k8s/base/namespace.yaml
+	@kubectl label namespace hydra-system pod-security.kubernetes.io/enforce=privileged --overwrite 2>/dev/null || true
+	@echo "Applying Traefik components..."
+	@kubectl apply -f ../k8s/components/traefik/deployment.yaml
+	@kubectl apply -f ../k8s/components/traefik/service.yaml 2>/dev/null || true
+	@kubectl apply -f ../k8s/components/traefik/ingressroute-hydra.yaml
+	@echo "Applying mock services..."
 	@kubectl apply -k ../k8s/dev/mock-services/
+	@echo "Applying hydra-auth components..."
 	@kubectl apply -f ../k8s/components/hydra-auth/configmap.yaml
 	@kubectl apply -f ../k8s/components/hydra-auth/pvc.yaml
 	@kubectl apply -f ../k8s/components/hydra-auth/service.yaml
@@ -348,8 +355,9 @@ k8s-start:
 	@kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=traefik -n $(K8S_NAMESPACE) --timeout=60s || true
 	@echo ""
 	@echo "Services deployed! Access at:"
-	@echo "  - Hydra:   http://hydra.local (or http://localhost with Host: hydra.local header)"
-	@echo "  - Traefik: http://localhost:8081"
+	@echo "  - Hydra:   http://hydra.local:6969 (or curl -H 'Host: hydra.local' localhost:6969)"
+	@echo "  - Health:  curl -H 'Host: hydra.local' localhost:6969/health"
+	@echo "  - Traefik: http://localhost:8081 (dashboard)"
 
 # Stop services (scale to 0)
 k8s-stop:

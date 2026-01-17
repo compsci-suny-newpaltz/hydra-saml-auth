@@ -295,6 +295,28 @@ async function initContainer(username, email, config = {}) {
   const studentNet = docker.getNetwork(studentNetworkName);
   await studentNet.connect({ Container: containerName });
 
+  // Fix volume permissions before starting (Jupyter runs as UID 1000)
+  // Run a temporary container to chown the volume
+  try {
+    const fixPermsContainer = await docker.createContainer({
+      Image: 'alpine',
+      Cmd: ['sh', '-c', 'chown -R 1000:1000 /data && chmod 755 /data'],
+      HostConfig: {
+        AutoRemove: true,
+        Mounts: [{
+          Type: 'volume',
+          Source: volumeName,
+          Target: '/data'
+        }]
+      }
+    });
+    await fixPermsContainer.start();
+    await fixPermsContainer.wait();
+    console.log(`[Docker] Fixed volume permissions for ${username}`);
+  } catch (err) {
+    console.warn(`[Docker] Could not fix volume permissions: ${err.message}`);
+  }
+
   // Start container
   await container.start();
 
