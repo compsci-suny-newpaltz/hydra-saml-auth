@@ -20,6 +20,13 @@ spec:
         app.kubernetes.io/component: auth
     spec:
       serviceAccountName: hydra-auth
+      # Dev only: resolve mock-saml-idp to Traefik for metadata fetch
+      # Remove or update hostAliases in production
+      hostAliases:
+        - ip: "10.43.161.231"  # Traefik ClusterIP - update if it changes
+          hostnames:
+            - "mock-saml-idp"
+            - "hydra.local"
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000

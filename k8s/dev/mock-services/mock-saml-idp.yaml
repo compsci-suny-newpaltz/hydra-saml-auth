@@ -28,9 +28,11 @@ spec:
               containerPort: 8443
           env:
             - name: SIMPLESAMLPHP_SP_ENTITY_ID
-              value: "http://localhost:6969"
+              value: "hydra.local"
             - name: SIMPLESAMLPHP_SP_ASSERTION_CONSUMER_SERVICE
-              value: "http://localhost:6969/login/callback"
+              value: "http://hydra.local:6969/login/callback"
+            - name: SIMPLESAMLPHP_BASEURLPATH
+              value: "http://localhost:8080/simplesaml/"
           resources:
             requests:
               memory: "128Mi"

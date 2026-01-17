@@ -18,24 +18,4 @@ spec:
   selector:
     app.kubernetes.io/name: hydra
     app.kubernetes.io/component: auth
----
-# NodePort for direct access in dev
-apiVersion: v1
-kind: Service
-metadata:
-  name: hydra-auth-nodeport
-  namespace: hydra-system
-  labels:
-    app.kubernetes.io/name: hydra
-    app.kubernetes.io/component: auth
-spec:
-  type: NodePort
-  ports:
-    - name: http
-      port: 6969
-      targetPort: http
-      nodePort: 30969
-      protocol: TCP
-  selector:
-    app.kubernetes.io/name: hydra
-    app.kubernetes.io/component: auth
+# NodePort service removed - Traefik handles ingress via hostPort
