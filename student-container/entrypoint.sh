@@ -30,15 +30,6 @@ if [ -d "$SKEL_EXTENSIONS" ]; then
     chown -R student:student /home/student/.local
 fi
 
-# Copy pip-installed tools (jupyter, etc) if not present
-if [ ! -d "/home/student/.local/bin" ] && [ -d "/etc/skel/.local/bin" ]; then
-    echo "Copying pip tools (jupyter, etc)..."
-    mkdir -p /home/student/.local
-    cp -r /etc/skel/.local/bin /home/student/.local/
-    cp -r /etc/skel/.local/lib /home/student/.local/
-    chown -R student:student /home/student/.local
-fi
-
 # Copy CUH63 tools to user's home directory if not present
 if [ ! -d "/home/student/cuh63" ] && [ -d "/etc/skel/cuh63" ]; then
     echo "Copying CUH63 tools to home directory..."
