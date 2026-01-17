@@ -157,12 +157,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends unzip && \
         mv /opt/cuh63/cuh63Linux/* /opt/cuh63/ && \
         rmdir /opt/cuh63/cuh63Linux; \
     fi && \
-    # Make binaries executable
-    chmod +x /opt/cuh63/b /opt/cuh63/basic /opt/cuh63/comment 2>/dev/null || true && \
-    # Create symlinks in /usr/local/bin for PATH access
-    ln -sf /opt/cuh63/b /usr/local/bin/lcc-b && \
-    ln -sf /opt/cuh63/basic /usr/local/bin/lcc-basic && \
-    ln -sf /opt/cuh63/comment /usr/local/bin/lcc-comment && \
+    # Use Linux binaries from lnx/ subdirectory (not Windows .exe)
+    chmod +x /opt/cuh63/lnx/* && \
+    # Create symlinks to Linux binaries in /usr/local/bin for PATH access
+    ln -sf /opt/cuh63/lnx/b /usr/local/bin/lcc-b && \
+    ln -sf /opt/cuh63/lnx/basic /usr/local/bin/lcc-basic && \
+    ln -sf /opt/cuh63/lnx/lcc /usr/local/bin/lcc && \
+    ln -sf /opt/cuh63/lnx/linker /usr/local/bin/lcc-linker && \
+    ln -sf /opt/cuh63/lnx/sim /usr/local/bin/lcc-sim && \
+    ln -sf /opt/cuh63/lnx/micro /usr/local/bin/lcc-micro && \
+    ln -sf /opt/cuh63/lnx/see /usr/local/bin/lcc-see && \
     # Also copy to /etc/skel so users get it in home directory
     mkdir -p /etc/skel/cuh63 && \
     cp -r /opt/cuh63/* /etc/skel/cuh63/ && \
