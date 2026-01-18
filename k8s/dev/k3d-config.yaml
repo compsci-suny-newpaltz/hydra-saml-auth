@@ -1,4 +1,5 @@
 # k3d cluster configuration for Hydra development
+# Mirrors production RKE2 v1.28.4+rke2r1 cluster topology
 # Usage: k3d cluster create --config k3d-config.yaml
 apiVersion: k3d.io/v1alpha5
 kind: Simple
@@ -6,52 +7,84 @@ metadata:
   name: hydra-dev
 servers: 1
 agents: 2
+# Match production RKE2 version (k3s is the upstream of RKE2)
 image: rancher/k3s:v1.28.4-k3s1
 ports:
-  # HTTP traffic
-  - port: 80:80
+  # HTTP traffic (offset by 8000 to avoid Docker Compose dev env)
+  - port: 8090:80
     nodeFilters:
       - loadbalancer
   # HTTPS traffic
-  - port: 443:443
+  - port: 8443:443
     nodeFilters:
       - loadbalancer
-  # Hydra auth service
-  - port: 6969:6969
+  # Hydra auth service (k8s version)
+  - port: 6970:6969
     nodeFilters:
       - loadbalancer
   # Traefik dashboard
-  - port: 8081:8080
+  - port: 8091:8080
+    nodeFilters:
+      - loadbalancer
+  # Kubernetes API (for external access)
+  - port: 6444:6443
     nodeFilters:
       - loadbalancer
 registries:
   create:
     name: hydra-registry.localhost
     host: "0.0.0.0"
-    hostPort: "5050"  # Changed from 5000 (used by macOS AirPlay)
+    hostPort: "5050"
+# Persistent volumes for production-like storage testing
+volumes:
+  # Simulated student volumes (maps to host directory)
+  - volume: hydra-student-data:/var/lib/rancher/k3s/storage
+    nodeFilters:
+      - server:*
+      - agent:*
 options:
   k3d:
     wait: true
-    timeout: "180s"
+    timeout: "300s"
   k3s:
     extraArgs:
-      # Disable built-in traefik (we'll deploy our own)
+      # Match production cluster CIDRs
+      - arg: --cluster-cidr=10.42.0.0/16
+        nodeFilters:
+          - server:*
+      - arg: --service-cidr=10.43.0.0/16
+        nodeFilters:
+          - server:*
+      # Disable built-in traefik (we deploy our own)
       - arg: --disable=traefik
         nodeFilters:
           - server:*
-      # Disable servicelb (use NodePort instead)
+      # Disable servicelb (use our ingress)
       - arg: --disable=servicelb
         nodeFilters:
           - server:*
+      # Enable local-path-provisioner for PVs (simulates ZFS)
+      - arg: --kubelet-arg=eviction-hard=nodefs.available<1%
+        nodeFilters:
+          - server:*
+          - agent:*
+      # Node labels for server (control-plane like hydra)
+      - arg: --node-label=hydra.node-role=control-plane
+        nodeFilters:
+          - server:*
+      # Node labels for agents (GPU nodes simulation)
+      - arg: --node-label=hydra.node-role=inference
+        nodeFilters:
+          - agent:0
+      - arg: --node-label=hydra.gpu-enabled=true
+        nodeFilters:
+          - agent:0
+      - arg: --node-label=hydra.node-role=training
+        nodeFilters:
+          - agent:1
+      - arg: --node-label=hydra.gpu-enabled=true
+        nodeFilters:
+          - agent:1
   kubeconfig:
     updateDefaultKubeconfig: true
     switchCurrentContext: true
-# Note: Volume mounts require absolute paths in k3d
-# JWT keys and shared dirs are handled via ConfigMaps/Secrets in k8s
-# volumes:
-#   - volume: /absolute/path/to/shared:/shared
-#     nodeFilters:
-#       - all
-#   - volume: /absolute/path/to/jwt-keys:/app/jwt-keys
-#     nodeFilters:
-#       - server:*

@@ -4,22 +4,25 @@ set -e
 # Create log directory
 mkdir -p /var/log/supervisor
 
+# Ensure .local directory structure exists with proper permissions
+# This is needed for both code-server and Jupyter on mounted volumes
+mkdir -p /home/student/.local/share/code-server/User
+mkdir -p /home/student/.local/share/jupyter/runtime
+mkdir -p /home/student/.jupyter
+chown -R student:student /home/student/.local /home/student/.jupyter
+
 # Copy default VS Code settings if user doesn't have any (fresh volume)
 SETTINGS_DIR="/home/student/.local/share/code-server/User"
 if [ ! -f "$SETTINGS_DIR/settings.json" ]; then
     echo "Copying default VS Code settings..."
-    mkdir -p "$SETTINGS_DIR"
     cp /etc/skel/.local/share/code-server/User/settings.json "$SETTINGS_DIR/"
-    chown -R student:student /home/student/.local
 fi
 
 # Copy VS Code extensions if not present or outdated
-# This ensures extensions are available on mounted volumes
 EXTENSIONS_DIR="/home/student/.local/share/code-server/extensions"
 SKEL_EXTENSIONS="/etc/skel/.local/share/code-server/extensions"
 if [ -d "$SKEL_EXTENSIONS" ]; then
     mkdir -p "$EXTENSIONS_DIR"
-    # Copy each extension if not already present
     for ext in "$SKEL_EXTENSIONS"/*; do
         ext_name=$(basename "$ext")
         if [ ! -d "$EXTENSIONS_DIR/$ext_name" ]; then
@@ -27,7 +30,7 @@ if [ -d "$SKEL_EXTENSIONS" ]; then
             cp -r "$ext" "$EXTENSIONS_DIR/"
         fi
     done
-    chown -R student:student /home/student/.local
+    chown -R student:student "$EXTENSIONS_DIR"
 fi
 
 # Copy CUH63 tools to user's home directory if not present

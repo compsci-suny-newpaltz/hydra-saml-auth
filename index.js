@@ -552,9 +552,9 @@ const ensureAuthenticated = (req, res, next) =>
           return;
         }
 
-        // Create exec instance
+        // Create exec instance - use login shell to source .bashrc for nvm, etc.
         const exec = await container.exec({
-          Cmd: ['bash'],
+          Cmd: ['/bin/bash', '-l'],
           AttachStdin: true,
           AttachStdout: true,
           AttachStderr: true,
@@ -600,6 +600,9 @@ const ensureAuthenticated = (req, res, next) =>
       res.redirect(req.isAuthenticated() ? '/dashboard' : '/login');
     });
 
+    // Admin users list for approval panel
+    const ADMIN_USERS = (process.env.ADMIN_USERS || '').split(',').map(u => u.trim().toLowerCase()).filter(Boolean);
+
     app.get('/dashboard', (req, res) => {
       if (!req.isAuthenticated()) return res.redirect('/login');
       const viewUser = {
@@ -609,7 +612,8 @@ const ensureAuthenticated = (req, res, next) =>
         displayName: req.user.display_name || req.user.name || req.user.email || '',
         oid: req.user.oid || req.user.id || ''
       };
-      res.render('dashboard', { user: viewUser, baseUrl: BASE_URL });
+      const isAdmin = ADMIN_USERS.includes((req.user.email || '').toLowerCase());
+      res.render('dashboard', { user: viewUser, baseUrl: BASE_URL, isAdmin });
     });
 
     // Cluster status page (public, Bloomberg terminal style)
@@ -668,6 +672,15 @@ const ensureAuthenticated = (req, res, next) =>
       console.log('[Init] Metrics collector started');
     } catch (e) {
       console.warn('[Init] metrics-collector service not started:', e?.message || e);
+    }
+
+    // Start security monitoring service
+    try {
+      const securityMonitor = require('./services/security-monitor');
+      securityMonitor.start();
+      console.log('[Init] Security monitor started');
+    } catch (e) {
+      console.warn('[Init] security-monitor service not started:', e?.message || e);
     }
 
     // Start
