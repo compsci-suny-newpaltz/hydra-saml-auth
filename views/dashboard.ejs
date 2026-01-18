@@ -22,6 +22,35 @@
     </div>
   </header>
 
+  <% if (isAdmin) { %>
+  <!-- Admin Approval Panel -->
+  <div id="admin-panel" class="fixed top-16 right-4 z-50">
+    <!-- Notification Bell -->
+    <button id="admin-toggle" class="relative bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700 transition-colors">
+      <i class="fas fa-bell text-lg"></i>
+      <span id="admin-badge" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center hidden">0</span>
+    </button>
+
+    <!-- Dropdown Panel -->
+    <div id="admin-dropdown" class="hidden absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-xl border border-gray-200">
+      <div class="p-4 border-b bg-gray-50 rounded-t-lg">
+        <h3 class="font-bold text-gray-800"><i class="fas fa-clipboard-check mr-2"></i>Pending Approvals</h3>
+      </div>
+      <div id="admin-requests-list" class="max-h-96 overflow-y-auto">
+        <p class="p-4 text-gray-500 text-center">Loading...</p>
+      </div>
+      <div class="p-3 border-t bg-gray-50 rounded-b-lg flex gap-2">
+        <button id="approve-all-btn" class="flex-1 bg-green-600 text-white px-3 py-2 rounded hover:bg-green-700 transition-colors text-sm font-medium">
+          <i class="fas fa-check-double mr-1"></i> Approve All
+        </button>
+        <button id="refresh-requests-btn" class="bg-gray-200 px-3 py-2 rounded hover:bg-gray-300 transition-colors" title="Refresh">
+          <i class="fas fa-sync"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+  <% } %>
+
   <main class="max-w-5xl mx-auto px-4 py-6">
     <div class="bg-white rounded shadow p-6">
       <div class="border-b pb-4 mb-4 flex items-start justify-between gap-4">
@@ -612,32 +641,55 @@
           <div id="routing-message" class="mt-3"></div>
         </div>
 
-        <!-- GPU Resource Status Section (view-only) -->
-        <div id="gpu-queue-section" class="mb-6 border rounded p-4 hidden">
+        <!-- Server Status Section -->
+        <div id="server-status-section" class="mb-6 border rounded p-4 hidden">
           <h4 class="text-lg font-semibold mb-3">
-            <i class="fas fa-microchip text-purple-600"></i> GPU Cluster Status
+            <i class="fas fa-server text-purple-600"></i> Server Status
           </h4>
 
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <!-- Hydra Status -->
+            <div class="border rounded p-3 bg-gray-50">
+              <div class="flex items-center justify-between mb-2">
+                <span class="font-semibold text-[#052049]">Hydra</span>
+                <span id="hydra-status-badge" class="px-2 py-1 text-xs rounded bg-green-100 text-green-700">Online</span>
+              </div>
+              <p class="text-xs text-gray-500 mb-2">Control Plane</p>
+              <div class="space-y-1 text-sm">
+                <div class="flex justify-between">
+                  <span class="text-gray-600">CPU:</span>
+                  <span id="hydra-cpu" class="font-mono">--%</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-gray-600">RAM:</span>
+                  <span id="hydra-ram" class="font-mono">--</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-gray-600">Disk:</span>
+                  <span id="hydra-disk" class="font-mono">--</span>
+                </div>
+              </div>
+            </div>
+
             <!-- Chimera Status -->
             <div class="border rounded p-3 bg-gray-50">
               <div class="flex items-center justify-between mb-2">
                 <span class="font-semibold text-[#052049]">Chimera</span>
                 <span id="chimera-status-badge" class="px-2 py-1 text-xs rounded bg-green-100 text-green-700">Online</span>
               </div>
-              <p class="text-xs text-gray-500 mb-2">Inference Node - 3x RTX 3090 (72GB VRAM)</p>
+              <p class="text-xs text-gray-500 mb-2">Inference Node</p>
               <div class="space-y-1 text-sm">
                 <div class="flex justify-between">
-                  <span class="text-gray-600">GPU Utilization:</span>
-                  <span id="chimera-gpu-util" class="font-mono">--%</span>
+                  <span class="text-gray-600">CPU:</span>
+                  <span id="chimera-cpu" class="font-mono">--%</span>
                 </div>
                 <div class="flex justify-between">
-                  <span class="text-gray-600">Queue Depth:</span>
-                  <span id="chimera-queue-depth" class="font-mono">--</span>
+                  <span class="text-gray-600">RAM:</span>
+                  <span id="chimera-ram" class="font-mono">--</span>
                 </div>
                 <div class="flex justify-between">
-                  <span class="text-gray-600">Avg Wait:</span>
-                  <span id="chimera-avg-wait" class="font-mono">--</span>
+                  <span class="text-gray-600">Disk:</span>
+                  <span id="chimera-disk" class="font-mono">--</span>
                 </div>
               </div>
             </div>
@@ -646,45 +698,28 @@
             <div class="border rounded p-3 bg-gray-50">
               <div class="flex items-center justify-between mb-2">
                 <span class="font-semibold text-[#052049]">Cerberus</span>
-                <span id="cerberus-status-badge" class="px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-700">Training</span>
+                <span id="cerberus-status-badge" class="px-2 py-1 text-xs rounded bg-green-100 text-green-700">Online</span>
               </div>
-              <p class="text-xs text-gray-500 mb-2">Training Node - 2x RTX 5090 (64GB VRAM)</p>
+              <p class="text-xs text-gray-500 mb-2">Training Node</p>
               <div class="space-y-1 text-sm">
                 <div class="flex justify-between">
-                  <span class="text-gray-600">GPU Utilization:</span>
-                  <span id="cerberus-gpu-util" class="font-mono">--%</span>
+                  <span class="text-gray-600">CPU:</span>
+                  <span id="cerberus-cpu" class="font-mono">--%</span>
                 </div>
                 <div class="flex justify-between">
-                  <span class="text-gray-600">Active Job:</span>
-                  <span id="cerberus-active-job" class="font-mono text-xs">--</span>
+                  <span class="text-gray-600">RAM:</span>
+                  <span id="cerberus-ram" class="font-mono">--</span>
                 </div>
                 <div class="flex justify-between">
-                  <span class="text-gray-600">Queue Depth:</span>
-                  <span id="cerberus-queue-depth" class="font-mono">--</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- User Queue Position -->
-          <div id="user-queue-info" class="border-t pt-3 hidden">
-            <h5 class="font-semibold text-sm mb-2">Your GPU Request</h5>
-            <div class="bg-blue-50 border border-blue-200 rounded p-3">
-              <div class="flex items-center gap-3">
-                <div class="text-center">
-                  <div id="user-queue-position" class="text-2xl font-bold text-blue-600">--</div>
-                  <div class="text-xs text-gray-500">Queue Position</div>
-                </div>
-                <div class="flex-1 text-sm">
-                  <p><span class="text-gray-600">Target Node:</span> <span id="user-target-node" class="font-mono">--</span></p>
-                  <p><span class="text-gray-600">Est. Wait:</span> <span id="user-est-wait" class="font-mono">--</span></p>
+                  <span class="text-gray-600">Disk:</span>
+                  <span id="cerberus-disk" class="font-mono">--</span>
                 </div>
               </div>
             </div>
           </div>
 
           <p class="text-xs text-gray-500 mt-3">
-            <i class="fas fa-info-circle"></i> GPU access is scheduled by administrators.
+            <i class="fas fa-info-circle"></i>
             <a href="/servers" target="_blank" class="text-blue-600 underline">View full cluster status</a>
           </p>
         </div>
@@ -931,7 +966,7 @@
           const controls = document.getElementById('container-controls');
           const servicesSection = document.getElementById('services-section');
           const routingSection = document.getElementById('routing-section');
-          const gpuQueueSection = document.getElementById('gpu-queue-section');
+          const serverStatusSection = document.getElementById('server-status-section');
 
           if (!data.exists) {
             // Container not created
@@ -941,7 +976,7 @@
             controls.classList.add('hidden');
             servicesSection.classList.add('hidden');
             routingSection.classList.add('hidden');
-            gpuQueueSection.classList.add('hidden');
+            serverStatusSection.classList.add('hidden');
           } else {
             // Container exists
             notCreated.classList.add('hidden');
@@ -952,18 +987,18 @@
               badge.className = 'px-3 py-1 rounded text-sm font-medium bg-green-100 text-green-700';
               servicesSection.classList.remove('hidden');
               routingSection.classList.remove('hidden');
-              gpuQueueSection.classList.remove('hidden');
+              serverStatusSection.classList.remove('hidden');
 
-              // Load services, routes, and GPU queue status
+              // Load services, routes, and server status
               loadServices();
               loadRoutes();
-              loadGpuQueueStatus();
+              loadServerStatus();
             } else {
               badge.textContent = 'Stopped';
               badge.className = 'px-3 py-1 rounded text-sm font-medium bg-yellow-100 text-yellow-700';
               servicesSection.classList.add('hidden');
               routingSection.classList.add('hidden');
-              gpuQueueSection.classList.add('hidden');
+              serverStatusSection.classList.add('hidden');
             }
           }
         } catch (err) {
@@ -1510,81 +1545,42 @@
         }
       }
 
-      // Load GPU cluster status and user queue position
-      async function loadGpuQueueStatus() {
+      // Load server status (CPU, RAM, Disk for all servers)
+      async function loadServerStatus() {
         try {
-          // Fetch server status (public endpoint)
           const statusRes = await fetch('/api/servers/status');
           if (!statusRes.ok) throw new Error('Failed to fetch server status');
           const statusData = await statusRes.json();
 
           if (statusData.servers) {
-            // Update Chimera status
-            const chimera = statusData.servers.chimera;
-            if (chimera) {
-              const avgUtil = chimera.gpus ? Math.round(chimera.gpus.reduce((sum, g) => sum + (g.util || 0), 0) / chimera.gpus.length) : 0;
-              document.getElementById('chimera-gpu-util').textContent = `${avgUtil}%`;
-              document.getElementById('chimera-queue-depth').textContent = chimera.queue_depth || '0';
-              document.getElementById('chimera-avg-wait').textContent = chimera.avg_wait_minutes ? `~${chimera.avg_wait_minutes}m` : '--';
-
-              // Update badge
-              const chimeraBadge = document.getElementById('chimera-status-badge');
-              if (chimera.status === 'online') {
-                chimeraBadge.textContent = 'Online';
-                chimeraBadge.className = 'px-2 py-1 text-xs rounded bg-green-100 text-green-700';
-              } else {
-                chimeraBadge.textContent = chimera.status || 'Unknown';
-                chimeraBadge.className = 'px-2 py-1 text-xs rounded bg-gray-100 text-gray-600';
+            // Helper to update server card
+            const updateServer = (name, data) => {
+              if (!data) return;
+              const badge = document.getElementById(`${name}-status-badge`);
+              if (badge) {
+                badge.textContent = data.status === 'online' ? 'Online' : (data.status || 'Unknown');
+                badge.className = data.status === 'online'
+                  ? 'px-2 py-1 text-xs rounded bg-green-100 text-green-700'
+                  : 'px-2 py-1 text-xs rounded bg-gray-100 text-gray-600';
               }
-            }
-
-            // Update Cerberus status
-            const cerberus = statusData.servers.cerberus;
-            if (cerberus) {
-              const avgUtil = cerberus.gpus ? Math.round(cerberus.gpus.reduce((sum, g) => sum + (g.util || 0), 0) / cerberus.gpus.length) : 0;
-              document.getElementById('cerberus-gpu-util').textContent = `${avgUtil}%`;
-              document.getElementById('cerberus-active-job').textContent = cerberus.training_job || 'None';
-              document.getElementById('cerberus-queue-depth').textContent = cerberus.queue_depth || '0';
-
-              // Update badge
-              const cerberusBadge = document.getElementById('cerberus-status-badge');
-              if (cerberus.training_job) {
-                cerberusBadge.textContent = 'Training';
-                cerberusBadge.className = 'px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-700';
-              } else if (cerberus.status === 'online') {
-                cerberusBadge.textContent = 'Online';
-                cerberusBadge.className = 'px-2 py-1 text-xs rounded bg-green-100 text-green-700';
-              } else {
-                cerberusBadge.textContent = cerberus.status || 'Unknown';
-                cerberusBadge.className = 'px-2 py-1 text-xs rounded bg-gray-100 text-gray-600';
+              const cpu = document.getElementById(`${name}-cpu`);
+              if (cpu) cpu.textContent = `${data.cpu_percent || 0}%`;
+              const ram = document.getElementById(`${name}-ram`);
+              if (ram) ram.textContent = `${data.ram_used_gb || 0}/${data.ram_total_gb || 0} GB`;
+              const disk = document.getElementById(`${name}-disk`);
+              if (disk && data.disk_total_gb) {
+                disk.textContent = `${Math.round((data.disk_used_gb || 0) / 1000)}/${Math.round(data.disk_total_gb / 1000)} TB`;
+              } else if (disk) {
+                disk.textContent = '--';
               }
-            }
-          }
+            };
 
-          // Fetch user's queue position (authenticated endpoint)
-          try {
-            const queueRes = await fetch('/api/servers/gpu-queue');
-            if (queueRes.ok) {
-              const queueData = await queueRes.json();
-              const userQueueInfo = document.getElementById('user-queue-info');
-
-              if (queueData.user_requests && queueData.user_requests.length > 0) {
-                // User has pending requests
-                const request = queueData.user_requests[0];
-                userQueueInfo.classList.remove('hidden');
-                document.getElementById('user-queue-position').textContent = request.queue_position || '--';
-                document.getElementById('user-target-node').textContent = request.target_node || '--';
-                document.getElementById('user-est-wait').textContent = request.estimated_wait_minutes ? `~${request.estimated_wait_minutes}m` : '--';
-              } else {
-                userQueueInfo.classList.add('hidden');
-              }
-            }
-          } catch (queueErr) {
-            // Silently fail for queue - not critical
-            console.log('Could not fetch GPU queue:', queueErr);
+            updateServer('hydra', statusData.servers.hydra);
+            updateServer('chimera', statusData.servers.chimera);
+            updateServer('cerberus', statusData.servers.cerberus);
           }
         } catch (err) {
-          console.error('Failed to load GPU queue status:', err);
+          console.error('Failed to load server status:', err);
         }
       }
 
@@ -2037,6 +2033,138 @@
           messageDiv.innerHTML = '<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2">Error updating password. Please try again later.</p>';
         });
     }
+
+    // ==================== Admin Approval Panel ====================
+    <% if (isAdmin) { %>
+    // Fetch and display pending requests
+    async function loadAdminRequests() {
+      try {
+        const res = await fetch('/dashboard/api/admin/requests');
+        const data = await res.json();
+        const badge = document.getElementById('admin-badge');
+        const list = document.getElementById('admin-requests-list');
+
+        const count = data.requests ? data.requests.length : 0;
+        badge.textContent = count;
+        badge.classList.toggle('hidden', count === 0);
+
+        if (count === 0) {
+          list.innerHTML = '<p class="p-4 text-gray-500 text-center"><i class="fas fa-check-circle text-green-500 mr-2"></i>No pending requests</p>';
+          return;
+        }
+
+        list.innerHTML = data.requests.map(r => `
+          <div class="p-3 border-b hover:bg-gray-50 transition-colors">
+            <div class="flex justify-between items-start gap-2">
+              <div class="flex-1 min-w-0">
+                <p class="font-medium text-gray-900 truncate">${escapeHtml(r.email)}</p>
+                <p class="text-sm text-gray-600">
+                  <span class="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded">${escapeHtml(r.preset_id || 'custom')}</span>
+                  <i class="fas fa-arrow-right mx-1 text-gray-400"></i>
+                  <span class="inline-block bg-purple-100 text-purple-800 text-xs px-2 py-0.5 rounded">${escapeHtml(r.target_node)}</span>
+                </p>
+                <p class="text-xs text-gray-500 mt-1">
+                  <i class="fas fa-memory mr-1"></i>${r.requested_memory_gb}GB
+                  <i class="fas fa-microchip ml-2 mr-1"></i>${r.requested_cpus} CPU
+                  <i class="fas fa-hdd ml-2 mr-1"></i>${r.requested_storage_gb}GB
+                </p>
+              </div>
+              <div class="flex gap-1 shrink-0">
+                <button onclick="approveRequest(${r.id})" class="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-sm transition-colors" title="Approve">
+                  <i class="fas fa-check"></i>
+                </button>
+                <button onclick="denyRequest(${r.id})" class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-sm transition-colors" title="Deny">
+                  <i class="fas fa-times"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        `).join('');
+      } catch (err) {
+        console.error('Error loading admin requests:', err);
+        document.getElementById('admin-requests-list').innerHTML =
+          '<p class="p-4 text-red-500 text-center"><i class="fas fa-exclamation-circle mr-2"></i>Error loading requests</p>';
+      }
+    }
+
+    // Escape HTML to prevent XSS
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    async function approveRequest(id) {
+      try {
+        const res = await fetch(`/dashboard/api/admin/requests/${id}/approve`, { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          loadAdminRequests();
+        } else {
+          alert('Error approving request: ' + (data.message || 'Unknown error'));
+        }
+      } catch (err) {
+        console.error('Error approving request:', err);
+        alert('Error approving request');
+      }
+    }
+
+    async function denyRequest(id) {
+      const reason = prompt('Reason for denial (optional):');
+      try {
+        const res = await fetch(`/dashboard/api/admin/requests/${id}/deny`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ admin_notes: reason || '' })
+        });
+        const data = await res.json();
+        if (data.success) {
+          loadAdminRequests();
+        } else {
+          alert('Error denying request: ' + (data.message || 'Unknown error'));
+        }
+      } catch (err) {
+        console.error('Error denying request:', err);
+        alert('Error denying request');
+      }
+    }
+
+    async function approveAllRequests() {
+      if (!confirm('Approve all pending requests?')) return;
+      try {
+        const res = await fetch('/dashboard/api/admin/requests');
+        const data = await res.json();
+        for (const r of (data.requests || [])) {
+          await fetch(`/dashboard/api/admin/requests/${r.id}/approve`, { method: 'POST' });
+        }
+        loadAdminRequests();
+      } catch (err) {
+        console.error('Error approving all requests:', err);
+        alert('Error approving requests');
+      }
+    }
+
+    // Toggle admin dropdown
+    document.getElementById('admin-toggle').addEventListener('click', () => {
+      document.getElementById('admin-dropdown').classList.toggle('hidden');
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+      const panel = document.getElementById('admin-panel');
+      if (!panel.contains(e.target)) {
+        document.getElementById('admin-dropdown').classList.add('hidden');
+      }
+    });
+
+    document.getElementById('approve-all-btn').addEventListener('click', approveAllRequests);
+    document.getElementById('refresh-requests-btn').addEventListener('click', loadAdminRequests);
+
+    // Load on page load and poll every 30s
+    loadAdminRequests();
+    setInterval(loadAdminRequests, 30000);
+    <% } %>
   </script>
 </body>
 

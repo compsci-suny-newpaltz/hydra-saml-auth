@@ -189,14 +189,14 @@ module.exports = {
     { value: 16, label: '16 Cores', requiresApproval: true }
   ],
 
-  // Default quota for new users (conservative for 500 students)
+  // Default quota for new users (minimal to conserve storage - 500 students)
   defaults: {
-    storage_gb: 10,
-    memory_gb: 0.5,    // 512 MB
-    memory_mb: 512,
-    cpus: 1,
+    storage_gb: 5,      // Reduced from 10 - sufficient for basic coding
+    memory_gb: 0.25,    // 256 MB - enough for VS Code + compiler
+    memory_mb: 256,
+    cpus: 0.5,
     gpu_count: 0,
-    preset: 'conservative',
+    preset: 'minimal',  // Changed from 'conservative' - smaller default
     node: 'hydra',
     image: process.env.STUDENT_IMAGE || 'hydra-student-container:latest'
   },

@@ -12,7 +12,10 @@ const {
     updateContainerConfig,
     getAllUserQuotas,
     getNodeStatus,
-    updateNodeStatus
+    updateNodeStatus,
+    getSecurityEvents,
+    getSecuritySummary,
+    acknowledgeSecurityEvent
 } = require('../services/db-init');
 
 // Admin users list from environment
@@ -383,6 +386,155 @@ router.get('/stats', async (req, res) => {
     } catch (error) {
         console.error('[admin] Failed to get stats:', error);
         res.status(500).json({ error: 'Failed to retrieve statistics' });
+    }
+});
+
+// ==================== Security Monitoring Endpoints ====================
+
+/**
+ * GET /security
+ * Get security events summary and recent critical events
+ */
+router.get('/security', async (req, res) => {
+    try {
+        const hours = parseInt(req.query.hours) || 24;
+        const { summary, byType, topUsers } = await getSecuritySummary(hours);
+
+        // Get recent critical events
+        const criticalEvents = await getSecurityEvents({
+            severity: 'critical',
+            hours,
+            limit: 20
+        });
+
+        res.json({
+            summary,
+            byType,
+            topUsers,
+            criticalEvents: criticalEvents.map(e => ({
+                id: e.id,
+                username: e.username,
+                container_name: e.container_name,
+                event_type: e.event_type,
+                severity: e.severity,
+                description: e.description,
+                metrics: e.metrics ? JSON.parse(e.metrics) : null,
+                action_taken: e.action_taken,
+                acknowledged: !!e.acknowledged,
+                created_at: e.created_at
+            })),
+            hours
+        });
+    } catch (error) {
+        console.error('[admin] Failed to get security summary:', error);
+        res.status(500).json({ error: 'Failed to retrieve security data' });
+    }
+});
+
+/**
+ * GET /security/events
+ * Get security events with filters
+ */
+router.get('/security/events', async (req, res) => {
+    try {
+        const {
+            severity,
+            event_type,
+            username,
+            hours = 24,
+            limit = 100
+        } = req.query;
+
+        const events = await getSecurityEvents({
+            severity,
+            event_type,
+            username,
+            hours: parseInt(hours),
+            limit: parseInt(limit)
+        });
+
+        res.json({
+            events: events.map(e => ({
+                id: e.id,
+                username: e.username,
+                email: e.email,
+                container_name: e.container_name,
+                event_type: e.event_type,
+                severity: e.severity,
+                description: e.description,
+                metrics: e.metrics ? JSON.parse(e.metrics) : null,
+                process_info: e.process_info ? JSON.parse(e.process_info) : null,
+                action_taken: e.action_taken,
+                acknowledged: !!e.acknowledged,
+                acknowledged_by: e.acknowledged_by,
+                acknowledged_at: e.acknowledged_at,
+                created_at: e.created_at
+            })),
+            count: events.length
+        });
+    } catch (error) {
+        console.error('[admin] Failed to get security events:', error);
+        res.status(500).json({ error: 'Failed to retrieve security events' });
+    }
+});
+
+/**
+ * POST /security/:id/acknowledge
+ * Acknowledge a security event
+ */
+router.post('/security/:id/acknowledge', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const adminEmail = req.user.email;
+
+        await acknowledgeSecurityEvent(parseInt(id), adminEmail);
+
+        console.log(`[admin] Security event ${id} acknowledged by ${adminEmail}`);
+
+        res.json({
+            success: true,
+            message: 'Event acknowledged'
+        });
+    } catch (error) {
+        console.error('[admin] Failed to acknowledge event:', error);
+        res.status(500).json({ error: 'Failed to acknowledge event' });
+    }
+});
+
+/**
+ * GET /security/status
+ * Get security monitor status
+ */
+router.get('/security/status', async (req, res) => {
+    try {
+        const securityMonitor = require('../services/security-monitor');
+        const status = securityMonitor.getStatus();
+
+        res.json(status);
+    } catch (error) {
+        console.error('[admin] Failed to get monitor status:', error);
+        res.status(500).json({ error: 'Failed to get monitor status' });
+    }
+});
+
+/**
+ * POST /security/scan
+ * Force an immediate security scan
+ */
+router.post('/security/scan', async (req, res) => {
+    try {
+        const securityMonitor = require('../services/security-monitor');
+        await securityMonitor.forceScan();
+
+        console.log(`[admin] Security scan triggered by ${req.user.email}`);
+
+        res.json({
+            success: true,
+            message: 'Security scan completed'
+        });
+    } catch (error) {
+        console.error('[admin] Failed to run security scan:', error);
+        res.status(500).json({ error: 'Failed to run security scan' });
     }
 });
 

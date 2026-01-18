@@ -74,12 +74,39 @@ CREATE TABLE IF NOT EXISTS node_status (
     updated_at TEXT DEFAULT (datetime('now'))
 );
 
+-- Security monitoring events - logs suspicious activity
+CREATE TABLE IF NOT EXISTS security_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL,
+    email TEXT,
+    container_name TEXT,
+    event_type TEXT NOT NULL CHECK(event_type IN (
+        'high_cpu', 'high_memory', 'high_network',
+        'long_running_process', 'mining_detected',
+        'port_scan', 'unusual_traffic', 'resource_spike',
+        'process_killed', 'container_oom'
+    )),
+    severity TEXT NOT NULL CHECK(severity IN ('info', 'warning', 'critical')),
+    description TEXT NOT NULL,
+    metrics TEXT,
+    process_info TEXT,
+    action_taken TEXT CHECK(action_taken IN ('logged', 'throttled', 'terminated', 'alerted')),
+    acknowledged INTEGER DEFAULT 0,
+    acknowledged_by TEXT,
+    acknowledged_at TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_requests_username ON resource_requests(username);
 CREATE INDEX IF NOT EXISTS idx_requests_status ON resource_requests(status);
 CREATE INDEX IF NOT EXISTS idx_requests_target_node ON resource_requests(target_node);
 CREATE INDEX IF NOT EXISTS idx_requests_created ON resource_requests(created_at);
 CREATE INDEX IF NOT EXISTS idx_configs_current_node ON container_configs(current_node);
+CREATE INDEX IF NOT EXISTS idx_security_username ON security_events(username);
+CREATE INDEX IF NOT EXISTS idx_security_type ON security_events(event_type);
+CREATE INDEX IF NOT EXISTS idx_security_severity ON security_events(severity);
+CREATE INDEX IF NOT EXISTS idx_security_created ON security_events(created_at);
 `;
 
 // Initial node data from config
@@ -434,6 +461,114 @@ async function expireOldRequests() {
     return result.changes;
 }
 
+// ==================== Security Events ====================
+
+/**
+ * Log a security event
+ */
+async function logSecurityEvent(event) {
+    const db = await getDb();
+
+    const result = await db.run(
+        `INSERT INTO security_events
+         (username, email, container_name, event_type, severity, description, metrics, process_info, action_taken)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+            event.username,
+            event.email || null,
+            event.container_name || null,
+            event.event_type,
+            event.severity,
+            event.description,
+            event.metrics ? JSON.stringify(event.metrics) : null,
+            event.process_info ? JSON.stringify(event.process_info) : null,
+            event.action_taken || 'logged'
+        ]
+    );
+
+    console.log(`[security] ${event.severity.toUpperCase()}: ${event.event_type} for ${event.username} - ${event.description}`);
+    return result.lastID;
+}
+
+/**
+ * Get recent security events (for admin dashboard)
+ */
+async function getSecurityEvents(options = {}) {
+    const db = await getDb();
+    const { limit = 100, severity, event_type, username, hours = 24 } = options;
+
+    let query = `SELECT * FROM security_events WHERE created_at > datetime('now', '-${hours} hours')`;
+    const params = [];
+
+    if (severity) {
+        query += ' AND severity = ?';
+        params.push(severity);
+    }
+    if (event_type) {
+        query += ' AND event_type = ?';
+        params.push(event_type);
+    }
+    if (username) {
+        query += ' AND username = ?';
+        params.push(username);
+    }
+
+    query += ' ORDER BY created_at DESC LIMIT ?';
+    params.push(limit);
+
+    return db.all(query, params);
+}
+
+/**
+ * Get security events summary (for admin dashboard)
+ */
+async function getSecuritySummary(hours = 24) {
+    const db = await getDb();
+
+    const summary = await db.get(`
+        SELECT
+            COUNT(*) as total,
+            SUM(CASE WHEN severity = 'critical' THEN 1 ELSE 0 END) as critical,
+            SUM(CASE WHEN severity = 'warning' THEN 1 ELSE 0 END) as warnings,
+            SUM(CASE WHEN severity = 'info' THEN 1 ELSE 0 END) as info,
+            SUM(CASE WHEN acknowledged = 0 THEN 1 ELSE 0 END) as unacknowledged
+        FROM security_events
+        WHERE created_at > datetime('now', '-${hours} hours')
+    `);
+
+    const byType = await db.all(`
+        SELECT event_type, COUNT(*) as count
+        FROM security_events
+        WHERE created_at > datetime('now', '-${hours} hours')
+        GROUP BY event_type
+        ORDER BY count DESC
+    `);
+
+    const topUsers = await db.all(`
+        SELECT username, COUNT(*) as event_count
+        FROM security_events
+        WHERE created_at > datetime('now', '-${hours} hours')
+        GROUP BY username
+        ORDER BY event_count DESC
+        LIMIT 10
+    `);
+
+    return { summary, byType, topUsers };
+}
+
+/**
+ * Acknowledge a security event
+ */
+async function acknowledgeSecurityEvent(eventId, acknowledgedBy) {
+    const db = await getDb();
+    await db.run(
+        `UPDATE security_events
+         SET acknowledged = 1, acknowledged_by = ?, acknowledged_at = datetime('now')
+         WHERE id = ?`,
+        [acknowledgedBy, eventId]
+    );
+}
+
 module.exports = {
     initializeSchema,
     getOrCreateUserQuota,
@@ -448,5 +583,10 @@ module.exports = {
     getNodeStatus,
     updateNodeStatus,
     getAllUserQuotas,
-    expireOldRequests
+    expireOldRequests,
+    // Security monitoring
+    logSecurityEvent,
+    getSecurityEvents,
+    getSecuritySummary,
+    acknowledgeSecurityEvent
 };

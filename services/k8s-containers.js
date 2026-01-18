@@ -124,7 +124,7 @@ function buildPodSpec(username, email, config) {
 }
 
 // Build PVC specification
-function buildPVCSpec(username, storageGb, storageClass) {
+function buildPVCSpec(username, storageGb, storageClass, config = {}) {
   return {
     apiVersion: 'v1',
     kind: 'PersistentVolumeClaim',
@@ -135,7 +135,13 @@ function buildPVCSpec(username, storageGb, storageClass) {
         'app.kubernetes.io/name': 'student-volume',
         'app.kubernetes.io/instance': username,
         'app.kubernetes.io/managed-by': 'hydra-auth',
-        'hydra.owner': username
+        'hydra.owner': username,
+        'hydra.owner-email': config.email || ''
+      },
+      annotations: {
+        'hydra.preset': config.preset || resourceConfig.defaults.preset,
+        'hydra.target-node': config.target_node || 'hydra',
+        'hydra.created-at': new Date().toISOString()
       }
     },
     spec: {
@@ -273,12 +279,15 @@ async function initContainer(username, email, config = {}) {
   const nodeConfig = resourceConfig.getNodeConfig(config.target_node || 'hydra');
   const storageClass = nodeConfig?.k8s?.storageClass || runtimeConfig.k8s.defaultStorageClass;
 
+  // Merge config with email for PVC storage
+  const fullConfig = { ...config, email };
+
   try {
     // 1. Create PVC if not exists
     const existingPVC = await k8sClient.getPVC(`hydra-vol-${username}`);
     if (!existingPVC) {
       console.log(`[K8s] Creating PVC for ${username} (${storageGb}GB)`);
-      await k8sClient.createPVC(buildPVCSpec(username, storageGb, storageClass));
+      await k8sClient.createPVC(buildPVCSpec(username, storageGb, storageClass, fullConfig));
     }
 
     // 2. Create credentials secret
@@ -347,25 +356,70 @@ async function getContainerStatus(username) {
 }
 
 /**
- * Start a container (no-op for K8s - pods auto-start)
+ * Start a container - recreate pod if stopped (PVC preserved)
  */
-async function startContainer(username) {
+async function startContainer(username, email = '') {
+  // Check if pod already exists and running
   const status = await getContainerStatus(username);
-  if (!status.exists) {
-    throw new Error(`Container for ${username} does not exist`);
+  if (status.exists && status.running) {
+    return { success: true, message: 'Container already running' };
   }
-  // Pods in K8s auto-restart, so this is a no-op
-  return { success: true, message: 'Container is managed by Kubernetes' };
+
+  // Check if PVC exists (means container was initialized before)
+  const pvc = await k8sClient.getPVC(`hydra-vol-${username}`);
+  if (!pvc) {
+    throw new Error(`Container for ${username} not initialized. Use init first.`);
+  }
+
+  // Get config from PVC labels or use defaults
+  const ownerEmail = email || pvc.metadata?.labels?.['hydra.owner-email'] || `${username}@newpaltz.edu`;
+  const config = {
+    preset: pvc.metadata?.annotations?.['hydra.preset'] || resourceConfig.defaults.preset,
+    target_node: pvc.metadata?.annotations?.['hydra.target-node'] || 'hydra',
+    storage_gb: parseInt(pvc.spec?.resources?.requests?.storage) || resourceConfig.defaults.storage_gb
+  };
+
+  try {
+    // Check if pod exists but not running - delete it first
+    if (status.exists) {
+      await k8sClient.deletePod(`student-${username}`);
+      // Wait a moment for deletion
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+
+    // Recreate pod
+    console.log(`[K8s] Starting container for ${username} (recreating pod)`);
+    await k8sClient.createPod(buildPodSpec(username, ownerEmail, config));
+
+    return { success: true, message: 'Container started (pod recreated)' };
+  } catch (err) {
+    console.error(`[K8s] Error starting container for ${username}:`, err.message);
+    throw err;
+  }
 }
 
 /**
- * Stop a container (delete and let it restart, or scale to 0 if using deployment)
+ * Stop a container - delete pod but preserve PVC data
  */
 async function stopContainer(username) {
-  // For pods, we can delete and let it not restart by removing the pod
-  // Or we could use a Deployment and scale to 0
-  // For now, we'll just return success as K8s manages this
-  return { success: true, message: 'Use destroyContainer to fully remove' };
+  const status = await getContainerStatus(username);
+  if (!status.exists) {
+    return { success: true, message: 'Container already stopped' };
+  }
+
+  try {
+    // Delete pod - PVC and data are preserved
+    console.log(`[K8s] Stopping container for ${username} (deleting pod, keeping PVC)`);
+    await k8sClient.deletePod(`student-${username}`);
+
+    return { success: true, message: 'Container stopped (data preserved in volume)' };
+  } catch (err) {
+    if (err.statusCode === 404) {
+      return { success: true, message: 'Container already stopped' };
+    }
+    console.error(`[K8s] Error stopping container for ${username}:`, err.message);
+    throw err;
+  }
 }
 
 /**
