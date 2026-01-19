@@ -1,9 +1,16 @@
 // services/container-migration.js - Container migration between cluster nodes
 // Handles moving containers between Hydra, Chimera, and Cerberus with data preservation
+// Uses Kubernetes APIs when running in RKE2 cluster, falls back to Docker for standalone
 
 const Docker = require('dockerode');
 const path = require('path');
 const resourceConfig = require('../config/resources');
+const runtimeConfig = require('../config/runtime');
+
+// Check if we should use Kubernetes for migrations
+function useK8sMigration() {
+  return runtimeConfig.k8s?.enabled === true;
+}
 
 // Migration staging path for NFS
 const NFS_STAGING_PATH = process.env.NFS_STAGING_PATH || '/mnt/hydra-nfs/migrations';
@@ -224,8 +231,18 @@ async function createContainerOnNode(docker, containerName, volumeName, nodeConf
 
 /**
  * Migrate a container from one node to another
+ * Uses Kubernetes when running in RKE2 cluster, Docker API for standalone
  */
-async function migrateContainer(username, fromNode, toNode) {
+async function migrateContainer(username, fromNode, toNode, newConfig = {}) {
+    // Use Kubernetes migration when in cluster mode (production RKE2)
+    if (useK8sMigration()) {
+        console.log(`[migration] Using Kubernetes migration (RKE2 mode)`);
+        const k8sMigration = require('./k8s-container-migration');
+        return await k8sMigration.migrateContainer(username, fromNode, toNode, newConfig);
+    }
+
+    // Fallback to Docker API for standalone mode
+    console.log(`[migration] Using Docker migration (standalone mode)`);
     console.log(`[migration] Starting migration for ${username}: ${fromNode} -> ${toNode}`);
 
     const containerName = `student-${username}`;
@@ -360,8 +377,16 @@ async function cleanupStagingData(username) {
 
 /**
  * Check if a node is reachable
+ * Uses Kubernetes when in cluster mode, Docker API for standalone
  */
 async function checkNodeHealth(nodeName) {
+    // Use Kubernetes health check when in cluster mode
+    if (useK8sMigration()) {
+        const k8sMigration = require('./k8s-container-migration');
+        return await k8sMigration.checkNodeHealth(nodeName);
+    }
+
+    // Fallback to Docker API for standalone mode
     try {
         const docker = getDockerClient(nodeName);
         const info = await docker.info();

@@ -293,6 +293,73 @@ class K8sClient {
     }
   }
 
+  // ==================== JOB OPERATIONS ====================
+  // For migration and one-off tasks
+
+  // Create a Job
+  async createJob(jobSpec) {
+    this.init();
+    const namespace = jobSpec.metadata?.namespace || this.namespace;
+    return await this.batchApi.createNamespacedJob(namespace, jobSpec);
+  }
+
+  // Get a Job by name
+  async getJob(name, namespace = this.namespace) {
+    this.init();
+    try {
+      const response = await this.batchApi.readNamespacedJob(name, namespace);
+      return response.body;
+    } catch (err) {
+      if (err.statusCode === 404) return null;
+      throw err;
+    }
+  }
+
+  // Delete a Job
+  async deleteJob(name, namespace = this.namespace, propagationPolicy = 'Background') {
+    this.init();
+    try {
+      await this.batchApi.deleteNamespacedJob(name, namespace, undefined, undefined, undefined, undefined, propagationPolicy);
+      return true;
+    } catch (err) {
+      if (err.statusCode === 404) return false;
+      throw err;
+    }
+  }
+
+  // Wait for Job completion
+  async waitForJobCompletion(name, namespace = this.namespace, timeoutMs = 300000) {
+    const startTime = Date.now();
+    while (Date.now() - startTime < timeoutMs) {
+      const job = await this.getJob(name, namespace);
+      if (!job) return { success: false, error: 'Job not found' };
+
+      if (job.status?.succeeded) {
+        return { success: true, status: job.status };
+      }
+      if (job.status?.failed) {
+        return { success: false, status: job.status, error: 'Job failed' };
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+    return { success: false, error: 'Job timed out' };
+  }
+
+  // List PVCs by label selector
+  async listPVCs(labelSelector, namespace = this.namespace) {
+    this.init();
+    const response = await this.coreApi.listNamespacedPersistentVolumeClaim(
+      namespace,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      labelSelector
+    );
+    return response.body.items;
+  }
+
   // ==================== NODE OPERATIONS ====================
 
   // List nodes
