@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS user_quotas (
     max_memory_gb INTEGER DEFAULT 4,
     max_cpus INTEGER DEFAULT 2,
     gpu_access_approved INTEGER DEFAULT 0,
+    jupyter_execution_approved INTEGER DEFAULT 0,
     chimera_approved INTEGER DEFAULT 0,
     cerberus_approved INTEGER DEFAULT 0,
     approved_by TEXT,
@@ -34,7 +35,7 @@ CREATE TABLE IF NOT EXISTS resource_requests (
     requested_storage_gb INTEGER NOT NULL,
     requested_gpu_count INTEGER DEFAULT 0,
     preset_id TEXT,
-    request_type TEXT NOT NULL CHECK(request_type IN ('new_container', 'migration', 'resource_upgrade')),
+    request_type TEXT NOT NULL CHECK(request_type IN ('new_container', 'migration', 'resource_upgrade', 'jupyter_execution')),
     status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'approved', 'denied', 'expired', 'cancelled')),
     auto_approved INTEGER DEFAULT 0,
     reason TEXT,
@@ -119,6 +120,25 @@ VALUES
 `;
 
 /**
+ * Run database migrations for existing tables
+ */
+async function runMigrations(db) {
+    try {
+        // Check if jupyter_execution_approved column exists
+        const columns = await db.all("PRAGMA table_info(user_quotas)");
+        const hasJupyterColumn = columns.some(c => c.name === 'jupyter_execution_approved');
+
+        if (!hasJupyterColumn) {
+            console.log('[db-init] Adding jupyter_execution_approved column...');
+            await db.run('ALTER TABLE user_quotas ADD COLUMN jupyter_execution_approved INTEGER DEFAULT 0');
+            console.log('[db-init] Migration complete: jupyter_execution_approved added');
+        }
+    } catch (error) {
+        console.warn('[db-init] Migration warning:', error.message);
+    }
+}
+
+/**
  * Initialize database schema
  * Creates all required tables if they don't exist
  */
@@ -131,6 +151,9 @@ async function initializeSchema() {
         // Execute schema creation
         await db.exec(SCHEMA);
         console.log('[db-init] Schema tables created');
+
+        // Run migrations for existing tables
+        await runMigrations(db);
 
         // Seed node status data
         await db.exec(NODE_SEED_DATA);
@@ -200,6 +223,10 @@ async function updateUserQuota(username, updates) {
     if (updates.gpu_access_approved !== undefined) {
         fields.push('gpu_access_approved = ?');
         values.push(updates.gpu_access_approved ? 1 : 0);
+    }
+    if (updates.jupyter_execution_approved !== undefined) {
+        fields.push('jupyter_execution_approved = ?');
+        values.push(updates.jupyter_execution_approved ? 1 : 0);
     }
     if (updates.chimera_approved !== undefined) {
         fields.push('chimera_approved = ?');

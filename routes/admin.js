@@ -105,6 +105,27 @@ router.post('/requests/:id/approve', async (req, res) => {
             approved_at: new Date().toISOString()
         };
 
+        // Handle Jupyter execution requests
+        if (request.request_type === 'jupyter_execution') {
+            quotaUpdates.jupyter_execution_approved = true;
+            quotaUpdates.gpu_access_approved = true; // Jupyter execution implies GPU access
+            await updateUserQuota(request.username, quotaUpdates);
+
+            // Send approval email
+            try {
+                const emailNotifications = require('../services/email-notifications');
+                await emailNotifications.sendApprovalResult(request, true, admin_notes);
+            } catch (emailError) {
+                console.warn('[admin] Failed to send approval email:', emailError.message);
+            }
+
+            console.log(`[admin] Jupyter execution request ${id} approved by ${adminEmail}`);
+            return res.json({
+                success: true,
+                message: 'Jupyter execution request approved successfully'
+            });
+        }
+
         // Grant node access if needed
         if (request.target_node === 'chimera') {
             quotaUpdates.chimera_approved = true;

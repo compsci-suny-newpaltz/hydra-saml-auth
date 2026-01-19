@@ -533,9 +533,16 @@
                 <div>
                   <div class="font-semibold">Jupyter Notebook</div>
                   <div id="jupyter-service-status" class="text-sm text-gray-600"></div>
+                  <div id="jupyter-execution-status" class="text-xs text-gray-500"></div>
                 </div>
               </div>
               <div class="flex gap-2">
+                <!-- Shown when execution NOT approved -->
+                <button onclick="requestJupyterExecution()" id="jupyter-request-btn"
+                  class="px-3 py-1 text-sm rounded bg-yellow-100 hover:bg-yellow-200 border border-yellow-400 text-yellow-700 hidden">
+                  <i class="fas fa-lock"></i> Request GPU Access
+                </button>
+                <!-- Shown when execution IS approved -->
                 <button onclick="startService('jupyter')" id="jupyter-start-btn"
                   class="px-3 py-1 text-sm rounded bg-green-100 hover:bg-green-200 border border-green-300 text-green-700">
                   Start
@@ -1181,6 +1188,72 @@
           msg.innerHTML = `<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2">${err.message || 'Failed to wipe container'}</p>`;
         }
       }
+
+      // Jupyter Execution Approval Functions
+      let jupyterExecutionApproved = false;
+
+      async function checkJupyterExecutionStatus() {
+        try {
+          const res = await fetch('/dashboard/api/containers/jupyter-status');
+          if (handleAuthError(res)) return;
+          const data = await res.json();
+
+          jupyterExecutionApproved = data.jupyter_execution_approved;
+          const statusEl = document.getElementById('jupyter-execution-status');
+          const requestBtn = document.getElementById('jupyter-request-btn');
+          const startBtn = document.getElementById('jupyter-start-btn');
+          const stopBtn = document.getElementById('jupyter-stop-btn');
+
+          if (data.jupyter_execution_approved) {
+            statusEl.textContent = 'Execution enabled';
+            statusEl.className = 'text-xs text-green-600';
+            requestBtn?.classList.add('hidden');
+            startBtn?.classList.remove('hidden');
+            stopBtn?.classList.remove('hidden');
+          } else {
+            statusEl.textContent = 'Edit only - execution requires approval';
+            statusEl.className = 'text-xs text-yellow-600';
+            requestBtn?.classList.remove('hidden');
+            // Still allow start/open for editing notebooks
+            startBtn?.classList.remove('hidden');
+            stopBtn?.classList.remove('hidden');
+          }
+        } catch (err) {
+          console.error('[jupyter] Status check failed:', err);
+        }
+      }
+
+      window.requestJupyterExecution = async function() {
+        const reason = prompt('Why do you need Jupyter execution access? (e.g., ML course, data science project)');
+        if (!reason) return;
+
+        try {
+          const res = await fetch('/dashboard/api/containers/jupyter-request', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reason })
+          });
+
+          if (handleAuthError(res)) return;
+          const data = await res.json();
+
+          if (data.success) {
+            if (data.already_approved) {
+              alert('Jupyter execution is already approved for your account!');
+              checkJupyterExecutionStatus();
+            } else {
+              alert('Request submitted! An admin will review your request and you will be notified.');
+            }
+          } else {
+            alert(data.message || 'Failed to submit request');
+          }
+        } catch (err) {
+          alert('Failed to submit Jupyter execution request: ' + err.message);
+        }
+      };
+
+      // Check Jupyter status on load
+      checkJupyterExecutionStatus();
 
       // SSH Access Functions
       window.toggleSSHDropdown = function() {
@@ -2220,21 +2293,28 @@
           return;
         }
 
-        list.innerHTML = data.requests.map(r => `
+        list.innerHTML = data.requests.map(r => {
+          // Special display for Jupyter execution requests
+          const isJupyter = r.request_type === 'jupyter_execution';
+          const typeLabel = isJupyter ? 'Jupyter/GPU Access' : (r.preset_id || 'custom');
+          const typeBgColor = isJupyter ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800';
+          const reasonText = r.reason ? `<p class="text-xs text-gray-500 mt-1 italic">"${escapeHtml(r.reason)}"</p>` : '';
+
+          return `
           <div class="p-3 border-b hover:bg-gray-50 transition-colors">
             <div class="flex justify-between items-start gap-2">
               <div class="flex-1 min-w-0">
                 <p class="font-medium text-gray-900 truncate">${escapeHtml(r.email)}</p>
                 <p class="text-sm text-gray-600">
-                  <span class="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded">${escapeHtml(r.preset_id || 'custom')}</span>
-                  <i class="fas fa-arrow-right mx-1 text-gray-400"></i>
-                  <span class="inline-block bg-purple-100 text-purple-800 text-xs px-2 py-0.5 rounded">${escapeHtml(r.target_node)}</span>
+                  <span class="inline-block ${typeBgColor} text-xs px-2 py-0.5 rounded">${escapeHtml(typeLabel)}</span>
+                  ${isJupyter ? '' : `<i class="fas fa-arrow-right mx-1 text-gray-400"></i>
+                  <span class="inline-block bg-purple-100 text-purple-800 text-xs px-2 py-0.5 rounded">${escapeHtml(r.target_node)}</span>`}
                 </p>
-                <p class="text-xs text-gray-500 mt-1">
+                ${isJupyter ? reasonText : `<p class="text-xs text-gray-500 mt-1">
                   <i class="fas fa-memory mr-1"></i>${r.requested_memory_gb}GB
                   <i class="fas fa-microchip ml-2 mr-1"></i>${r.requested_cpus} CPU
                   <i class="fas fa-hdd ml-2 mr-1"></i>${r.requested_storage_gb}GB
-                </p>
+                </p>`}
               </div>
               <div class="flex gap-1 shrink-0">
                 <button onclick="approveRequest(${r.id})" class="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-sm transition-colors" title="Approve">
@@ -2246,7 +2326,7 @@
               </div>
             </div>
           </div>
-        `).join('');
+        `}).join('');
       } catch (err) {
         console.error('Error loading admin requests:', err);
         document.getElementById('admin-requests-list').innerHTML =
