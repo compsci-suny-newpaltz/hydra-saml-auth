@@ -201,14 +201,17 @@ module.exports = {
 
   // Duration tier options (for dropdown) - how long resources are allocated
   durationTiers: [
-    { value: null, label: 'Permanent (Default)', requiresApproval: false, description: 'No expiration' },
+    { value: 1, label: '1 Day (Default)', requiresApproval: false, description: 'Quick testing', default: true },
+    { value: 3, label: '3 Days', requiresApproval: false, description: 'Short assignment' },
     { value: 7, label: '1 Week', requiresApproval: false, description: 'Good for short projects' },
     { value: 14, label: '2 Weeks', requiresApproval: false, description: 'Standard project length' },
     { value: 30, label: '1 Month', requiresApproval: false, description: 'Semester project' },
     { value: 60, label: '2 Months', requiresApproval: true, description: 'Extended project' },
-    { value: 90, label: '3 Months', requiresApproval: true, description: 'Full semester' },
-    { value: 180, label: '6 Months', requiresApproval: true, description: 'Multi-semester' }
+    { value: 90, label: '3 Months', requiresApproval: true, description: 'Full semester' }
   ],
+
+  // Default duration for resource allocations (in days)
+  defaultDurationDays: 1,
 
   // Default quota for new users (minimal to conserve storage - 500 students)
   defaults: {

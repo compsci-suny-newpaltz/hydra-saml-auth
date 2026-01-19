@@ -492,9 +492,10 @@ router.post('/', async (req, res) => {
             requestedStorage
         );
 
-        // Validate duration if provided
-        const requestedDuration = duration_days ? parseInt(duration_days) : null;
-        if (requestedDuration !== null && (requestedDuration < 1 || requestedDuration > 365)) {
+        // Validate and set duration (default to 1 day if not specified)
+        const defaultDuration = resourceConfig.defaultDurationDays || 1;
+        const requestedDuration = duration_days ? parseInt(duration_days) : defaultDuration;
+        if (requestedDuration < 1 || requestedDuration > 365) {
             return res.status(400).json({ error: 'Duration must be between 1 and 365 days' });
         }
 
@@ -516,13 +517,10 @@ router.post('/', async (req, res) => {
 
         // If auto-approved, update container config immediately
         if (!requiresApproval) {
-            // Calculate expiry date if duration is set
-            let resourcesExpireAt = null;
-            if (requestedDuration) {
-                const expireDate = new Date();
-                expireDate.setDate(expireDate.getDate() + requestedDuration);
-                resourcesExpireAt = expireDate.toISOString();
-            }
+            // Calculate expiry date based on duration
+            const expireDate = new Date();
+            expireDate.setDate(expireDate.getDate() + requestedDuration);
+            const resourcesExpireAt = expireDate.toISOString();
 
             await updateContainerConfig(username, {
                 memory_gb: requestedMemory,
@@ -533,7 +531,7 @@ router.post('/', async (req, res) => {
                 resources_expire_at: resourcesExpireAt
             });
 
-            console.log(`[resource-requests] Auto-approved request ${requestId} for ${username}${requestedDuration ? ` (expires in ${requestedDuration} days)` : ''}`);
+            console.log(`[resource-requests] Auto-approved request ${requestId} for ${username} (expires in ${requestedDuration} days)`);
 
             return res.json({
                 success: true,
@@ -541,9 +539,7 @@ router.post('/', async (req, res) => {
                 auto_approved: true,
                 duration_days: requestedDuration,
                 expires_at: resourcesExpireAt,
-                message: requestedDuration
-                    ? `Request auto-approved for ${requestedDuration} days. Your container will use the new configuration on next restart.`
-                    : 'Request auto-approved. Your container will use the new configuration on next restart.'
+                message: `Request auto-approved for ${requestedDuration} day${requestedDuration > 1 ? 's' : ''}. Your container will use the new configuration on next restart.`
             });
         }
 
