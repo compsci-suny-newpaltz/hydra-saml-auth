@@ -1,4 +1,5 @@
-# Setup NVIDIA GPU support on GPU nodes
+# Setup NVIDIA GPU support on GPU nodes using GPU Operator
+# Reference: https://docs.rke2.io/add-ons/gpu_operators
 ---
 - name: Install NVIDIA drivers and container toolkit on GPU nodes
   hosts: gpu_nodes
@@ -43,38 +44,84 @@
         name: rke2-agent
         state: restarted
 
-- name: Deploy NVIDIA device plugin to cluster
+- name: Deploy NVIDIA GPU Operator to cluster
   hosts: control_plane
   become: yes
 
-  vars:
-    k8s_manifests_dir: "{{ playbook_dir }}/../../k8s"
-
   tasks:
-    - name: Copy NVIDIA device plugin manifest
+    - name: Create GPU Operator HelmChart manifest
       copy:
-        src: "{{ k8s_manifests_dir }}/gpu/nvidia-device-plugin.yaml"
-        dest: /tmp/nvidia-device-plugin.yaml
+        dest: /var/lib/rancher/rke2/server/manifests/gpu-operator.yaml
+        content: |
+          apiVersion: helm.cattle.io/v1
+          kind: HelmChart
+          metadata:
+            name: gpu-operator
+            namespace: kube-system
+          spec:
+            repo: https://helm.ngc.nvidia.com/nvidia
+            chart: gpu-operator
+            version: v25.3.0
+            targetNamespace: gpu-operator
+            createNamespace: true
+            valuesContent: |-
+              toolkit:
+                env:
+                - name: CONTAINERD_CONFIG
+                  value: /var/lib/rancher/rke2/agent/etc/containerd/config.toml
+                - name: CONTAINERD_SOCKET
+                  value: /run/k3s/containerd/containerd.sock
+                - name: CONTAINERD_RUNTIME_CLASS
+                  value: nvidia
+                - name: CONTAINERD_SET_AS_DEFAULT
+                  value: "true"
+              driver:
+                enabled: false  # Using pre-installed drivers
+              devicePlugin:
+                config:
+                  name: time-slicing-config
+                  default: any
+        mode: '0644'
 
-    - name: Apply NVIDIA device plugin
+    - name: Wait for GPU Operator namespace to be created
       shell: |
         export KUBECONFIG=/etc/rancher/rke2/rke2.yaml
-        kubectl apply -f /tmp/nvidia-device-plugin.yaml
+        kubectl get namespace gpu-operator
+      register: gpu_operator_ns
+      retries: 30
+      delay: 10
+      until: gpu_operator_ns.rc == 0
+      ignore_errors: yes
 
-    - name: Wait for device plugin to be ready
+    - name: Wait for GPU Operator pods to start
       shell: |
         export KUBECONFIG=/etc/rancher/rke2/rke2.yaml
-        kubectl -n kube-system wait --for=condition=Ready pod -l name=nvidia-device-plugin-ds --timeout=120s
-      register: device_plugin_ready
-      retries: 5
+        kubectl -n gpu-operator get pods
+      register: gpu_operator_pods
+      retries: 30
+      delay: 10
+      until: gpu_operator_pods.rc == 0
+      ignore_errors: yes
+
+    - name: Display GPU Operator pods
+      debug:
+        var: gpu_operator_pods.stdout_lines
+      when: gpu_operator_pods is defined
+
+    - name: Wait for GPU resources to be advertised (may take several minutes)
+      shell: |
+        export KUBECONFIG=/etc/rancher/rke2/rke2.yaml
+        kubectl get nodes -o json | jq -r '.items[] | select(.status.capacity["nvidia.com/gpu"] != null) | .metadata.name'
+      register: gpu_nodes_ready
+      retries: 30
       delay: 20
-      until: device_plugin_ready.rc == 0
+      until: gpu_nodes_ready.stdout != ""
       ignore_errors: yes
 
     - name: Verify GPU resources are advertised
       shell: |
         export KUBECONFIG=/etc/rancher/rke2/rke2.yaml
-        kubectl get nodes -o json | jq '.items[] | {name: .metadata.name, gpus: .status.capacity["nvidia.com/gpu"]}'
+        kubectl get nodes -o custom-columns="NAME:.metadata.name,GPU:.status.capacity.nvidia\.com/gpu"
       register: gpu_resources
 
     - name: Display GPU resources per node
