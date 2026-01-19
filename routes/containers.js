@@ -591,6 +591,100 @@ router.post('/ssh-key/regenerate', async (req, res) => {
     }
 });
 
+// ========================================
+// JUPYTER EXECUTION APPROVAL
+// ========================================
+
+// GET /dashboard/api/containers/jupyter-status
+// Check if user has Jupyter execution approval
+router.get('/jupyter-status', async (req, res) => {
+    try {
+        if (!req.isAuthenticated?.() || !req.user?.email) {
+            return res.status(401).json({ success: false, message: 'Not authenticated' });
+        }
+
+        const username = String(req.user.email).split('@')[0];
+
+        // Get user quota to check approval status
+        const { getOrCreateUserQuota } = require('../services/db-init');
+        const quota = await getOrCreateUserQuota(username, req.user.email);
+
+        return res.json({
+            success: true,
+            jupyter_execution_approved: !!quota.jupyter_execution_approved,
+            gpu_access_approved: !!quota.gpu_access_approved,
+            message: quota.jupyter_execution_approved
+                ? 'Jupyter execution is enabled. You can run notebooks.'
+                : 'Jupyter execution requires approval. You can edit notebooks but cannot run cells until approved.'
+        });
+    } catch (err) {
+        console.error('[containers] jupyter-status error:', err);
+        return res.status(500).json({ success: false, message: 'Failed to check Jupyter status' });
+    }
+});
+
+// POST /dashboard/api/containers/jupyter-request
+// Request Jupyter execution access
+router.post('/jupyter-request', async (req, res) => {
+    try {
+        if (!req.isAuthenticated?.() || !req.user?.email) {
+            return res.status(401).json({ success: false, message: 'Not authenticated' });
+        }
+
+        const username = String(req.user.email).split('@')[0];
+        const { reason } = req.body;
+
+        // Get user quota to check current status
+        const { getOrCreateUserQuota, getUserPendingRequests, createResourceRequest } = require('../services/db-init');
+        const quota = await getOrCreateUserQuota(username, req.user.email);
+
+        if (quota.jupyter_execution_approved) {
+            return res.json({
+                success: true,
+                already_approved: true,
+                message: 'Jupyter execution is already approved for your account.'
+            });
+        }
+
+        // Check for existing pending request
+        const pendingRequests = await getUserPendingRequests(username);
+        const hasPendingJupyterRequest = pendingRequests.some(r => r.request_type === 'jupyter_execution');
+
+        if (hasPendingJupyterRequest) {
+            return res.status(400).json({
+                success: false,
+                message: 'You already have a pending Jupyter execution request. Please wait for admin review.'
+            });
+        }
+
+        // Create a Jupyter execution request
+        const requestId = await createResourceRequest({
+            username,
+            email: req.user.email,
+            target_node: 'hydra', // Jupyter runs locally
+            memory_gb: 0,
+            cpus: 0,
+            storage_gb: 0,
+            gpu_count: 0,
+            preset_id: null,
+            request_type: 'jupyter_execution',
+            auto_approved: false,
+            reason: reason || 'Request for Jupyter notebook execution access'
+        });
+
+        console.log(`[containers] Jupyter execution request ${requestId} created for ${username}`);
+
+        return res.json({
+            success: true,
+            request_id: requestId,
+            message: 'Jupyter execution request submitted. An admin will review your request.'
+        });
+    } catch (err) {
+        console.error('[containers] jupyter-request error:', err);
+        return res.status(500).json({ success: false, message: 'Failed to submit Jupyter request' });
+    }
+});
+
 // Start student container
 // POST /dashboard/api/containers/start
 router.post('/start', async (req, res) => {
