@@ -199,6 +199,17 @@ module.exports = {
     { value: 16, label: '16 Cores', requiresApproval: true }
   ],
 
+  // Duration tier options (for dropdown) - how long resources are allocated
+  durationTiers: [
+    { value: null, label: 'Permanent (Default)', requiresApproval: false, description: 'No expiration' },
+    { value: 7, label: '1 Week', requiresApproval: false, description: 'Good for short projects' },
+    { value: 14, label: '2 Weeks', requiresApproval: false, description: 'Standard project length' },
+    { value: 30, label: '1 Month', requiresApproval: false, description: 'Semester project' },
+    { value: 60, label: '2 Months', requiresApproval: true, description: 'Extended project' },
+    { value: 90, label: '3 Months', requiresApproval: true, description: 'Full semester' },
+    { value: 180, label: '6 Months', requiresApproval: true, description: 'Multi-semester' }
+  ],
+
   // Default quota for new users (minimal to conserve storage - 500 students)
   defaults: {
     storage_gb: 5,      // Reduced from 10 - sufficient for basic coding

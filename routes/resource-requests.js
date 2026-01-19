@@ -300,7 +300,12 @@ router.get('/presets', async (req, res) => {
             storageTiers: resourceConfig.storageTiers,
             memoryTiers: resourceConfig.memoryTiers,
             cpuTiers: resourceConfig.cpuTiers,
-            currentConfig: containerConfig,
+            durationTiers: resourceConfig.durationTiers,
+            currentConfig: {
+                ...containerConfig,
+                resources_expire_at: containerConfig.resources_expire_at,
+                duration_days: containerConfig.duration_days
+            },
             quota: {
                 storage_gb: quota.storage_gb,
                 max_memory_gb: quota.max_memory_gb,
@@ -416,6 +421,7 @@ router.post('/', async (req, res) => {
             cpus,
             storage_gb,
             gpu_count = 0,
+            duration_days,
             reason
         } = req.body;
 
@@ -486,6 +492,12 @@ router.post('/', async (req, res) => {
             requestedStorage
         );
 
+        // Validate duration if provided
+        const requestedDuration = duration_days ? parseInt(duration_days) : null;
+        if (requestedDuration !== null && (requestedDuration < 1 || requestedDuration > 365)) {
+            return res.status(400).json({ error: 'Duration must be between 1 and 365 days' });
+        }
+
         // Create the request
         const requestId = await createResourceRequest({
             username,
@@ -495,6 +507,7 @@ router.post('/', async (req, res) => {
             cpus: requestedCpus,
             storage_gb: requestedStorage,
             gpu_count: requestedGpus,
+            duration_days: requestedDuration,
             preset_id,
             request_type: requestType,
             auto_approved: !requiresApproval,
@@ -503,20 +516,34 @@ router.post('/', async (req, res) => {
 
         // If auto-approved, update container config immediately
         if (!requiresApproval) {
+            // Calculate expiry date if duration is set
+            let resourcesExpireAt = null;
+            if (requestedDuration) {
+                const expireDate = new Date();
+                expireDate.setDate(expireDate.getDate() + requestedDuration);
+                resourcesExpireAt = expireDate.toISOString();
+            }
+
             await updateContainerConfig(username, {
                 memory_gb: requestedMemory,
                 cpus: requestedCpus,
                 storage_gb: requestedStorage,
-                preset_tier: preset_id || 'conservative'
+                preset_tier: preset_id || 'conservative',
+                duration_days: requestedDuration,
+                resources_expire_at: resourcesExpireAt
             });
 
-            console.log(`[resource-requests] Auto-approved request ${requestId} for ${username}`);
+            console.log(`[resource-requests] Auto-approved request ${requestId} for ${username}${requestedDuration ? ` (expires in ${requestedDuration} days)` : ''}`);
 
             return res.json({
                 success: true,
                 request_id: requestId,
                 auto_approved: true,
-                message: 'Request auto-approved. Your container will use the new configuration on next restart.'
+                duration_days: requestedDuration,
+                expires_at: resourcesExpireAt,
+                message: requestedDuration
+                    ? `Request auto-approved for ${requestedDuration} days. Your container will use the new configuration on next restart.`
+                    : 'Request auto-approved. Your container will use the new configuration on next restart.'
             });
         }
 

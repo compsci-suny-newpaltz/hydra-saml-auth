@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS resource_requests (
     requested_cpus INTEGER NOT NULL,
     requested_storage_gb INTEGER NOT NULL,
     requested_gpu_count INTEGER DEFAULT 0,
+    requested_duration_days INTEGER DEFAULT NULL,
     preset_id TEXT,
     request_type TEXT NOT NULL CHECK(request_type IN ('new_container', 'migration', 'resource_upgrade', 'jupyter_execution')),
     status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'approved', 'denied', 'expired', 'cancelled')),
@@ -57,6 +58,8 @@ CREATE TABLE IF NOT EXISTS container_configs (
     gpu_count INTEGER DEFAULT 0,
     preset_tier TEXT DEFAULT 'conservative',
     image_name TEXT NOT NULL DEFAULT 'hydra-student-container:latest',
+    duration_days INTEGER DEFAULT NULL,
+    resources_expire_at TEXT DEFAULT NULL,
     last_migration_at TEXT,
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
@@ -124,14 +127,41 @@ VALUES
  */
 async function runMigrations(db) {
     try {
-        // Check if jupyter_execution_approved column exists
-        const columns = await db.all("PRAGMA table_info(user_quotas)");
-        const hasJupyterColumn = columns.some(c => c.name === 'jupyter_execution_approved');
+        // Check if jupyter_execution_approved column exists in user_quotas
+        const quotaColumns = await db.all("PRAGMA table_info(user_quotas)");
+        const hasJupyterColumn = quotaColumns.some(c => c.name === 'jupyter_execution_approved');
 
         if (!hasJupyterColumn) {
             console.log('[db-init] Adding jupyter_execution_approved column...');
             await db.run('ALTER TABLE user_quotas ADD COLUMN jupyter_execution_approved INTEGER DEFAULT 0');
             console.log('[db-init] Migration complete: jupyter_execution_approved added');
+        }
+
+        // Check if duration_days and resources_expire_at columns exist in container_configs
+        const configColumns = await db.all("PRAGMA table_info(container_configs)");
+        const hasDurationColumn = configColumns.some(c => c.name === 'duration_days');
+        const hasExpireColumn = configColumns.some(c => c.name === 'resources_expire_at');
+
+        if (!hasDurationColumn) {
+            console.log('[db-init] Adding duration_days column to container_configs...');
+            await db.run('ALTER TABLE container_configs ADD COLUMN duration_days INTEGER DEFAULT NULL');
+            console.log('[db-init] Migration complete: duration_days added');
+        }
+
+        if (!hasExpireColumn) {
+            console.log('[db-init] Adding resources_expire_at column to container_configs...');
+            await db.run('ALTER TABLE container_configs ADD COLUMN resources_expire_at TEXT DEFAULT NULL');
+            console.log('[db-init] Migration complete: resources_expire_at added');
+        }
+
+        // Check if requested_duration_days column exists in resource_requests
+        const requestColumns = await db.all("PRAGMA table_info(resource_requests)");
+        const hasRequestDurationColumn = requestColumns.some(c => c.name === 'requested_duration_days');
+
+        if (!hasRequestDurationColumn) {
+            console.log('[db-init] Adding requested_duration_days column to resource_requests...');
+            await db.run('ALTER TABLE resource_requests ADD COLUMN requested_duration_days INTEGER DEFAULT NULL');
+            console.log('[db-init] Migration complete: requested_duration_days added');
         }
     } catch (error) {
         console.warn('[db-init] Migration warning:', error.message);
@@ -266,9 +296,9 @@ async function createResourceRequest(request) {
     const result = await db.run(
         `INSERT INTO resource_requests
          (username, email, target_node, requested_memory_gb, requested_cpus,
-          requested_storage_gb, requested_gpu_count, preset_id, request_type,
-          auto_approved, reason, expires_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          requested_storage_gb, requested_gpu_count, requested_duration_days,
+          preset_id, request_type, auto_approved, reason, expires_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
             request.username,
             request.email,
@@ -277,6 +307,7 @@ async function createResourceRequest(request) {
             request.cpus,
             request.storage_gb,
             request.gpu_count || 0,
+            request.duration_days || null,
             request.preset_id || null,
             request.request_type,
             request.auto_approved ? 1 : 0,
@@ -405,6 +436,14 @@ async function updateContainerConfig(username, updates) {
         fields.push('last_migration_at = ?');
         values.push(updates.last_migration_at);
     }
+    if (updates.duration_days !== undefined) {
+        fields.push('duration_days = ?');
+        values.push(updates.duration_days);
+    }
+    if (updates.resources_expire_at !== undefined) {
+        fields.push('resources_expire_at = ?');
+        values.push(updates.resources_expire_at);
+    }
 
     fields.push("updated_at = datetime('now')");
     values.push(username);
@@ -413,6 +452,38 @@ async function updateContainerConfig(username, updates) {
         `UPDATE container_configs SET ${fields.join(', ')} WHERE username = ?`,
         values
     );
+}
+
+/**
+ * Get expired resource configurations
+ */
+async function getExpiredConfigs() {
+    const db = await getDb();
+    return db.all(
+        `SELECT * FROM container_configs
+         WHERE resources_expire_at IS NOT NULL
+         AND resources_expire_at < datetime('now')
+         AND preset_tier != 'minimal'`
+    );
+}
+
+/**
+ * Reset container config to defaults (when resources expire)
+ */
+async function resetContainerConfigToDefaults(username) {
+    const db = await getDb();
+    const defaults = resourceConfig.defaults;
+
+    await db.run(
+        `UPDATE container_configs
+         SET memory_gb = ?, cpus = ?, storage_gb = ?, gpu_count = 0,
+             preset_tier = ?, duration_days = NULL, resources_expire_at = NULL,
+             current_node = 'hydra', updated_at = datetime('now')
+         WHERE username = ?`,
+        [defaults.memory_gb, defaults.cpus, defaults.storage_gb, defaults.preset, username]
+    );
+
+    console.log(`[db-init] Reset container config to defaults for user: ${username}`);
 }
 
 /**
@@ -607,6 +678,8 @@ module.exports = {
     getRequestById,
     getOrCreateContainerConfig,
     updateContainerConfig,
+    getExpiredConfigs,
+    resetContainerConfigToDefaults,
     getNodeStatus,
     updateNodeStatus,
     getAllUserQuotas,
