@@ -3,7 +3,9 @@
 
 all:
   vars:
-    ansible_user: root
+    ansible_user: infra
+    ansible_become: true
+    ansible_become_method: sudo
     ansible_python_interpreter: /usr/bin/python3
 
     # RKE2 Configuration
