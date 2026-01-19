@@ -29,6 +29,8 @@ services:
       SIMPLESAMLPHP_SP_ENTITY_ID: hydra.local
       SIMPLESAMLPHP_SP_ASSERTION_CONSUMER_SERVICE: http://hydra.local/login/callback
       SIMPLESAMLPHP_BASEURLPATH: http://mock-saml-idp/simplesaml/
+    volumes:
+      - ./saml-users.php:/var/www/simplesamlphp/config/authsources.php:ro
     ports:
       - "8080:8080"
     labels:

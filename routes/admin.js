@@ -22,7 +22,7 @@ const {
 const ADMIN_USERS = (process.env.ADMIN_USERS || '').split(',').map(u => u.trim().toLowerCase());
 
 /**
- * Middleware: Check if user is an admin
+ * Middleware: Check if user is an admin (faculty OR whitelist)
  */
 function requireAdmin(req, res, next) {
     if (!req.isAuthenticated?.() || !req.user?.email) {
@@ -30,7 +30,10 @@ function requireAdmin(req, res, next) {
     }
 
     const email = req.user.email.toLowerCase();
-    if (!ADMIN_USERS.includes(email)) {
+    const isFaculty = (req.user.affiliation || '').toLowerCase() === 'faculty';
+    const isWhitelisted = ADMIN_USERS.includes(email);
+
+    if (!isFaculty && !isWhitelisted) {
         console.warn(`[admin] Unauthorized access attempt by ${email}`);
         return res.status(403).json({ error: 'Admin access required' });
     }

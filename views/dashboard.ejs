@@ -8,12 +8,15 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="icon" type="image/png" href="https://hydra.newpaltz.edu/SUNYCAT.png" />
   <title>Hydra Dashboard - SUNY New Paltz</title>
+  <style>
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  </style>
 </head>
 
 <body class="bg-gray-50 text-gray-900">
   <header class="bg-[#052049] text-white">
     <div class="max-w-5xl mx-auto px-4 py-4 relative flex items-center gap-3">
-      <img src="https://hydra.newpaltz.edu/SUNYCAT.png" alt="Hydra" class="h-8 w-8 rounded" />
+      <img id="hydra-cat" src="https://hydra.newpaltz.edu/SUNYCAT.png" alt="Hydra" class="h-8 w-8 rounded cursor-pointer select-none" />
       <h1 class="text-xl font-semibold">SUNY New Paltz - Hydra</h1>
       <a href="https://github.com/lettucegoblin/hydra-saml-auth" target="_blank"
         class="absolute top-4 right-4 text-white">
@@ -22,17 +25,11 @@
     </div>
   </header>
 
-  <% if (isAdmin) { %>
+  <% if (typeof isAdmin !== 'undefined' && isAdmin) { %>
   <!-- Admin Approval Panel -->
-  <div id="admin-panel" class="fixed top-16 right-4 z-50">
-    <!-- Notification Bell -->
-    <button id="admin-toggle" class="relative bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700 transition-colors">
-      <i class="fas fa-bell text-lg"></i>
-      <span id="admin-badge" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center hidden">0</span>
-    </button>
-
-    <!-- Dropdown Panel -->
-    <div id="admin-dropdown" class="hidden absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-xl border border-gray-200">
+  <div id="admin-panel" class="fixed bottom-4 right-4 z-50">
+    <!-- Dropdown Panel (opens upward) -->
+    <div id="admin-dropdown" class="hidden absolute right-0 bottom-14 w-96 bg-white rounded-lg shadow-xl border border-gray-200">
       <div class="p-4 border-b bg-gray-50 rounded-t-lg">
         <h3 class="font-bold text-gray-800"><i class="fas fa-clipboard-check mr-2"></i>Pending Approvals</h3>
       </div>
@@ -48,6 +45,12 @@
         </button>
       </div>
     </div>
+
+    <!-- Notification Bell -->
+    <button id="admin-toggle" class="relative bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700 transition-colors">
+      <i class="fas fa-bell text-lg"></i>
+      <span id="admin-badge" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center hidden">0</span>
+    </button>
   </div>
   <% } %>
 
@@ -85,7 +88,7 @@
           <button id="tab-openwebui" class="px-4 py-2 text-gray-600 hover:text-gray-900"
             data-target="#panel-openwebui">OpenWebUI</button>
           <button id="tab-n8n" class="px-4 py-2 text-gray-600 hover:text-gray-900" data-target="#panel-n8n">n8n</button>
-          <button id="tab-minecraft" class="px-4 py-2 text-gray-600 hover:text-gray-900"
+          <button id="tab-minecraft" class="px-4 py-2 text-gray-600 hover:text-gray-900 hidden"
             data-target="#panel-minecraft">Minecraft</button>
         </div>
 
@@ -845,6 +848,23 @@
           document.getElementById(t.btn).classList.remove('text-gray-600');
           document.getElementById(t.panel).classList.remove('hidden');
         });
+      });
+
+      // Easter egg: Click cat 20 times to reveal Minecraft tab
+      let catClicks = 0;
+      const hydraCat = document.getElementById('hydra-cat');
+      const minecraftTab = document.getElementById('tab-minecraft');
+      hydraCat.addEventListener('click', () => {
+        catClicks++;
+        if (catClicks >= 20 && minecraftTab.classList.contains('hidden')) {
+          minecraftTab.classList.remove('hidden');
+          hydraCat.style.animation = 'spin 0.5s ease-out';
+          setTimeout(() => hydraCat.style.animation = '', 500);
+        } else if (catClicks < 20) {
+          // Small bounce animation as feedback
+          hydraCat.style.transform = 'scale(1.2)';
+          setTimeout(() => hydraCat.style.transform = '', 100);
+        }
       });
 
       // Centralized API helper with 401 redirect
@@ -2035,7 +2055,7 @@
     }
 
     // ==================== Admin Approval Panel ====================
-    <% if (isAdmin) { %>
+    <% if (typeof isAdmin !== 'undefined' && isAdmin) { %>
     // Fetch and display pending requests
     async function loadAdminRequests() {
       try {
@@ -2164,6 +2184,97 @@
     // Load on page load and poll every 30s
     loadAdminRequests();
     setInterval(loadAdminRequests, 30000);
+
+    // ========== Container Events Toast Notifications ==========
+    const toastContainer = document.createElement('div');
+    toastContainer.id = 'toast-container';
+    toastContainer.className = 'fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm';
+    document.body.appendChild(toastContainer);
+
+    const toastColors = {
+      success: 'bg-green-500',
+      warning: 'bg-yellow-500',
+      error: 'bg-red-500',
+      info: 'bg-blue-500'
+    };
+
+    const toastIcons = {
+      success: 'fa-check-circle',
+      warning: 'fa-exclamation-triangle',
+      error: 'fa-times-circle',
+      info: 'fa-info-circle'
+    };
+
+    function showToast(message, type = 'info', duration = 4000) {
+      const toast = document.createElement('div');
+      toast.className = `${toastColors[type] || toastColors.info} text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 transform translate-x-full opacity-0 transition-all duration-300`;
+      toast.innerHTML = `
+        <i class="fas ${toastIcons[type] || toastIcons.info}"></i>
+        <span class="flex-1 text-sm">${message}</span>
+        <button onclick="this.parentElement.remove()" class="text-white/80 hover:text-white">
+          <i class="fas fa-times"></i>
+        </button>
+      `;
+      toastContainer.appendChild(toast);
+
+      // Animate in
+      requestAnimationFrame(() => {
+        toast.classList.remove('translate-x-full', 'opacity-0');
+      });
+
+      // Auto-remove after duration
+      setTimeout(() => {
+        toast.classList.add('translate-x-full', 'opacity-0');
+        setTimeout(() => toast.remove(), 300);
+      }, duration);
+    }
+
+    // Connect to container events SSE stream
+    let eventSource = null;
+    let reconnectAttempts = 0;
+
+    function connectContainerEvents() {
+      if (eventSource) {
+        eventSource.close();
+      }
+
+      eventSource = new EventSource('/api/events/containers');
+
+      eventSource.onopen = () => {
+        console.log('[SSE] Connected to container events');
+        reconnectAttempts = 0;
+      };
+
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'connected') {
+            showToast('Container events connected', 'success', 2000);
+          } else if (data.message) {
+            showToast(data.message, data.type || 'info');
+          }
+        } catch (e) {
+          console.error('[SSE] Parse error:', e);
+        }
+      };
+
+      eventSource.onerror = (e) => {
+        console.error('[SSE] Connection error, reconnecting...');
+        eventSource.close();
+        reconnectAttempts++;
+        // Exponential backoff: 1s, 2s, 4s, 8s, max 30s
+        const delay = Math.min(1000 * Math.pow(2, reconnectAttempts - 1), 30000);
+        setTimeout(connectContainerEvents, delay);
+      };
+    }
+
+    // Start SSE connection
+    connectContainerEvents();
+
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+      if (eventSource) eventSource.close();
+    });
     <% } %>
   </script>
 </body>
