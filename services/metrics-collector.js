@@ -87,6 +87,7 @@ async function fetchRemoteMetrics(nodeName) {
  */
 function collectHydraMetrics() {
   const os = require('os');
+  const { execSync } = require('child_process');
 
   // CPU usage calculation
   const cpus = os.cpus();
@@ -101,18 +102,59 @@ function collectHydraMetrics() {
   const freeMem = os.freemem();
   const usedMem = totalMem - freeMem;
 
+  // Disk usage - try to get from df
+  let diskUsedGb = 0;
+  let diskTotalGb = 21000;
+  try {
+    // Get root filesystem usage
+    const dfOutput = execSync("df -BG / | tail -1 | awk '{print $2, $3}'", { encoding: 'utf8', timeout: 5000 });
+    const [total, used] = dfOutput.trim().split(/\s+/).map(s => parseInt(s.replace('G', '')));
+    if (!isNaN(total)) diskTotalGb = total;
+    if (!isNaN(used)) diskUsedGb = used;
+  } catch (e) {
+    // Ignore errors, use defaults
+  }
+
+  // Container count - try docker ps
+  let containersRunning = 0;
+  try {
+    const dockerOutput = execSync('docker ps -q 2>/dev/null | wc -l', { encoding: 'utf8', timeout: 5000 });
+    containersRunning = parseInt(dockerOutput.trim()) || 0;
+  } catch (e) {
+    // Ignore errors
+  }
+
+  // ZFS status - try zpool status
+  let zfsStatus = 'ONLINE';
+  try {
+    const zpoolOutput = execSync('zpool status -x 2>/dev/null | head -1', { encoding: 'utf8', timeout: 5000 });
+    if (zpoolOutput.includes('all pools are healthy')) {
+      zfsStatus = 'ONLINE';
+    } else if (zpoolOutput.includes('DEGRADED')) {
+      zfsStatus = 'DEGRADED';
+    } else if (zpoolOutput.includes('FAULTED')) {
+      zfsStatus = 'FAULTED';
+    }
+  } catch (e) {
+    zfsStatus = 'N/A';
+  }
+
+  // Return in the format expected by formatCollectedMetrics
   return {
     status: 'online',
     role: 'control-plane',
-    cpu_percent: Math.round(cpuUsage),
-    ram_used_gb: Math.round(usedMem / (1024 * 1024 * 1024)),
-    ram_total_gb: Math.round(totalMem / (1024 * 1024 * 1024)),
-    // Placeholder values - would need actual ZFS stats
-    disk_used_gb: null,
-    disk_total_gb: 21000,
-    containers_running: null, // Would count Docker containers
-    zfs_status: 'ONLINE', // Would check ZFS pool status
-    last_updated: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    system: {
+      cpu_percent: Math.round(cpuUsage),
+      ram_used_gb: Math.round(usedMem / (1024 * 1024 * 1024)),
+      ram_total_gb: Math.round(totalMem / (1024 * 1024 * 1024)),
+      disk_used_gb: diskUsedGb,
+      disk_total_gb: diskTotalGb
+    },
+    containers: {
+      running: containersRunning
+    },
+    zfs_status: zfsStatus
   };
 }
 

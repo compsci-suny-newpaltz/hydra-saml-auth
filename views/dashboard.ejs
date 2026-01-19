@@ -550,6 +550,80 @@
                 </button>
               </div>
             </div>
+
+            <!-- SSH Access Section -->
+            <div class="flex items-center justify-between border-t pt-3 mt-3">
+              <div class="flex items-center gap-3">
+                <i class="fas fa-terminal text-green-600"></i>
+                <div>
+                  <div class="font-semibold">SSH Access</div>
+                  <div id="ssh-service-status" class="text-sm text-gray-600">Direct terminal access</div>
+                </div>
+              </div>
+              <div class="flex gap-2">
+                <button onclick="toggleSSHDropdown()" id="ssh-info-btn"
+                  class="px-3 py-1 text-sm rounded bg-green-600 text-white hover:bg-green-700">
+                  <i class="fas fa-key"></i> Connect
+                </button>
+              </div>
+            </div>
+
+            <!-- SSH Connection Dropdown -->
+            <div id="ssh-dropdown" class="hidden mt-3 bg-gray-50 rounded-lg p-4 border">
+              <h5 class="font-semibold text-gray-800 mb-3"><i class="fas fa-terminal"></i> SSH Connection</h5>
+
+              <!-- SSH Command -->
+              <div class="mb-3">
+                <label class="block text-xs font-medium text-gray-600 mb-1">SSH Command</label>
+                <div class="flex items-center gap-2">
+                  <code id="ssh-command" class="flex-1 bg-white border rounded px-3 py-2 text-sm font-mono text-gray-800 select-all">
+                    Loading...
+                  </code>
+                  <button onclick="copySSHCommand()" class="px-3 py-2 rounded bg-gray-200 hover:bg-gray-300 text-sm" title="Copy">
+                    <i class="fas fa-copy"></i>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Download Key Section -->
+              <div class="mb-3">
+                <label class="block text-xs font-medium text-gray-600 mb-1">SSH Private Key</label>
+                <div class="flex items-center gap-2">
+                  <button onclick="downloadSSHKey()" id="download-key-btn"
+                    class="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700 text-sm">
+                    <i class="fas fa-download"></i> Download Key
+                  </button>
+                  <button onclick="regenerateSSHKey()" id="regenerate-key-btn"
+                    class="px-3 py-2 rounded bg-yellow-500 text-white hover:bg-yellow-600 text-sm" title="Generate new key pair">
+                    <i class="fas fa-sync"></i> Regenerate
+                  </button>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">Save the key to <code class="bg-gray-200 px-1">~/.ssh/</code> and set permissions with <code class="bg-gray-200 px-1">chmod 600</code></p>
+              </div>
+
+              <!-- Quick Setup Instructions -->
+              <details class="mt-3">
+                <summary class="cursor-pointer text-sm font-medium text-blue-600 hover:text-blue-800">
+                  <i class="fas fa-info-circle"></i> Setup Instructions
+                </summary>
+                <div class="mt-2 text-xs text-gray-600 space-y-2 bg-white rounded p-3 border">
+                  <p><strong>1. Download your private key</strong> using the button above.</p>
+                  <p><strong>2. Save the key file:</strong></p>
+                  <code class="block bg-gray-100 p-2 rounded">
+                    # Linux/Mac<br>
+                    mv ~/Downloads/<%= user.email.split('@')[0] %>_hydra_key ~/.ssh/<br>
+                    chmod 600 ~/.ssh/<%= user.email.split('@')[0] %>_hydra_key
+                  </code>
+                  <p><strong>3. Connect:</strong></p>
+                  <code id="ssh-setup-command" class="block bg-gray-100 p-2 rounded">
+                    ssh -i ~/.ssh/<%= user.email.split('@')[0] %>_hydra_key student@hydra.newpaltz.edu -p [PORT]
+                  </code>
+                  <p class="text-yellow-600"><i class="fas fa-exclamation-triangle"></i> Windows users: Use PuTTY or Windows Terminal with OpenSSH</p>
+                </div>
+              </details>
+
+              <div id="ssh-message" class="mt-2"></div>
+            </div>
           </div>
         </div>
 
@@ -1107,6 +1181,79 @@
           msg.innerHTML = `<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2">${err.message || 'Failed to wipe container'}</p>`;
         }
       }
+
+      // SSH Access Functions
+      window.toggleSSHDropdown = function() {
+        const dropdown = document.getElementById('ssh-dropdown');
+        dropdown.classList.toggle('hidden');
+        if (!dropdown.classList.contains('hidden')) {
+          loadSSHInfo();
+        }
+      };
+
+      async function loadSSHInfo() {
+        const commandEl = document.getElementById('ssh-command');
+        const setupCommandEl = document.getElementById('ssh-setup-command');
+        const msg = document.getElementById('ssh-message');
+
+        try {
+          const res = await fetch('/dashboard/api/containers/ssh-info');
+          if (handleAuthError(res)) return;
+          const data = await res.json();
+
+          if (!data.success || !data.sshPort) {
+            commandEl.textContent = 'SSH not available - container not initialized';
+            return;
+          }
+
+          commandEl.textContent = data.sshCommand;
+          if (setupCommandEl) {
+            setupCommandEl.textContent = data.sshCommand;
+          }
+
+          // Update status
+          const statusEl = document.getElementById('ssh-service-status');
+          if (statusEl) {
+            statusEl.textContent = `Port ${data.sshPort} • ${data.hasKey ? 'Key available' : 'No key generated'}`;
+          }
+        } catch (err) {
+          console.error('Failed to load SSH info:', err);
+          commandEl.textContent = 'Error loading SSH info';
+        }
+      }
+
+      window.copySSHCommand = function() {
+        const commandEl = document.getElementById('ssh-command');
+        navigator.clipboard.writeText(commandEl.textContent).then(() => {
+          const msg = document.getElementById('ssh-message');
+          msg.innerHTML = '<p class="text-green-600 text-sm"><i class="fas fa-check"></i> Copied to clipboard!</p>';
+          setTimeout(() => { msg.innerHTML = ''; }, 2000);
+        });
+      };
+
+      window.downloadSSHKey = function() {
+        window.location.href = '/dashboard/api/containers/ssh-key';
+      };
+
+      window.regenerateSSHKey = async function() {
+        if (!confirm('Generate new SSH keys? Your old key will no longer work and you will need to download the new key.')) return;
+
+        const msg = document.getElementById('ssh-message');
+        msg.innerHTML = '<p class="text-gray-600"><i class="fas fa-spinner fa-spin"></i> Regenerating keys...</p>';
+
+        try {
+          const res = await fetch('/dashboard/api/containers/ssh-key/regenerate', { method: 'POST' });
+          if (handleAuthError(res)) return;
+          const data = await res.json();
+
+          if (!data.success) throw new Error(data.message || 'Failed');
+
+          msg.innerHTML = '<p class="text-green-600"><i class="fas fa-check"></i> New keys generated! Download your new key below.</p>';
+          loadSSHInfo();
+        } catch (err) {
+          msg.innerHTML = `<p class="text-red-600"><i class="fas fa-exclamation-circle"></i> ${err.message}</p>`;
+        }
+      };
 
       // Resource Configuration Functions
       let resourceConfig = null;

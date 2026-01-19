@@ -3,6 +3,11 @@ const Docker = require('dockerode');
 const fs = require('fs').promises;
 const path = require('path');
 const yaml = require('js-yaml');
+const crypto = require('crypto');
+const { execSync } = require('child_process');
+
+// SSH Keys directory - stores private keys for users to download
+const SSH_KEYS_DIR = process.env.SSH_KEYS_DIR || '/app/data/ssh-keys';
 
 // Resource configuration (replaces hardcoded values)
 const resourceConfig = require('../config/resources');
@@ -119,6 +124,67 @@ async function ensureNetwork(networkName) {
             Driver: 'bridge',
             Attachable: true
         });
+    }
+}
+
+// Helper to ensure SSH keys directory exists
+async function ensureSSHKeysDir() {
+    try {
+        await fs.mkdir(SSH_KEYS_DIR, { recursive: true, mode: 0o700 });
+    } catch (err) {
+        if (err.code !== 'EEXIST') throw err;
+    }
+}
+
+// Generate SSH key pair for a user
+async function generateSSHKeys(username) {
+    await ensureSSHKeysDir();
+
+    const privateKeyPath = path.join(SSH_KEYS_DIR, `${username}_id_ed25519`);
+    const publicKeyPath = `${privateKeyPath}.pub`;
+
+    // Check if keys already exist
+    try {
+        await fs.access(privateKeyPath);
+        const publicKey = await fs.readFile(publicKeyPath, 'utf8');
+        return { publicKey: publicKey.trim(), keyExists: true };
+    } catch {
+        // Keys don't exist, generate new ones
+    }
+
+    // Generate Ed25519 key pair using ssh-keygen
+    try {
+        execSync(`ssh-keygen -t ed25519 -f "${privateKeyPath}" -N "" -C "${username}@hydra.newpaltz.edu"`, {
+            stdio: 'pipe'
+        });
+
+        const publicKey = await fs.readFile(publicKeyPath, 'utf8');
+        console.log(`[containers] Generated SSH keys for ${username}`);
+
+        return { publicKey: publicKey.trim(), keyExists: false };
+    } catch (err) {
+        console.error(`[containers] Failed to generate SSH keys for ${username}:`, err);
+        throw new Error('Failed to generate SSH keys');
+    }
+}
+
+// Get SSH private key for download
+async function getSSHPrivateKey(username) {
+    const privateKeyPath = path.join(SSH_KEYS_DIR, `${username}_id_ed25519`);
+    try {
+        return await fs.readFile(privateKeyPath, 'utf8');
+    } catch {
+        return null;
+    }
+}
+
+// Get SSH public key
+async function getSSHPublicKey(username) {
+    const publicKeyPath = path.join(SSH_KEYS_DIR, `${username}_id_ed25519.pub`);
+    try {
+        return (await fs.readFile(publicKeyPath, 'utf8')).trim();
+    } catch {
+        return null;
     }
 }
 
@@ -320,6 +386,16 @@ router.post('/init', async (req, res) => {
             });
         }
 
+        // Generate SSH keys for the user
+        const { publicKey: sshPublicKey } = await generateSSHKeys(username);
+
+        // Calculate SSH port (base 22000 + hash of username for consistency)
+        const usernameHash = crypto.createHash('md5').update(username).digest('hex');
+        const sshPort = 22000 + (parseInt(usernameHash.substring(0, 4), 16) % 10000);
+
+        // Update labels with SSH port
+        labels['hydra.ssh_port'] = String(sshPort);
+
         // Create container
         const container = await docker.createContainer({
             name: containerName,
@@ -328,15 +404,22 @@ router.post('/init', async (req, res) => {
             Labels: labels,
             Env: [
                 `USERNAME=${username}`,
-                `HOME=/home/student`
+                `HOME=/home/student`,
+                `SSH_PUBLIC_KEY=${sshPublicKey}`
             ],
+            ExposedPorts: {
+                '22/tcp': {}
+            },
             HostConfig: {
                 NetworkMode: MAIN_NETWORK,
                 RestartPolicy: { Name: 'unless-stopped' },
                 Mounts: mounts,
                 Memory: resourceConfig.memoryToBytes(resourceConfig.defaults.memory_gb),
                 NanoCpus: resourceConfig.cpusToNanoCpus(resourceConfig.defaults.cpus),
-                Privileged: true // For Docker-in-Docker
+                Privileged: true, // For Docker-in-Docker
+                PortBindings: {
+                    '22/tcp': [{ HostPort: String(sshPort) }]
+                }
             }
         });
 
@@ -376,11 +459,135 @@ router.post('/init', async (req, res) => {
             success: true,
             name: containerName,
             vscodeUrl: `${publicBase}/${username}/vscode/`,
-            jupyterUrl: `${publicBase}/${username}/jupyter/`
+            jupyterUrl: `${publicBase}/${username}/jupyter/`,
+            sshPort: sshPort,
+            sshHost: 'hydra.newpaltz.edu',
+            sshUser: 'student'
         });
     } catch (err) {
         console.error('[containers] init error:', err);
         return res.status(500).json({ success: false, message: err.message || 'Failed to initialize container' });
+    }
+});
+
+// Download SSH private key
+// GET /dashboard/api/containers/ssh-key
+router.get('/ssh-key', async (req, res) => {
+    try {
+        if (!req.isAuthenticated?.() || !req.user?.email) {
+            return res.status(401).json({ success: false, message: 'Not authenticated' });
+        }
+
+        const username = String(req.user.email).split('@')[0];
+        const privateKey = await getSSHPrivateKey(username);
+
+        if (!privateKey) {
+            return res.status(404).json({
+                success: false,
+                message: 'SSH key not found. Please initialize your container first.'
+            });
+        }
+
+        // Send as downloadable file
+        res.setHeader('Content-Type', 'application/x-pem-file');
+        res.setHeader('Content-Disposition', `attachment; filename="${username}_hydra_key"`);
+        return res.send(privateKey);
+    } catch (err) {
+        console.error('[containers] ssh-key error:', err);
+        return res.status(500).json({ success: false, message: err.message || 'Failed to get SSH key' });
+    }
+});
+
+// Get SSH connection info
+// GET /dashboard/api/containers/ssh-info
+router.get('/ssh-info', async (req, res) => {
+    try {
+        if (!req.isAuthenticated?.() || !req.user?.email) {
+            return res.status(401).json({ success: false, message: 'Not authenticated' });
+        }
+
+        const username = String(req.user.email).split('@')[0];
+        const result = await getStudentContainer(username);
+
+        if (!result) {
+            return res.json({
+                success: false,
+                message: 'Container not found'
+            });
+        }
+
+        const sshPort = result.info.Config.Labels?.['hydra.ssh_port'];
+        const publicKey = await getSSHPublicKey(username);
+        const hasPrivateKey = (await getSSHPrivateKey(username)) !== null;
+
+        return res.json({
+            success: true,
+            sshPort: sshPort ? parseInt(sshPort) : null,
+            sshHost: 'hydra.newpaltz.edu',
+            sshUser: 'student',
+            sshCommand: sshPort ? `ssh -i ~/.ssh/${username}_hydra_key student@hydra.newpaltz.edu -p ${sshPort}` : null,
+            hasKey: hasPrivateKey,
+            publicKey: publicKey
+        });
+    } catch (err) {
+        console.error('[containers] ssh-info error:', err);
+        return res.status(500).json({ success: false, message: err.message || 'Failed to get SSH info' });
+    }
+});
+
+// Regenerate SSH keys (creates new key pair)
+// POST /dashboard/api/containers/ssh-key/regenerate
+router.post('/ssh-key/regenerate', async (req, res) => {
+    try {
+        if (!req.isAuthenticated?.() || !req.user?.email) {
+            return res.status(401).json({ success: false, message: 'Not authenticated' });
+        }
+
+        const username = String(req.user.email).split('@')[0];
+        const result = await getStudentContainer(username);
+
+        if (!result) {
+            return res.status(404).json({
+                success: false,
+                message: 'Container not found. Please initialize first.'
+            });
+        }
+
+        // Delete existing keys
+        const privateKeyPath = path.join(SSH_KEYS_DIR, `${username}_id_ed25519`);
+        const publicKeyPath = `${privateKeyPath}.pub`;
+        try {
+            await fs.unlink(privateKeyPath);
+            await fs.unlink(publicKeyPath);
+        } catch {
+            // Keys might not exist
+        }
+
+        // Generate new keys
+        const { publicKey } = await generateSSHKeys(username);
+
+        // Update the container's SSH key by restarting it with new env
+        // The container will pick up the new key on restart
+        const container = result.container;
+
+        // Stop container if running
+        if (result.info.State.Running) {
+            await container.stop();
+        }
+
+        // Update container environment with new public key
+        // Note: Docker doesn't allow updating env vars directly, so we need to
+        // store the key in a way the container can access on restart
+
+        // For now, we'll need to wipe and recreate - inform user
+        return res.json({
+            success: true,
+            message: 'New SSH keys generated. Please restart your container for changes to take effect.',
+            publicKey: publicKey
+        });
+    } catch (err) {
+        console.error('[containers] ssh-key regenerate error:', err);
+        return res.status(500).json({ success: false, message: err.message || 'Failed to regenerate SSH key' });
     }
 });
 

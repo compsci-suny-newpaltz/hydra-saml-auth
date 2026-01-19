@@ -12,6 +12,8 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./traefik-dynamic:/etc/traefik/dynamic
+      - ./jwt-private.pem:/app/jwt-private.pem:ro
+      - ./jwt-public.pem:/app/jwt-public.pem:ro
     labels:
       # Make the /auth/verify endpoint accessible to Traefik
       - "traefik.enable=true"
