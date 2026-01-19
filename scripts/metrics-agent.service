@@ -1,0 +1,14 @@
+[Unit]
+Description=Hydra Cluster Metrics Agent
+After=network.target docker.service
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/bin/python3 /opt/metrics-agent/metrics-agent.py
+Restart=always
+RestartSec=10
+Environment=METRICS_PORT=9100
+
+[Install]
+WantedBy=multi-user.target
