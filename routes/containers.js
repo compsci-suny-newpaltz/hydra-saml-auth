@@ -770,11 +770,23 @@ router.get('/status', async (req, res) => {
         // ========== DOCKER MODE ==========
         const result = await getStudentContainer(username);
 
+        // Get container config for resource info
+        const { getOrCreateContainerConfig } = require('../services/db-init');
+        const containerConfig = await getOrCreateContainerConfig(username, `student-${username}`);
+
         if (!result) {
             return res.json({
                 success: true,
                 exists: false,
-                state: 'not_created'
+                state: 'not_created',
+                resources: {
+                    cpu: containerConfig.cpus,
+                    memory_gb: containerConfig.memory_gb,
+                    storage_gb: containerConfig.storage_gb,
+                    gpu_count: containerConfig.gpu_count,
+                    node: containerConfig.current_node,
+                    preset: containerConfig.preset_tier
+                }
             });
         }
 
@@ -786,7 +798,15 @@ router.get('/status', async (req, res) => {
             state: info.State.Status,
             running: info.State.Running,
             startedAt: info.State.StartedAt,
-            finishedAt: info.State.FinishedAt
+            finishedAt: info.State.FinishedAt,
+            resources: {
+                cpu: containerConfig.cpus,
+                memory_gb: containerConfig.memory_gb,
+                storage_gb: containerConfig.storage_gb,
+                gpu_count: containerConfig.gpu_count,
+                node: containerConfig.current_node,
+                preset: containerConfig.preset_tier
+            }
         });
     } catch (err) {
         console.error('[containers] status error:', err);

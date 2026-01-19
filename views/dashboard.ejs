@@ -242,6 +242,31 @@
             <h4 class="text-lg font-semibold"><i class="fas fa-server"></i> Container Status</h4>
             <span id="container-state-badge" class="px-3 py-1 rounded text-sm font-medium"></span>
           </div>
+          <!-- Resource Info Display -->
+          <div id="container-resources" class="hidden mb-4 p-3 bg-white rounded border">
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
+              <div class="flex items-center gap-2">
+                <i class="fas fa-microchip text-blue-500"></i>
+                <span><strong id="res-cpu">-</strong> CPU</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <i class="fas fa-memory text-green-500"></i>
+                <span><strong id="res-ram">-</strong> RAM</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <i class="fas fa-hdd text-purple-500"></i>
+                <span><strong id="res-storage">-</strong> Storage</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <i class="fas fa-bolt text-yellow-500"></i>
+                <span><strong id="res-gpu">-</strong> GPU</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <i class="fas fa-server text-gray-500"></i>
+                <span>Node: <strong id="res-node">-</strong></span>
+              </div>
+            </div>
+          </div>
           <div id="container-not-created" class="hidden">
             <p class="text-gray-600 text-sm mb-3">Your student container has not been created yet.</p>
             <button onclick="initContainer()" id="init-btn"
@@ -1068,6 +1093,17 @@
           const servicesSection = document.getElementById('services-section');
           const routingSection = document.getElementById('routing-section');
           const serverStatusSection = document.getElementById('server-status-section');
+          const resourcesSection = document.getElementById('container-resources');
+
+          // Update resource display
+          if (data.resources) {
+            document.getElementById('res-cpu').textContent = data.resources.cpu;
+            document.getElementById('res-ram').textContent = data.resources.memory_gb + 'GB';
+            document.getElementById('res-storage').textContent = data.resources.storage_gb + 'GB';
+            document.getElementById('res-gpu').textContent = data.resources.gpu_count || '0';
+            document.getElementById('res-node').textContent = data.resources.node || 'hydra';
+            resourcesSection.classList.remove('hidden');
+          }
 
           if (!data.exists) {
             // Container not created
