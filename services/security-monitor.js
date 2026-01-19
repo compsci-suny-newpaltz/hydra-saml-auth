@@ -1,50 +1,42 @@
-// services/security-monitor.js - Background security monitoring for student containers
-// Monitors CPU, memory, network usage and detects suspicious activity
+// services/security-monitor.js - Event-driven security monitoring for student containers
+// Uses Docker events stream instead of polling - much more efficient
 // Logs events but only takes action on critical issues
+// Emits events for real-time dashboard notifications
 
 const Docker = require('dockerode');
+const EventEmitter = require('events');
 const runtimeConfig = require('../config/runtime');
 const { logSecurityEvent } = require('./db-init');
 
-// Monitoring interval (60 seconds)
-const MONITOR_INTERVAL = 60000;
+// Event emitter for broadcasting container events to dashboard
+const eventBus = new EventEmitter();
+eventBus.setMaxListeners(100); // Allow many SSE connections
 
-// Thresholds for different severity levels
+// Optional periodic stats check interval (5 minutes) - for mining detection
+// Set to 0 to disable periodic checks entirely
+const STATS_CHECK_INTERVAL = process.env.SECURITY_STATS_INTERVAL
+  ? parseInt(process.env.SECURITY_STATS_INTERVAL)
+  : 300000; // 5 minutes default, 0 to disable
+
+// Thresholds for periodic stats checks
 const THRESHOLDS = {
   cpu: {
-    warning: 80,      // 80% CPU sustained
-    critical: 95      // 95% CPU - potential runaway process
+    warning: 80,
+    critical: 95
   },
   memory: {
-    warning: 85,      // 85% of limit
-    critical: 95      // 95% - risk of OOM
-  },
-  network: {
-    warning: 50,      // 50 MB/min outbound
-    critical: 200     // 200 MB/min - potential mining/exfiltration
+    warning: 85,
+    critical: 95
   }
 };
 
-// Known mining pool indicators
-const MINING_INDICATORS = [
-  /stratum\+tcp/i,
-  /pool\./i,
-  /\.mining\./i,
-  /xmr\./i,
-  /monero/i,
-  /nicehash/i,
-  /nanopool/i
-];
-
-// Common mining ports
-const MINING_PORTS = [3333, 4444, 5555, 7777, 8333, 9999, 14444, 45700];
-
-// Track container stats over time for trend detection
+// Track container stats for trend detection (only used if periodic checks enabled)
 const containerHistory = new Map();
-const HISTORY_SIZE = 5; // Keep last 5 readings
+const HISTORY_SIZE = 5;
 
 let docker = null;
-let monitorTimer = null;
+let eventStream = null;
+let statsTimer = null;
 let isRunning = false;
 
 /**
@@ -52,14 +44,173 @@ let isRunning = false;
  */
 function initDocker() {
   if (docker) return docker;
-
   const socketPath = runtimeConfig.docker?.socketPath || '/var/run/docker.sock';
   docker = new Docker({ socketPath });
   return docker;
 }
 
 /**
- * Get container stats
+ * Handle Docker events
+ */
+async function handleDockerEvent(event) {
+  // Only process container events
+  if (event.Type !== 'container') return;
+
+  // Only process student containers
+  const containerName = event.Actor?.Attributes?.name || '';
+  if (!containerName.startsWith('student-')) return;
+
+  const username = containerName.replace('student-', '');
+  const action = event.Action;
+
+  try {
+    // Build event payload for dashboard notifications
+    const eventPayload = {
+      timestamp: Date.now(),
+      username,
+      containerName,
+      action,
+      type: 'info'
+    };
+
+    switch (action) {
+      case 'oom':
+        // Container ran out of memory
+        await logSecurityEvent({
+          username,
+          container_name: containerName,
+          event_type: 'container_oom',
+          severity: 'critical',
+          description: `Container killed by OOM (Out of Memory)`,
+          metrics: { event: 'oom' },
+          action_taken: 'logged'
+        });
+        eventPayload.type = 'error';
+        eventPayload.message = `OOM: ${username}'s container killed`;
+        console.log(`[security-monitor] OOM event for ${containerName}`);
+        break;
+
+      case 'die':
+        // Container died - check exit code
+        const exitCode = event.Actor?.Attributes?.exitCode;
+        if (exitCode && exitCode !== '0') {
+          const severity = exitCode === '137' || exitCode === '143' ? 'info' : 'warning';
+          await logSecurityEvent({
+            username,
+            container_name: containerName,
+            event_type: 'process_killed',
+            severity,
+            description: `Container exited with code ${exitCode}`,
+            metrics: { exitCode, signal: event.Actor?.Attributes?.signal },
+            action_taken: 'logged'
+          });
+          eventPayload.type = severity === 'warning' ? 'warning' : 'info';
+          eventPayload.message = `Container ${username} exited (code ${exitCode})`;
+        } else {
+          eventPayload.message = `Container ${username} stopped`;
+        }
+        break;
+
+      case 'kill':
+        // Container was killed (SIGKILL, SIGTERM, etc.)
+        const signal = event.Actor?.Attributes?.signal;
+        if (signal === 'SIGKILL') {
+          await logSecurityEvent({
+            username,
+            container_name: containerName,
+            event_type: 'process_killed',
+            severity: 'warning',
+            description: `Container received SIGKILL`,
+            metrics: { signal },
+            action_taken: 'logged'
+          });
+          eventPayload.type = 'warning';
+        }
+        eventPayload.message = `Container ${username} killed (${signal || 'unknown'})`;
+        break;
+
+      case 'start':
+        // Container started - clear history for fresh stats
+        containerHistory.delete(containerName);
+        eventPayload.type = 'success';
+        eventPayload.message = `Container ${username} started`;
+        console.log(`[security-monitor] Container started: ${containerName}`);
+        break;
+
+      case 'stop':
+        // Container stopped - clean up history
+        containerHistory.delete(containerName);
+        eventPayload.message = `Container ${username} stopped`;
+        break;
+
+      default:
+        eventPayload.message = `Container ${username}: ${action}`;
+    }
+
+    // Emit event for SSE clients (dashboard toast notifications)
+    eventBus.emit('container-event', eventPayload);
+  } catch (err) {
+    console.error(`[security-monitor] Error handling event for ${containerName}:`, err.message);
+  }
+}
+
+/**
+ * Start listening to Docker events
+ */
+async function startEventListener() {
+  const dockerClient = initDocker();
+
+  try {
+    // Get event stream with filters for container events only
+    eventStream = await dockerClient.getEvents({
+      filters: {
+        type: ['container'],
+        event: ['oom', 'die', 'kill', 'start', 'stop']
+      }
+    });
+
+    eventStream.on('data', (chunk) => {
+      try {
+        const event = JSON.parse(chunk.toString());
+        // Properly handle async function with error catching
+        handleDockerEvent(event).catch(err => {
+          console.error('[security-monitor] Unhandled error in event handler:', err.message);
+        });
+      } catch (e) {
+        // Ignore parse errors (incomplete chunks)
+      }
+    });
+
+    eventStream.on('error', (err) => {
+      console.error('[security-monitor] Event stream error:', err.message);
+      // Try to reconnect after 5 seconds
+      if (isRunning) {
+        setTimeout(() => {
+          console.log('[security-monitor] Attempting to reconnect event stream...');
+          startEventListener();
+        }, 5000);
+      }
+    });
+
+    eventStream.on('end', () => {
+      console.log('[security-monitor] Event stream ended');
+      if (isRunning) {
+        setTimeout(() => {
+          console.log('[security-monitor] Reconnecting event stream...');
+          startEventListener();
+        }, 1000);
+      }
+    });
+
+    console.log('[security-monitor] Listening to Docker events');
+  } catch (err) {
+    console.error('[security-monitor] Failed to start event listener:', err.message);
+    throw err;
+  }
+}
+
+/**
+ * Get container stats (used for periodic mining detection)
  */
 async function getContainerStats(container) {
   return new Promise((resolve, reject) => {
@@ -75,11 +226,9 @@ async function getContainerStats(container) {
  */
 function calculateCpuPercent(stats) {
   if (!stats.cpu_stats || !stats.precpu_stats) return 0;
-
   const cpuDelta = stats.cpu_stats.cpu_usage.total_usage - stats.precpu_stats.cpu_usage.total_usage;
   const systemDelta = stats.cpu_stats.system_cpu_usage - stats.precpu_stats.system_cpu_usage;
   const cpuCount = stats.cpu_stats.online_cpus || 1;
-
   if (systemDelta > 0 && cpuDelta > 0) {
     return (cpuDelta / systemDelta) * cpuCount * 100;
   }
@@ -91,240 +240,163 @@ function calculateCpuPercent(stats) {
  */
 function calculateMemoryPercent(stats) {
   if (!stats.memory_stats) return 0;
-
   const usage = stats.memory_stats.usage || 0;
   const limit = stats.memory_stats.limit || 1;
-
   return (usage / limit) * 100;
 }
 
 /**
- * Calculate network bytes from Docker stats
+ * Periodic stats check for sustained high usage / mining detection
+ * This runs less frequently (every 5 min) and is optional
  */
-function calculateNetworkBytes(stats) {
-  if (!stats.networks) return { rx: 0, tx: 0 };
-
-  let rx = 0, tx = 0;
-  for (const [, net] of Object.entries(stats.networks)) {
-    rx += net.rx_bytes || 0;
-    tx += net.tx_bytes || 0;
-  }
-
-  return { rx, tx };
-}
-
-/**
- * Detect potential mining behavior
- */
-function detectMiningBehavior(containerName, stats, history) {
-  const cpuPercent = calculateCpuPercent(stats);
-  const network = calculateNetworkBytes(stats);
-
-  // High sustained CPU + network = likely mining
-  if (cpuPercent > 90 && history.length >= 3) {
-    const avgCpu = history.reduce((a, h) => a + h.cpu, 0) / history.length;
-    if (avgCpu > 85) {
-      // Calculate network rate
-      const oldestNetwork = history[0].network;
-      const timeDiff = (Date.now() - history[0].timestamp) / 1000; // seconds
-      const txRate = (network.tx - oldestNetwork.tx) / timeDiff; // bytes/sec
-      const txMBPerMin = (txRate * 60) / (1024 * 1024);
-
-      if (txMBPerMin > 10) { // 10 MB/min sustained with high CPU
-        return {
-          detected: true,
-          confidence: 'high',
-          avgCpu,
-          txMBPerMin: Math.round(txMBPerMin * 10) / 10
-        };
-      }
-    }
-  }
-
-  return { detected: false };
-}
-
-/**
- * Check a single container for security issues
- */
-async function checkContainer(container, containerInfo) {
-  const containerName = containerInfo.Names[0]?.replace('/', '') || containerInfo.Id.slice(0, 12);
-
-  // Only monitor student containers
-  if (!containerName.startsWith('student-')) {
-    return [];
-  }
-
-  const username = containerName.replace('student-', '');
-  const events = [];
-
-  try {
-    const stats = await getContainerStats(container);
-
-    const cpuPercent = calculateCpuPercent(stats);
-    const memPercent = calculateMemoryPercent(stats);
-    const network = calculateNetworkBytes(stats);
-
-    // Update history
-    let history = containerHistory.get(containerName) || [];
-    history.push({
-      timestamp: Date.now(),
-      cpu: cpuPercent,
-      memory: memPercent,
-      network
-    });
-    if (history.length > HISTORY_SIZE) {
-      history = history.slice(-HISTORY_SIZE);
-    }
-    containerHistory.set(containerName, history);
-
-    const metrics = {
-      cpu_percent: Math.round(cpuPercent * 10) / 10,
-      memory_percent: Math.round(memPercent * 10) / 10,
-      memory_usage_mb: Math.round((stats.memory_stats?.usage || 0) / (1024 * 1024)),
-      memory_limit_mb: Math.round((stats.memory_stats?.limit || 0) / (1024 * 1024)),
-      network_rx_mb: Math.round(network.rx / (1024 * 1024)),
-      network_tx_mb: Math.round(network.tx / (1024 * 1024))
-    };
-
-    // CPU checks
-    if (cpuPercent >= THRESHOLDS.cpu.critical) {
-      events.push({
-        username,
-        container_name: containerName,
-        event_type: 'high_cpu',
-        severity: 'critical',
-        description: `CPU at ${metrics.cpu_percent}% (critical threshold: ${THRESHOLDS.cpu.critical}%)`,
-        metrics,
-        action_taken: 'logged'
-      });
-    } else if (cpuPercent >= THRESHOLDS.cpu.warning) {
-      events.push({
-        username,
-        container_name: containerName,
-        event_type: 'high_cpu',
-        severity: 'warning',
-        description: `CPU at ${metrics.cpu_percent}% (warning threshold: ${THRESHOLDS.cpu.warning}%)`,
-        metrics,
-        action_taken: 'logged'
-      });
-    }
-
-    // Memory checks
-    if (memPercent >= THRESHOLDS.memory.critical) {
-      events.push({
-        username,
-        container_name: containerName,
-        event_type: 'high_memory',
-        severity: 'critical',
-        description: `Memory at ${metrics.memory_percent}% of limit (${metrics.memory_usage_mb}MB / ${metrics.memory_limit_mb}MB)`,
-        metrics,
-        action_taken: 'logged'
-      });
-    } else if (memPercent >= THRESHOLDS.memory.warning) {
-      events.push({
-        username,
-        container_name: containerName,
-        event_type: 'high_memory',
-        severity: 'warning',
-        description: `Memory at ${metrics.memory_percent}% of limit (${metrics.memory_usage_mb}MB / ${metrics.memory_limit_mb}MB)`,
-        metrics,
-        action_taken: 'logged'
-      });
-    }
-
-    // Mining detection
-    const miningCheck = detectMiningBehavior(containerName, stats, history);
-    if (miningCheck.detected) {
-      events.push({
-        username,
-        container_name: containerName,
-        event_type: 'mining_detected',
-        severity: 'critical',
-        description: `Potential cryptocurrency mining detected: ${miningCheck.avgCpu.toFixed(1)}% avg CPU with ${miningCheck.txMBPerMin}MB/min network`,
-        metrics: { ...metrics, detection: miningCheck },
-        action_taken: 'alerted'
-      });
-    }
-
-  } catch (err) {
-    // Container might have stopped, that's OK
-    if (!err.message?.includes('is not running')) {
-      console.error(`[security-monitor] Error checking ${containerName}:`, err.message);
-    }
-  }
-
-  return events;
-}
-
-/**
- * Run a full security scan of all containers
- */
-async function runSecurityScan() {
+async function runPeriodicStatsCheck() {
   if (!isRunning) return;
 
   try {
     const dockerClient = initDocker();
-    const containers = await dockerClient.listContainers({ all: false }); // Only running
-
-    let totalEvents = 0;
+    const containers = await dockerClient.listContainers({ all: false });
 
     for (const containerInfo of containers) {
-      const container = dockerClient.getContainer(containerInfo.Id);
-      const events = await checkContainer(container, containerInfo);
+      const containerName = containerInfo.Names[0]?.replace('/', '') || '';
+      if (!containerName.startsWith('student-')) continue;
 
-      for (const event of events) {
-        await logSecurityEvent(event);
-        totalEvents++;
+      const username = containerName.replace('student-', '');
+
+      try {
+        const container = dockerClient.getContainer(containerInfo.Id);
+        const stats = await getContainerStats(container);
+
+        const cpuPercent = calculateCpuPercent(stats);
+        const memPercent = calculateMemoryPercent(stats);
+
+        // Update history
+        let history = containerHistory.get(containerName) || [];
+        history.push({ timestamp: Date.now(), cpu: cpuPercent, memory: memPercent });
+        if (history.length > HISTORY_SIZE) {
+          history = history.slice(-HISTORY_SIZE);
+        }
+        containerHistory.set(containerName, history);
+
+        // Check for sustained high CPU (potential mining)
+        if (history.length >= 3) {
+          const avgCpu = history.reduce((a, h) => a + h.cpu, 0) / history.length;
+          if (avgCpu >= THRESHOLDS.cpu.critical) {
+            await logSecurityEvent({
+              username,
+              container_name: containerName,
+              event_type: 'mining_detected',
+              severity: 'critical',
+              description: `Sustained high CPU: ${avgCpu.toFixed(1)}% average over ${history.length} checks`,
+              metrics: { avgCpu: Math.round(avgCpu), currentCpu: Math.round(cpuPercent) },
+              action_taken: 'alerted'
+            });
+          } else if (avgCpu >= THRESHOLDS.cpu.warning) {
+            await logSecurityEvent({
+              username,
+              container_name: containerName,
+              event_type: 'high_cpu',
+              severity: 'warning',
+              description: `High CPU usage: ${avgCpu.toFixed(1)}% average`,
+              metrics: { avgCpu: Math.round(avgCpu), currentCpu: Math.round(cpuPercent) },
+              action_taken: 'logged'
+            });
+          }
+        }
+
+        // Check high memory (close to limit) - check both thresholds with appropriate severities
+        if (memPercent >= THRESHOLDS.memory.critical) {
+          await logSecurityEvent({
+            username,
+            container_name: containerName,
+            event_type: 'high_memory',
+            severity: 'critical',
+            description: `Critical memory usage: ${memPercent.toFixed(1)}% of limit`,
+            metrics: { memoryPercent: Math.round(memPercent) },
+            action_taken: 'alerted'
+          });
+        } else if (memPercent >= THRESHOLDS.memory.warning) {
+          await logSecurityEvent({
+            username,
+            container_name: containerName,
+            event_type: 'high_memory',
+            severity: 'warning',
+            description: `High memory usage: ${memPercent.toFixed(1)}% of limit`,
+            metrics: { memoryPercent: Math.round(memPercent) },
+            action_taken: 'logged'
+          });
+        }
+
+      } catch (err) {
+        // Container might have stopped
+        if (!err.message?.includes('is not running')) {
+          console.error(`[security-monitor] Stats error for ${containerName}:`, err.message);
+        }
       }
     }
-
-    if (totalEvents > 0) {
-      console.log(`[security-monitor] Scan complete: ${totalEvents} security events logged`);
-    }
-
   } catch (err) {
-    console.error('[security-monitor] Scan error:', err.message);
+    console.error('[security-monitor] Periodic check error:', err.message);
   }
 }
 
 /**
  * Start the security monitoring service
  */
-function start() {
+async function start() {
   if (isRunning) {
     console.log('[security-monitor] Already running');
     return;
   }
 
-  console.log('[security-monitor] Starting security monitoring service');
-  console.log('[security-monitor] Thresholds:', JSON.stringify(THRESHOLDS, null, 2));
+  console.log('[security-monitor] Starting event-driven security monitor');
   isRunning = true;
 
-  // Run first scan after a short delay
-  setTimeout(runSecurityScan, 5000);
+  try {
+    // Start Docker event listener
+    await startEventListener();
 
-  // Then run periodically
-  monitorTimer = setInterval(runSecurityScan, MONITOR_INTERVAL);
+    // Start periodic stats check if enabled
+    if (STATS_CHECK_INTERVAL > 0) {
+      console.log(`[security-monitor] Periodic stats check every ${STATS_CHECK_INTERVAL / 1000}s`);
+      statsTimer = setInterval(runPeriodicStatsCheck, STATS_CHECK_INTERVAL);
+      // Run first check after 30 seconds
+      setTimeout(runPeriodicStatsCheck, 30000);
+    } else {
+      console.log('[security-monitor] Periodic stats check disabled');
+    }
+
+    console.log('[security-monitor] Started successfully');
+  } catch (err) {
+    console.error('[security-monitor] Failed to start:', err.message);
+    isRunning = false;
+    throw err;
+  }
 }
 
 /**
  * Stop the security monitoring service
  */
 function stop() {
-  if (monitorTimer) {
-    clearInterval(monitorTimer);
-    monitorTimer = null;
-  }
   isRunning = false;
+
+  if (eventStream) {
+    eventStream.destroy();
+    eventStream = null;
+  }
+
+  if (statsTimer) {
+    clearInterval(statsTimer);
+    statsTimer = null;
+  }
+
+  containerHistory.clear();
   console.log('[security-monitor] Stopped');
 }
 
 /**
- * Force an immediate security scan
+ * Force an immediate stats check
  */
 async function forceScan() {
-  await runSecurityScan();
+  await runPeriodicStatsCheck();
 }
 
 /**
@@ -333,7 +405,11 @@ async function forceScan() {
 function getStatus() {
   return {
     running: isRunning,
-    containersMonitored: containerHistory.size,
+    mode: 'event-driven',
+    eventStreamConnected: eventStream !== null,
+    periodicStatsEnabled: STATS_CHECK_INTERVAL > 0,
+    periodicStatsInterval: STATS_CHECK_INTERVAL,
+    containersTracked: containerHistory.size,
     thresholds: THRESHOLDS
   };
 }
@@ -343,5 +419,6 @@ module.exports = {
   stop,
   forceScan,
   getStatus,
-  THRESHOLDS
+  THRESHOLDS,
+  eventBus // For SSE dashboard notifications
 };

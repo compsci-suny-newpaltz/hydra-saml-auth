@@ -514,49 +514,62 @@ router.get('/services', async (req, res) => {
             return res.json({ success: true, services: [], containerRunning: false });
         }
 
-        // Execute supervisorctl status
-        const exec = await container.exec({
-            Cmd: ['supervisorctl', 'status'],
-            AttachStdout: true,
-            AttachStderr: true
-        });
+        // Execute supervisorctl status (may not exist in minimal containers)
+        try {
+            const exec = await container.exec({
+                Cmd: ['supervisorctl', 'status'],
+                AttachStdout: true,
+                AttachStderr: true
+            });
 
-        const stream = await exec.start({ Detach: false, Tty: false });
+            const stream = await exec.start({ Detach: false, Tty: false });
 
-        let output = '';
-        stream.on('data', (chunk) => {
-            // Strip Docker stream header (first 8 bytes)
-            if (chunk.length > 8) {
-                output += chunk.slice(8).toString('utf8');
+            let output = '';
+            stream.on('data', (chunk) => {
+                // Strip Docker stream header (first 8 bytes)
+                if (chunk.length > 8) {
+                    output += chunk.slice(8).toString('utf8');
+                }
+            });
+
+            await new Promise((resolve, reject) => {
+                stream.on('end', resolve);
+                stream.on('error', reject);
+            });
+
+            // Check if supervisorctl execution failed (command not found)
+            const execResult = await exec.inspect();
+            if (execResult.ExitCode !== 0 && output.includes('not found')) {
+                // No supervisor - container manages its own processes
+                return res.json({ success: true, services: [], containerRunning: true, noSupervisor: true });
             }
-        });
 
-        await new Promise((resolve, reject) => {
-            stream.on('end', resolve);
-            stream.on('error', reject);
-        });
+            // Parse supervisorctl output
+            // Format: "program_name    STATE    pid 123, uptime 1:23:45"
+            const services = [];
+            const lines = output.trim().split('\n');
 
-        // Parse supervisorctl output
-        // Format: "program_name    STATE    pid 123, uptime 1:23:45"
-        const services = [];
-        const lines = output.trim().split('\n');
-
-        for (const line of lines) {
-            const match = line.match(/^(\S+)\s+(\S+)/);
-            if (match) {
-                const [, name, state] = match;
-                // Only include code-server and jupyter
-                if (name === 'code-server' || name === 'jupyter') {
-                    services.push({
-                        name,
-                        running: state === 'RUNNING',
-                        state
-                    });
+            for (const line of lines) {
+                const match = line.match(/^(\S+)\s+(\S+)/);
+                if (match) {
+                    const [, name, state] = match;
+                    // Only include code-server and jupyter
+                    if (name === 'code-server' || name === 'jupyter') {
+                        services.push({
+                            name,
+                            running: state === 'RUNNING',
+                            state
+                        });
+                    }
                 }
             }
-        }
 
-        return res.json({ success: true, services, containerRunning: true });
+            return res.json({ success: true, services, containerRunning: true });
+        } catch (execErr) {
+            // supervisorctl not available - container manages its own processes
+            console.log('[containers] supervisorctl not available:', execErr.message);
+            return res.json({ success: true, services: [], containerRunning: true, noSupervisor: true });
+        }
     } catch (err) {
         console.error('[containers] services error:', err);
         return res.status(500).json({ success: false, message: 'Failed to get service status' });
@@ -596,12 +609,35 @@ router.post('/services/:service/start', async (req, res) => {
             AttachStderr: true
         });
 
-        await exec.start({ Detach: false, Tty: false });
+        const stream = await exec.start({ Detach: false, Tty: false });
+
+        // Collect output
+        let output = '';
+        await new Promise((resolve, reject) => {
+            stream.on('data', (chunk) => { output += chunk.toString(); });
+            stream.on('end', resolve);
+            stream.on('error', reject);
+        });
+
+        // Check exec result
+        const inspectResult = await exec.inspect();
+        if (inspectResult.ExitCode !== 0) {
+            console.error('[containers] supervisorctl start failed:', output);
+            // Check if supervisorctl doesn't exist
+            if (output.includes('not found') || output.includes('No such file')) {
+                return res.status(400).json({ success: false, message: 'Service management not available in this container' });
+            }
+            return res.status(500).json({ success: false, message: output.trim() || 'Service start failed' });
+        }
 
         return res.json({ success: true });
     } catch (err) {
         console.error('[containers] start service error:', err);
-        return res.status(500).json({ success: false, message: 'Failed to start service' });
+        // Check if it's a command not found error
+        if (err.message && (err.message.includes('not found') || err.message.includes('No such file'))) {
+            return res.status(400).json({ success: false, message: 'Service management not available in this container' });
+        }
+        return res.status(500).json({ success: false, message: err.message || 'Failed to start service' });
     }
 });
 
@@ -631,19 +667,42 @@ router.post('/services/:service/stop', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Container not running' });
         }
 
-        // Execute supervisorctl stop
+        // Execute supervisorctl stop (may not exist in minimal containers)
         const exec = await container.exec({
             Cmd: ['supervisorctl', 'stop', serviceName],
             AttachStdout: true,
             AttachStderr: true
         });
 
-        await exec.start({ Detach: false, Tty: false });
+        const stream = await exec.start({ Detach: false, Tty: false });
+
+        // Collect output
+        let output = '';
+        await new Promise((resolve, reject) => {
+            stream.on('data', (chunk) => { output += chunk.toString(); });
+            stream.on('end', resolve);
+            stream.on('error', reject);
+        });
+
+        // Check exec result
+        const inspectResult = await exec.inspect();
+        if (inspectResult.ExitCode !== 0) {
+            console.error('[containers] supervisorctl stop failed:', output);
+            // Check if supervisorctl doesn't exist
+            if (output.includes('not found') || output.includes('No such file')) {
+                return res.status(400).json({ success: false, message: 'Service management not available in this container' });
+            }
+            return res.status(500).json({ success: false, message: output.trim() || 'Service stop failed' });
+        }
 
         return res.json({ success: true });
     } catch (err) {
         console.error('[containers] stop service error:', err);
-        return res.status(500).json({ success: false, message: 'Failed to stop service' });
+        // Check if it's a command not found error
+        if (err.message && (err.message.includes('not found') || err.message.includes('No such file'))) {
+            return res.status(400).json({ success: false, message: 'Service management not available in this container' });
+        }
+        return res.status(500).json({ success: false, message: err.message || 'Failed to stop service' });
     }
 });
 

@@ -333,7 +333,7 @@ const ensureAuthenticated = (req, res, next) =>
 
         // Security / compat
         identifierFormat: null,
-        validateInResponseTo: true,
+        validateInResponseTo: false, // Disabled for mock IdP compatibility
         disableRequestedAuthnContext: true,
         acceptedClockSkewMs: 2 * 60 * 1000,
         wantAssertionsSigned: true,
@@ -612,7 +612,10 @@ const ensureAuthenticated = (req, res, next) =>
         displayName: req.user.display_name || req.user.name || req.user.email || '',
         oid: req.user.oid || req.user.id || ''
       };
-      const isAdmin = ADMIN_USERS.includes((req.user.email || '').toLowerCase());
+      // Admin = faculty affiliation OR in whitelist
+      const isFaculty = (req.user.affiliation || '').toLowerCase() === 'faculty';
+      const isWhitelisted = ADMIN_USERS.includes((req.user.email || '').toLowerCase());
+      const isAdmin = isFaculty || isWhitelisted;
       res.render('dashboard', { user: viewUser, baseUrl: BASE_URL, isAdmin });
     });
 
@@ -677,8 +680,39 @@ const ensureAuthenticated = (req, res, next) =>
     // Start security monitoring service
     try {
       const securityMonitor = require('./services/security-monitor');
-      securityMonitor.start();
+      await securityMonitor.start();
       console.log('[Init] Security monitor started');
+
+      // SSE endpoint for container events (admin only)
+      app.get('/api/events/containers', ensureAuthenticated, (req, res) => {
+        // Only admins can subscribe to container events (faculty OR whitelist)
+        const isFaculty = (req.user.affiliation || '').toLowerCase() === 'faculty';
+        const isWhitelisted = ADMIN_USERS.includes((req.user.email || '').toLowerCase());
+        if (!isFaculty && !isWhitelisted) {
+          return res.status(403).json({ error: 'Admin access required' });
+        }
+
+        // Set up SSE headers
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        res.flushHeaders();
+
+        // Send initial connection message
+        res.write(`data: ${JSON.stringify({ type: 'connected', message: 'Container events stream connected' })}\n\n`);
+
+        // Listen for container events
+        const onContainerEvent = (event) => {
+          res.write(`data: ${JSON.stringify(event)}\n\n`);
+        };
+
+        securityMonitor.eventBus.on('container-event', onContainerEvent);
+
+        // Clean up on disconnect
+        req.on('close', () => {
+          securityMonitor.eventBus.off('container-event', onContainerEvent);
+        });
+      });
     } catch (e) {
       console.warn('[Init] security-monitor service not started:', e?.message || e);
     }
