@@ -677,6 +677,15 @@ const ensureAuthenticated = (req, res, next) =>
       console.warn('[Init] metrics-collector service not started:', e?.message || e);
     }
 
+    // Start resource expiry checker service
+    try {
+      const resourceExpiry = require('./services/resource-expiry');
+      resourceExpiry.start();
+      console.log('[Init] Resource expiry checker started');
+    } catch (e) {
+      console.warn('[Init] resource-expiry service not started:', e?.message || e);
+    }
+
     // Start security monitoring service
     try {
       const securityMonitor = require('./services/security-monitor');
