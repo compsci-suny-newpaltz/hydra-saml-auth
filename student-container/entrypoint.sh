@@ -4,6 +4,27 @@ set -e
 # Create log directory
 mkdir -p /var/log/supervisor
 
+# Set SSH password for student user if provided
+if [ -n "$SSH_PASSWORD" ]; then
+    echo "student:$SSH_PASSWORD" | chpasswd
+    echo "SSH password configured for student user"
+fi
+
+# Setup SSH authorized_keys if provided
+if [ -n "$SSH_PUBLIC_KEY" ]; then
+    mkdir -p /home/student/.ssh
+    echo "$SSH_PUBLIC_KEY" > /home/student/.ssh/authorized_keys
+    chmod 700 /home/student/.ssh
+    chmod 600 /home/student/.ssh/authorized_keys
+    chown -R student:student /home/student/.ssh
+    echo "SSH public key configured"
+fi
+
+# Ensure SSH host keys exist
+if [ ! -f /etc/ssh/ssh_host_rsa_key ]; then
+    ssh-keygen -A
+fi
+
 # Ensure .local directory structure exists with proper permissions
 # This is needed for both code-server and Jupyter on mounted volumes
 mkdir -p /home/student/.local/share/code-server/User

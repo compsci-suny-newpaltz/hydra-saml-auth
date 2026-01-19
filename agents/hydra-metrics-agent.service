@@ -1,0 +1,23 @@
+[Unit]
+Description=Hydra Cluster Metrics Agent
+After=network.target docker.service
+Wants=docker.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/hydra-metrics
+ExecStart=/usr/bin/node /opt/hydra-metrics/metrics-agent.js
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=hydra-metrics
+
+# Environment variables
+Environment=NODE_NAME=%H
+Environment=NODE_ROLE=worker
+Environment=PORT=9100
+
+[Install]
+WantedBy=multi-user.target
