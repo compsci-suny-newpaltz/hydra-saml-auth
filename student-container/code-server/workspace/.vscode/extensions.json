@@ -1,0 +1,40 @@
+{
+  "recommendations": [
+    // === PRE-INSTALLED (Core) ===
+    // These are already installed - listed for reference
+    "llvm-vs-code-extensions.vscode-clangd",
+    "ms-python.python",
+    "formulahendry.code-runner",
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+
+    // === INSTALL ON DEMAND (Heavy) ===
+    // Click to install when needed - saves memory
+
+    // Java Development
+    "vscjava.vscode-java-pack",
+    "vscjava.vscode-gradle",
+    "vscjava.vscode-maven",
+
+    // LaTeX
+    "James-Yu.latex-workshop",
+
+    // Web Development
+    "Vue.volar",
+    "dsznajder.es7-react-js-snippets",
+    "ritwickdey.liveserver",
+    "ecmel.vscode-html-css",
+
+    // PHP
+    "bmewburn.vscode-intelephense-client",
+
+    // Docker
+    "ms-azuretools.vscode-docker",
+
+    // Other Tools
+    "ms-vscode.hexeditor",
+    "github.vscode-github-actions",
+    "christian-kohler.path-intellisense"
+  ],
+  "unwantedRecommendations": []
+}

@@ -111,6 +111,7 @@ RUN curl -fsSL https://code-server.dev/install.sh | sh && \
 # Copy extension list and settings
 COPY code-server/extensions.txt /tmp/extensions.txt
 COPY code-server/settings.json /tmp/default-settings.json
+COPY code-server/workspace/.vscode /tmp/default-vscode
 
 # Install VS Code extensions (skip comments/empty lines, continue on failure)
 RUN while IFS= read -r ext || [ -n "$ext" ]; do \
@@ -151,7 +152,10 @@ USER root
 # Setup /etc/skel for fresh volumes and supervisor config
 # Copy settings and extensions to skel so they persist on mounted volumes
 RUN mkdir -p /etc/skel/.local/share/code-server/User && \
+    mkdir -p /etc/skel/.vscode && \
     cp /tmp/default-settings.json /etc/skel/.local/share/code-server/User/settings.json && \
+    # Copy .vscode with extension recommendations
+    cp -r /tmp/default-vscode/* /etc/skel/.vscode/ && \
     # Copy installed extensions to skel
     cp -r /home/student/.local/share/code-server/extensions /etc/skel/.local/share/code-server/ && \
     rm -rf /tmp/*
