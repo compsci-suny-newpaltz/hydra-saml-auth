@@ -26,6 +26,7 @@ module.exports = {
     chimera: {
       role: 'inference',
       label: 'Chimera (GPU Inference)',
+      description: 'Reserved for OpenWebUI and inference workloads. For GPU training, use Cerberus instead.',
       host: process.env.CHIMERA_HOST || '192.168.1.150',
       dockerSocket: process.env.CHIMERA_DOCKER_SOCKET || 'tcp://192.168.1.150:2376',
       maxContainers: 20,
@@ -38,6 +39,9 @@ module.exports = {
       network: 'chimera_students_net',
       nfsPath: '/mnt/hydra-nfs',
       requiresApproval: true,
+      // OpenWebUI and Ollama run here - prioritize inference over student containers
+      reservedForOpenWebUI: true,
+      openwebuiGpuReserved: 1, // Reserve 1 GPU for OpenWebUI/Ollama
       // Kubernetes configuration
       k8s: {
         nodeSelector: {
@@ -53,6 +57,7 @@ module.exports = {
     cerberus: {
       role: 'training',
       label: 'Cerberus (GPU Training)',
+      description: 'Recommended for student GPU work and training. Chimera is reserved for OpenWebUI.',
       host: process.env.CERBERUS_HOST || '192.168.1.242',
       dockerSocket: process.env.CERBERUS_DOCKER_SOCKET || 'tcp://192.168.1.242:2376',
       maxContainers: 10,
@@ -65,6 +70,8 @@ module.exports = {
       network: 'cerberus_students_net',
       nfsPath: '/mnt/hydra-nfs',
       requiresApproval: true,
+      // Preferred node for student GPU work - Chimera reserved for OpenWebUI
+      preferredForGpuWork: true,
       // Kubernetes configuration
       k8s: {
         nodeSelector: {
@@ -133,24 +140,27 @@ module.exports = {
     gpu_inference: {
       id: 'gpu_inference',
       label: 'GPU Inference',
-      description: 'For Chimera - GPU-enabled inference workloads',
+      description: 'Limited availability - Chimera prioritized for OpenWebUI. Consider Cerberus for GPU work.',
       memory_gb: 32,
       cpus: 8,
       storage_gb: 100,
       gpu_count: 1,
       autoApproveOnHydra: false,
-      allowedNodes: ['chimera']
+      allowedNodes: ['chimera'],
+      warning: 'Chimera GPUs are shared with OpenWebUI. For dedicated GPU access, use Cerberus (gpu_training).'
     },
     gpu_training: {
       id: 'gpu_training',
-      label: 'GPU Training',
-      description: 'For Cerberus - Large model training',
+      label: 'GPU Training (Recommended)',
+      description: 'Cerberus - Recommended for student GPU work. RTX 5090 with 32GB VRAM.',
       memory_gb: 48,
       cpus: 16,
       storage_gb: 200,
       gpu_count: 2,
       autoApproveOnHydra: false,
-      allowedNodes: ['cerberus']
+      allowedNodes: ['cerberus'],
+      recommended: true,
+      note: 'Use Cerberus for GPU work - Chimera is reserved for OpenWebUI inference.'
     }
   },
 
