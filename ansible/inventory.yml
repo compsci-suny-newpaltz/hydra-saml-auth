@@ -16,7 +16,7 @@ all:
     service_cidr: "10.43.0.0/16"
 
     # NFS settings for cross-node storage
-    nfs_server: "192.168.1.100"  # Hydra's IP
+    nfs_server: "192.168.1.160"  # Hydra's IP
     nfs_path: "/srv/hydra-nfs"
 
   children:
@@ -24,7 +24,8 @@ all:
     control_plane:
       hosts:
         hydra:
-          ansible_host: 192.168.1.100
+          ansible_host: 192.168.1.160
+          ansible_connection: local
           node_role: control-plane
           node_labels:
             hydra.node-role: control-plane
