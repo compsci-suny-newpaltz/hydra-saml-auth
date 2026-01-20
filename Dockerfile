@@ -9,9 +9,10 @@ FROM node:18-slim
 # Install minimal runtime tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
     dumb-init \
+    openssh-client \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/* \
-  && mkdir -p /app/cert
+  && mkdir -p /app/cert /app/data/ssh-keys
 
 WORKDIR /app
 
