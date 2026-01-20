@@ -266,6 +266,19 @@
                 <span>Node: <strong id="res-node">-</strong></span>
               </div>
             </div>
+            <!-- Migration Banner -->
+            <div id="migration-banner" class="hidden mt-3 p-3 bg-gradient-to-r from-purple-50 to-blue-50 rounded border border-purple-200">
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="font-medium text-purple-800"><i class="fas fa-rocket mr-2"></i>GPU Resources Approved!</p>
+                  <p class="text-sm text-purple-600">Ready to migrate to <strong id="migrate-target-node">Cerberus</strong> with <strong id="migrate-gpu-count">2</strong> GPU(s)</p>
+                </div>
+                <button onclick="migrateContainer()" id="migrate-btn"
+                  class="px-4 py-2 rounded bg-purple-600 text-white hover:bg-purple-700 font-medium">
+                  <i class="fas fa-exchange-alt mr-1"></i> Migrate Now
+                </button>
+              </div>
+            </div>
           </div>
           <div id="container-not-created" class="hidden">
             <p class="text-gray-600 text-sm mb-3">Your student container has not been created yet.</p>
@@ -1103,6 +1116,19 @@
             document.getElementById('res-gpu').textContent = data.resources.gpu_count || '0';
             document.getElementById('res-node').textContent = data.resources.node || 'hydra';
             resourcesSection.classList.remove('hidden');
+
+            // Show migration banner if approved for GPU node but not yet migrated
+            const migrationBanner = document.getElementById('migration-banner');
+            if (data.resources.approved_target_node && data.resources.gpu_count > 0) {
+              document.getElementById('migrate-target-node').textContent =
+                data.resources.approved_target_node.charAt(0).toUpperCase() + data.resources.approved_target_node.slice(1);
+              document.getElementById('migrate-gpu-count').textContent = data.resources.gpu_count;
+              migrationBanner.classList.remove('hidden');
+              // Store target node for migration function
+              window.approvedTargetNode = data.resources.approved_target_node;
+            } else {
+              migrationBanner.classList.add('hidden');
+            }
           }
 
           if (!data.exists) {
@@ -1224,6 +1250,78 @@
           msg.innerHTML = `<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2">${err.message || 'Failed to wipe container'}</p>`;
         }
       }
+
+      // GPU Migration Function
+      window.migrateContainer = async function() {
+        const targetNode = window.approvedTargetNode;
+        if (!targetNode) {
+          alert('No approved target node found. Please wait for admin approval.');
+          return;
+        }
+
+        const confirmed = confirm(
+          `This will migrate your container to ${targetNode} with GPU access.\n\n` +
+          `Your container will be stopped on the current node and recreated on ${targetNode}.\n` +
+          `All your files will be preserved.\n\n` +
+          `This may take a few minutes. Continue?`
+        );
+
+        if (!confirmed) return;
+
+        const msg = document.getElementById('container-message');
+        const migrateBtn = document.getElementById('migrate-btn');
+
+        // Disable button and show progress
+        if (migrateBtn) {
+          migrateBtn.disabled = true;
+          migrateBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Migrating...';
+        }
+        msg.innerHTML = '<p class="text-blue-600 bg-blue-50 border border-blue-200 rounded p-2"><i class="fas fa-sync fa-spin mr-2"></i>Migrating container to GPU node... This may take a few minutes.</p>';
+
+        try {
+          const res = await fetch('/dashboard/api/containers/migrate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ target_node: targetNode })
+          });
+
+          if (handleAuthError(res)) return;
+          const data = await res.json();
+
+          if (!res.ok || !data.success) {
+            throw new Error(data.message || 'Migration failed');
+          }
+
+          msg.innerHTML = `
+            <p class="text-green-700 bg-green-100 border border-green-200 rounded p-2">
+              <i class="fas fa-check-circle mr-2"></i>
+              Container successfully migrated to ${targetNode}!
+              ${data.gpu_count ? `<br><small class="text-green-600">${data.gpu_count} GPU(s) now available</small>` : ''}
+            </p>
+          `;
+
+          // Hide migration banner after successful migration
+          const migrationBanner = document.getElementById('migration-banner');
+          if (migrationBanner) {
+            migrationBanner.classList.add('hidden');
+          }
+
+          // Refresh container status
+          setTimeout(() => {
+            msg.innerHTML = '';
+            loadContainerStatus();
+          }, 3000);
+
+        } catch (err) {
+          msg.innerHTML = `<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2"><i class="fas fa-exclamation-triangle mr-2"></i>${err.message || 'Failed to migrate container'}</p>`;
+
+          // Re-enable button on error
+          if (migrateBtn) {
+            migrateBtn.disabled = false;
+            migrateBtn.innerHTML = '<i class="fas fa-rocket mr-2"></i>Migrate Now';
+          }
+        }
+      };
 
       // Jupyter Execution Approval Functions
       let jupyterExecutionApproved = false;

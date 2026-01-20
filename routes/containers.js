@@ -771,8 +771,17 @@ router.get('/status', async (req, res) => {
         const result = await getStudentContainer(username);
 
         // Get container config for resource info
-        const { getOrCreateContainerConfig } = require('../services/db-init');
+        const { getOrCreateContainerConfig, getOrCreateUserQuota } = require('../services/db-init');
         const containerConfig = await getOrCreateContainerConfig(username, `student-${username}`);
+        const userQuota = await getOrCreateUserQuota(username, req.user.email);
+
+        // Check if user has approved GPU access to a different node
+        let approvedTargetNode = null;
+        if (userQuota.cerberus_approved && containerConfig.current_node !== 'cerberus') {
+            approvedTargetNode = 'cerberus';
+        } else if (userQuota.chimera_approved && containerConfig.current_node !== 'chimera') {
+            approvedTargetNode = 'chimera';
+        }
 
         if (!result) {
             return res.json({
@@ -785,7 +794,8 @@ router.get('/status', async (req, res) => {
                     storage_gb: containerConfig.storage_gb,
                     gpu_count: containerConfig.gpu_count,
                     node: containerConfig.current_node,
-                    preset: containerConfig.preset_tier
+                    preset: containerConfig.preset_tier,
+                    approved_target_node: approvedTargetNode
                 }
             });
         }
@@ -805,12 +815,139 @@ router.get('/status', async (req, res) => {
                 storage_gb: containerConfig.storage_gb,
                 gpu_count: containerConfig.gpu_count,
                 node: containerConfig.current_node,
-                preset: containerConfig.preset_tier
+                preset: containerConfig.preset_tier,
+                approved_target_node: approvedTargetNode
             }
         });
     } catch (err) {
         console.error('[containers] status error:', err);
         return res.status(500).json({ success: false, message: 'Failed to get status' });
+    }
+});
+
+// Migrate container to approved GPU node
+// POST /dashboard/api/containers/migrate
+router.post('/migrate', async (req, res) => {
+    try {
+        if (!req.isAuthenticated?.() || !req.user?.email) {
+            return res.status(401).json({ success: false, message: 'Not authenticated' });
+        }
+
+        const username = String(req.user.email).split('@')[0];
+        const { target_node } = req.body;
+
+        if (!target_node || !['chimera', 'cerberus'].includes(target_node)) {
+            return res.status(400).json({ success: false, message: 'Invalid target node' });
+        }
+
+        // Get user quota to verify approval
+        const { getOrCreateUserQuota, getOrCreateContainerConfig, updateContainerConfig } = require('../services/db-init');
+        const userQuota = await getOrCreateUserQuota(username, req.user.email);
+        const containerConfig = await getOrCreateContainerConfig(username, `student-${username}`);
+
+        // Verify user is approved for target node
+        if (target_node === 'cerberus' && !userQuota.cerberus_approved) {
+            return res.status(403).json({ success: false, message: 'Not approved for Cerberus' });
+        }
+        if (target_node === 'chimera' && !userQuota.chimera_approved) {
+            return res.status(403).json({ success: false, message: 'Not approved for Chimera' });
+        }
+
+        // Get node config
+        const nodeConfig = resourceConfig.nodes[target_node];
+        if (!nodeConfig) {
+            return res.status(400).json({ success: false, message: 'Unknown target node' });
+        }
+
+        console.log(`[containers] Migrating ${username} from ${containerConfig.current_node} to ${target_node}`);
+
+        // Step 1: Stop and remove current container on Hydra (if exists)
+        const currentContainer = await getStudentContainer(username);
+        if (currentContainer) {
+            const { container, info } = currentContainer;
+            if (info.State.Running) {
+                console.log(`[containers] Stopping container on ${containerConfig.current_node}`);
+                await container.stop();
+            }
+            console.log(`[containers] Removing container on ${containerConfig.current_node}`);
+            await container.remove();
+        }
+
+        // Step 2: Connect to target node's Docker
+        const Docker = require('dockerode');
+        const targetDocker = new Docker({ host: nodeConfig.host, port: 2376 });
+
+        // Verify connection
+        try {
+            await targetDocker.ping();
+        } catch (pingErr) {
+            console.error(`[containers] Cannot connect to ${target_node}:`, pingErr.message);
+            return res.status(500).json({
+                success: false,
+                message: `Cannot connect to ${target_node}. Docker may not be accessible.`
+            });
+        }
+
+        // Step 3: Create container on target node with GPU support
+        const containerName = `student-${username}`;
+        const { publicKey } = await generateSSHKeys(username);
+
+        // Calculate SSH port
+        const usernameHash = crypto.createHash('md5').update(username).digest('hex');
+        const sshPort = 22000 + (parseInt(usernameHash.substring(0, 4), 16) % 10000);
+
+        // Prepare GPU runtime options
+        const hostConfig = {
+            Memory: resourceConfig.memoryToBytes(containerConfig.memory_gb),
+            NanoCpus: resourceConfig.cpusToNanoCpus(containerConfig.cpus),
+            RestartPolicy: { Name: 'unless-stopped' },
+            PortBindings: {
+                '22/tcp': [{ HostPort: String(sshPort) }]
+            }
+        };
+
+        // Add GPU access
+        if (containerConfig.gpu_count > 0) {
+            hostConfig.DeviceRequests = [{
+                Driver: 'nvidia',
+                Count: containerConfig.gpu_count,
+                Capabilities: [['gpu']]
+            }];
+        }
+
+        console.log(`[containers] Creating container on ${target_node} with ${containerConfig.gpu_count} GPUs`);
+
+        const newContainer = await targetDocker.createContainer({
+            Image: nodeConfig.defaultImage || STUDENT_IMAGE,
+            name: containerName,
+            Env: [
+                `USERNAME=${username}`,
+                `SSH_PUBLIC_KEY=${publicKey}`,
+                `NODE=${target_node}`
+            ],
+            HostConfig: hostConfig
+        });
+
+        // Step 4: Start the container
+        await newContainer.start();
+        console.log(`[containers] Container started on ${target_node}`);
+
+        // Step 5: Update container config in database
+        await updateContainerConfig(username, {
+            current_node: target_node,
+            last_migration_at: new Date().toISOString()
+        });
+
+        return res.json({
+            success: true,
+            message: `Successfully migrated to ${target_node}`,
+            target_node,
+            gpu_count: containerConfig.gpu_count
+        });
+
+    } catch (err) {
+        console.error('[containers] migrate error:', err);
+        return res.status(500).json({ success: false, message: err.message || 'Migration failed' });
     }
 });
 
