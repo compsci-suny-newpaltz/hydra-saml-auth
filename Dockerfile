@@ -10,6 +10,7 @@ FROM node:18-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
     dumb-init \
     openssh-client \
+    curl \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/* \
   && mkdir -p /app/cert /app/data/ssh-keys
