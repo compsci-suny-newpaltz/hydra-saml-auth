@@ -8,7 +8,7 @@ Ansible playbooks for deploying the Hydra infrastructure on RKE2 Kubernetes acro
 
 | Node | Role | IP | Hardware |
 |------|------|-----|----------|
-| Hydra | Control Plane | 192.168.1.100 | 251GB RAM, 21TB ZFS RAID-10 |
+| Hydra | Control Plane | 192.168.1.160 | 251GB RAM, 21TB ZFS RAID-10 |
 | Chimera | GPU Inference | 192.168.1.150 | 3x RTX 3090 (72GB VRAM) |
 | Cerberus | GPU Training | 192.168.1.242 | 2x RTX 5090 (64GB VRAM) |
 
@@ -70,20 +70,20 @@ These playbooks are designed to **NOT lose data**:
 
 ### Step 0: Update Inventory (REQUIRED)
 
-Edit `inventory.yml` with your actual IPs:
+Edit `inventory.yml` with your actual IPs (already configured for the current cluster):
 
 ```yaml
 control_plane:
   hosts:
     hydra:
-      ansible_host: YOUR_HYDRA_IP  # Change this!
+      ansible_host: 192.168.1.160  # Hydra control plane
 
 gpu_nodes:
   hosts:
     chimera:
-      ansible_host: YOUR_CHIMERA_IP  # Change this!
+      ansible_host: 192.168.1.150  # GPU inference node
     cerberus:
-      ansible_host: YOUR_CERBERUS_IP  # Change this!
+      ansible_host: 192.168.1.242  # GPU training node
 ```
 
 ### Step 1: Test Connectivity
@@ -242,8 +242,8 @@ cat /etc/exports
 exportfs -ra
 
 # On GPU node - test manually
-showmount -e 192.168.1.100
-mount -t nfs 192.168.1.100:/srv/hydra-nfs /mnt/hydra-nfs
+showmount -e 192.168.1.160
+mount -t nfs 192.168.1.160:/srv/hydra-nfs /mnt/hydra-nfs
 ```
 
 ### Connection refused to API server

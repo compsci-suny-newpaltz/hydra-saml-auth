@@ -5,11 +5,13 @@ const axios = require('axios');
 const router = express.Router();
 
 const N8N_HOST = process.env.N8N_HOST;
-const N8N_API_KEY = process.env['X-N8N-API-KEY'] || process.env.N8N_API_KEY;
+const N8N_API_KEY = process.env.N8N_API_KEY;
 const N8N_USER_MANAGER_API_KEY = process.env.N8N_USER_MANAGER_API_KEY;
+// User manager is accessed via traefik on port 8080, not via n8n on 5678
+const N8N_USER_MANAGER_HOST = process.env.N8N_USER_MANAGER_HOST || 'http://127.0.0.1:8080';
 
 if (!N8N_HOST || !N8N_API_KEY) {
-  console.warn('[n8n-api] Missing N8N_HOST or X-N8N-API-KEY — endpoints will error');
+  console.warn('[n8n-api] Missing N8N_HOST or N8N_API_KEY — endpoints will error');
 }
 
 if (!N8N_USER_MANAGER_API_KEY) {
@@ -112,7 +114,7 @@ router.post('/change-password', ensureAuthenticated, async (req, res) => {
       return res.status(500).json({ success: false, message: 'Password change not configured on server' });
     }
 
-    const url = `${N8N_HOST}/n8n-user-manager/api/users/change-password`;
+    const url = `${N8N_USER_MANAGER_HOST}/n8n-user-manager/api/users/change-password`;
     const { data } = await axios.post(url,
       { email, newPassword },
       {

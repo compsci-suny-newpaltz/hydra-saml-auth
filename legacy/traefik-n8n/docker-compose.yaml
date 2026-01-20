@@ -52,6 +52,8 @@ services:
       # Pin a key so credentials survive container restarts (new instance = new data)
       - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
 
+    ports:
+      - "127.0.0.1:5678:5678"
     volumes:
       - n8n_data:/home/node/.n8n
     labels:
