@@ -108,40 +108,46 @@ Cerberus & 192.168.1.242 & Training & 2x RTX 5090 & Student GPU training \\
 \begin{tikzpicture}[
     node distance=1.2cm,
     box/.style={rectangle, draw, fill=blue!10, minimum width=2.5cm, minimum height=1cm, align=center},
-    server/.style={rectangle, draw, thick, fill=blue!20, minimum width=4cm, minimum height=2.5cm, align=center},
-    gpu/.style={rectangle, draw, thick, fill=gpu-green!30, minimum width=4cm, minimum height=2.5cm, align=center},
-    service/.style={rectangle, draw, fill=green!10, minimum width=2cm, minimum height=0.6cm, align=center, font=\scriptsize},
-    container/.style={rectangle, draw, fill=orange!10, minimum width=1.8cm, minimum height=0.6cm, align=center, font=\scriptsize},
+    server/.style={rectangle, draw, thick, fill=blue!20, minimum width=3.5cm, minimum height=3cm, align=center},
+    gpu/.style={rectangle, draw, thick, fill=gpu-green!30, minimum width=3.5cm, minimum height=3cm, align=center},
+    service/.style={rectangle, draw, fill=green!10, minimum width=2.8cm, minimum height=0.5cm, align=center, font=\scriptsize},
+    container/.style={rectangle, draw, fill=orange!10, minimum width=2.8cm, minimum height=0.5cm, align=center, font=\scriptsize},
     arrow/.style={->, thick},
     dashed_arrow/.style={->, dashed}
 ]
 
 % External
 \node[box] (user) {User\\Browser};
-\node[box, right=2.5cm of user] (azure) {Azure AD\\SAML IdP};
+\node[box, right=3cm of user] (azure) {Azure AD\\SAML IdP};
 
 % Traefik
 \node[box, below=1.5cm of user] (traefik) {Traefik\\:80, :443};
 
-% Hydra Server
-\node[server, below left=2cm and 0cm of traefik] (hydra) {\textbf{Hydra}\\192.168.1.160\\Control Plane};
-\node[service, below=0.3cm of hydra.north] (hydra-app) {hydra-saml-auth};
-\node[container, below=0.1cm of hydra-app] (student1) {student-*};
-\node[service, below=0.1cm of student1] (zfs) {ZFS 21TB};
+% Hydra Server - position with explicit coordinates
+\node[server, below=2.5cm of traefik, xshift=-5cm] (hydra) {};
+\node[font=\small\bfseries, anchor=north] at (hydra.north) {Hydra};
+\node[font=\scriptsize, anchor=north] at ([yshift=-0.35cm]hydra.north) {192.168.1.160};
+\node[service] at ([yshift=-0.2cm]hydra.center) (hydra-app) {hydra-saml-auth};
+\node[container, below=0.15cm of hydra-app] (student1) {student-*};
+\node[service, below=0.15cm of student1] (zfs) {ZFS 21TB};
 
 % Chimera Server
-\node[gpu, right=1.5cm of hydra] (chimera) {\textbf{Chimera}\\192.168.1.150\\3x RTX 3090};
-\node[service, below=0.3cm of chimera.north] (openwebui) {OpenWebUI};
-\node[service, below=0.1cm of openwebui] (ollama) {Ollama};
+\node[gpu, right=0.8cm of hydra] (chimera) {};
+\node[font=\small\bfseries, anchor=north] at (chimera.north) {Chimera};
+\node[font=\scriptsize, anchor=north] at ([yshift=-0.35cm]chimera.north) {3x RTX 3090};
+\node[service] at ([yshift=-0.2cm]chimera.center) (openwebui) {OpenWebUI};
+\node[service, below=0.15cm of openwebui] (ollama) {Ollama};
 
 % Cerberus Server
-\node[gpu, right=1.5cm of chimera] (cerberus) {\textbf{Cerberus}\\192.168.1.242\\2x RTX 5090};
-\node[service, below=0.3cm of cerberus.north] (metrics) {metrics-agent};
-\node[container, below=0.1cm of metrics] (gpu-student) {GPU containers};
+\node[gpu, right=0.8cm of chimera] (cerberus) {};
+\node[font=\small\bfseries, anchor=north] at (cerberus.north) {Cerberus};
+\node[font=\scriptsize, anchor=north] at ([yshift=-0.35cm]cerberus.north) {2x RTX 5090};
+\node[service] at ([yshift=-0.2cm]cerberus.center) (metrics) {metrics-agent};
+\node[container, below=0.15cm of metrics] (gpu-student) {GPU containers};
 
 % Storage
-\node[box, below=1cm of hydra] (db) {SQLite\\Database};
-\node[box, below=1cm of chimera] (nfs) {NFS\\Storage};
+\node[box, below=0.8cm of hydra] (db) {SQLite\\Database};
+\node[box, below=0.8cm of chimera] (nfs) {NFS\\Storage};
 
 % Arrows
 \draw[arrow] (user) -- node[above] {HTTPS} (traefik);
@@ -151,7 +157,7 @@ Cerberus & 192.168.1.242 & Training & 2x RTX 5090 & Student GPU training \\
 \draw[arrow] (traefik) -- (chimera);
 \draw[arrow] (traefik) -- (cerberus);
 \draw[dashed_arrow] (hydra) -- node[below, font=\scriptsize] {NFS} (chimera);
-\draw[dashed_arrow] (hydra) -- node[below, font=\scriptsize] {NFS} (cerberus);
+\draw[dashed_arrow] (chimera) -- node[below, font=\scriptsize] {NFS} (cerberus);
 
 \end{tikzpicture}
 \end{center}
