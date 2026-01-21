@@ -40,6 +40,7 @@ The system handles authentication, container lifecycle management, and routing t
 |---------|-----|
 | Dashboard | [https://hydra.newpaltz.edu/dashboard](https://hydra.newpaltz.edu/dashboard) |
 | OpenWebUI (GPT) | [https://gpt.hydra.newpaltz.edu/](https://gpt.hydra.newpaltz.edu/) |
+| n8n Automation | [https://n8n.hydra.newpaltz.edu/](https://n8n.hydra.newpaltz.edu/) |
 | VS Code | `https://hydra.newpaltz.edu/students/{username}/vscode` |
 | Jupyter | `https://hydra.newpaltz.edu/students/{username}/jupyter` |
 
@@ -78,6 +79,14 @@ The system handles authentication, container lifecycle management, and routing t
 
 ## Architecture
 
+### 3-Node Cluster
+
+| Node | IP | Role | Resources |
+|------|-----|------|-----------|
+| **Hydra** | 192.168.1.150 | Control plane, student containers | 256GB RAM, 64 cores |
+| **Chimera** | 192.168.1.151 | AI inference (OpenWebUI + Ollama) | 3× RTX 3090 (24GB each) |
+| **Cerberus** | 192.168.1.152 | GPU training workloads | 2× RTX 5090 (32GB each) |
+
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                         Internet                                 │
@@ -85,31 +94,37 @@ The system handles authentication, container lifecycle management, and routing t
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Traefik Reverse Proxy                        │
+│              Apache Reverse Proxy (Hydra)                       │
 │                      (Ports 80, 443)                            │
-│  • TLS Termination   • ForwardAuth   • Dynamic Routing          │
+│  • TLS Termination   • ProxyPass   • Load Balancing             │
 └────────┬──────────────────┬──────────────────┬──────────────────┘
          │                  │                  │
          ▼                  ▼                  ▼
 ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────────────┐
-│ hydra-saml-auth │ │    OpenWebUI    │ │   Student Containers    │
-│     :6969       │ │      :3000      │ │  student-{user}         │
+│ hydra-saml-auth │ │ OpenWebUI+Ollama│ │   Student Containers    │
+│ (Hydra :6969)   │ │ (Chimera :3000) │ │  student-{user}         │
 │                 │ │                 │ │  • VS Code :8443        │
 │ • SAML Auth     │ │ • AI Chat UI    │ │  • Jupyter :8888        │
-│ • Dashboard     │ │ • Ollama        │ │  • Custom ports         │
-│ • Container Mgmt│ │                 │ │                         │
+│ • Dashboard     │ │ • 3× RTX 3090   │ │  • Custom ports         │
+│ • Container Mgmt│ │ • 72GB VRAM     │ │                         │
+│ • n8n Proxy     │ │                 │ │                         │
 └────────┬────────┘ └─────────────────┘ └─────────────────────────┘
          │
          ▼
-┌─────────────────┐
-│     SQLite      │
-│   Database      │
-└─────────────────┘
+┌─────────────────┐     ┌─────────────────┐
+│     SQLite      │     │   Cerberus      │
+│   Database      │     │ • 2× RTX 5090   │
+└─────────────────┘     │ • GPU Training  │
+                        └─────────────────┘
 ```
 
 ### Network
 
-All services communicate on an isolated Docker network (`hydra_students_net`). Student containers have no direct internet access - all external traffic is mediated through Traefik.
+- **Hydra**: Hosts Traefik for internal routing on `hydra_students_net`
+- **Chimera**: Runs OpenWebUI + Ollama with GPU passthrough for inference
+- **Cerberus**: Reserved for GPU training workloads
+
+Student containers run on Hydra with isolated Docker networking. All external traffic is mediated through Apache reverse proxy.
 
 ## Quick Start
 
@@ -283,8 +298,7 @@ hydra-saml-auth/
 ├── docker-compose.yaml      # Production stack
 ├── docs/
 │   ├── containers.md        # Container system documentation
-│   ├── hydra_infrastructure_guide.tex  # Admin management guide
-│   └── hydra_installation_guide.tex    # Installation guide
+│   └── hydra_infrastructure_guide.tex  # Cluster setup and management guide
 └── README.md
 ```
 
@@ -328,8 +342,7 @@ sqlite3 /app/data/webui.db ".backup '/backups/hydra-$(date +%Y%m%d).db'"
 ## Documentation
 
 - **[Container System](docs/containers.md)** - Architecture, flows, routing details
-- **[Infrastructure Guide](docs/hydra_infrastructure_guide.pdf)** - Day-to-day management
-- **[Installation Guide](docs/hydra_installation_guide.pdf)** - Full setup instructions
+- **[Infrastructure Guide](docs/hydra_infrastructure_guide.pdf)** - Cluster setup, SSH access, resource management, backups
 
 ### Building Documentation
 
@@ -337,8 +350,6 @@ sqlite3 /app/data/webui.db ".backup '/backups/hydra-$(date +%Y%m%d).db'"
 cd docs
 pdflatex hydra_infrastructure_guide.tex
 pdflatex hydra_infrastructure_guide.tex  # Run twice for TOC
-pdflatex hydra_installation_guide.tex
-pdflatex hydra_installation_guide.tex
 ```
 
 ## Troubleshooting
