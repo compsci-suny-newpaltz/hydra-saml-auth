@@ -14,6 +14,8 @@ services:
       - ./traefik-dynamic:/etc/traefik/dynamic
       - ./jwt-private.pem:/app/jwt-private.pem:ro
       - ./jwt-public.pem:/app/jwt-public.pem:ro
+      - ./data/ssh-keys:/app/data/ssh-keys
+      - ./sshpiper/config:/app/sshpiper/config
     labels:
       # Make the /auth/verify endpoint accessible to Traefik
       - "traefik.enable=true"

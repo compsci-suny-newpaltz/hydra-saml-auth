@@ -661,7 +661,7 @@
                   </code>
                   <p><strong>3. Connect:</strong></p>
                   <code id="ssh-setup-command" class="block bg-gray-100 p-2 rounded">
-                    ssh -i ~/.ssh/<%= user.email.split('@')[0] %>_hydra_key student@hydra.newpaltz.edu -p [PORT]
+                    ssh -i ~/.ssh/<%= user.email.split('@')[0] %>_hydra_key <%= user.email.split('@')[0] %>@hydra.newpaltz.edu -p 2222
                   </code>
                   <p class="text-yellow-600"><i class="fas fa-exclamation-triangle"></i> Windows users: Use PuTTY or Windows Terminal with OpenSSH</p>
                 </div>

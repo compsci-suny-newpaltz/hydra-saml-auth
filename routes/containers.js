@@ -188,6 +188,63 @@ async function getSSHPublicKey(username) {
     }
 }
 
+// SSHPiper configuration directory
+const SSHPIPER_CONFIG_DIR = process.env.SSHPIPER_CONFIG_DIR || '/app/sshpiper/config';
+const SSHPIPER_PORT = 2222;
+
+// Create sshpiper upstream config for a user
+async function createSSHPiperConfig(username) {
+    const containerName = `student-${username}`;
+    const userDir = path.join(SSHPIPER_CONFIG_DIR, username);
+
+    try {
+        // Create user directory
+        await fs.mkdir(userDir, { recursive: true, mode: 0o755 });
+
+        // Create sshpiper_upstream file - points to container's SSH port
+        await fs.writeFile(
+            path.join(userDir, 'sshpiper_upstream'),
+            `${containerName}:22\n`,
+            { mode: 0o644 }
+        );
+
+        // Copy private key for sshpiper to use when connecting upstream
+        const privateKeyPath = path.join(SSH_KEYS_DIR, `${username}_id_ed25519`);
+        const piperKeyPath = path.join(userDir, 'id_ed25519');
+        try {
+            const privateKey = await fs.readFile(privateKeyPath, 'utf8');
+            await fs.writeFile(piperKeyPath, privateKey, { mode: 0o600 });
+        } catch (err) {
+            console.warn(`[sshpiper] Could not copy private key for ${username}:`, err.message);
+        }
+
+        // Copy public key as authorized_keys (for user auth to sshpiper)
+        const publicKeyPath = path.join(SSH_KEYS_DIR, `${username}_id_ed25519.pub`);
+        const authorizedKeysPath = path.join(userDir, 'authorized_keys');
+        try {
+            const publicKey = await fs.readFile(publicKeyPath, 'utf8');
+            await fs.writeFile(authorizedKeysPath, publicKey, { mode: 0o644 });
+        } catch (err) {
+            console.warn(`[sshpiper] Could not copy public key for ${username}:`, err.message);
+        }
+
+        console.log(`[sshpiper] Created config for ${username}`);
+    } catch (err) {
+        console.error(`[sshpiper] Failed to create config for ${username}:`, err);
+    }
+}
+
+// Remove sshpiper config for a user
+async function removeSSHPiperConfig(username) {
+    const userDir = path.join(SSHPIPER_CONFIG_DIR, username);
+    try {
+        await fs.rm(userDir, { recursive: true, force: true });
+        console.log(`[sshpiper] Removed config for ${username}`);
+    } catch (err) {
+        console.warn(`[sshpiper] Could not remove config for ${username}:`, err.message);
+    }
+}
+
 // Helper to get student's container
 async function getStudentContainer(username) {
     const containerName = `student-${username}`;
@@ -455,14 +512,17 @@ router.post('/init', async (req, res) => {
         // Write Traefik config file for routing
         await writeTraefikConfig(username, defaultRoutes);
 
+        // Create sshpiper config for username-based SSH routing
+        await createSSHPiperConfig(username);
+
         return res.json({
             success: true,
             name: containerName,
             vscodeUrl: `${publicBase}/${username}/vscode/`,
             jupyterUrl: `${publicBase}/${username}/jupyter/`,
-            sshPort: sshPort,
+            sshPort: SSHPIPER_PORT,
             sshHost: 'hydra.newpaltz.edu',
-            sshUser: 'student'
+            sshUser: username
         });
     } catch (err) {
         console.error('[containers] init error:', err);
@@ -516,16 +576,16 @@ router.get('/ssh-info', async (req, res) => {
             });
         }
 
-        const sshPort = result.info.Config.Labels?.['hydra.ssh_port'];
         const publicKey = await getSSHPublicKey(username);
         const hasPrivateKey = (await getSSHPrivateKey(username)) !== null;
 
+        // Use sshpiper port (2222) and username-based routing
         return res.json({
             success: true,
-            sshPort: sshPort ? parseInt(sshPort) : null,
+            sshPort: SSHPIPER_PORT,
             sshHost: 'hydra.newpaltz.edu',
-            sshUser: 'student',
-            sshCommand: sshPort ? `ssh -i ~/.ssh/${username}_hydra_key student@hydra.newpaltz.edu -p ${sshPort}` : null,
+            sshUser: username,
+            sshCommand: `ssh -i ~/.ssh/${username}_hydra_key ${username}@hydra.newpaltz.edu -p ${SSHPIPER_PORT}`,
             hasKey: hasPrivateKey,
             publicKey: publicKey
         });
@@ -565,6 +625,9 @@ router.post('/ssh-key/regenerate', async (req, res) => {
 
         // Generate new keys
         const { publicKey } = await generateSSHKeys(username);
+
+        // Update sshpiper config with new keys
+        await createSSHPiperConfig(username);
 
         // Update the container's SSH key by restarting it with new env
         // The container will pick up the new key on restart
@@ -1683,6 +1746,9 @@ router.post('/wipe', async (req, res) => {
         // Delete Traefik config file
         await deleteTraefikConfig(username);
 
+        // Remove sshpiper config (will be recreated with new container)
+        await removeSSHPiperConfig(username);
+
         // 2. Re-initialize container (logic copied and adapted from /init)
         const studentNetworkName = `hydra-student-${username}`;
         const host = 'hydra.newpaltz.edu';
@@ -1775,6 +1841,9 @@ router.post('/wipe', async (req, res) => {
         // Write Traefik config file for routing
         await writeTraefikConfig(username, defaultRoutes);
 
+        // Create sshpiper config for new container
+        await createSSHPiperConfig(username);
+
         return res.json({ success: true, message: 'Container wiped and recreated' });
 
     } catch (err) {
@@ -1812,6 +1881,7 @@ router.delete('/destroy', async (req, res) => {
         if (!result) {
             // Clean up Traefik config even if container doesn't exist
             await deleteTraefikConfig(username);
+            await removeSSHPiperConfig(username);
             return res.json({ success: true, message: 'Container does not exist' });
         }
 
@@ -1834,6 +1904,9 @@ router.delete('/destroy', async (req, res) => {
 
         // Delete Traefik config file
         await deleteTraefikConfig(username);
+
+        // Remove sshpiper config
+        await removeSSHPiperConfig(username);
 
         return res.json({ success: true });
     } catch (err) {
