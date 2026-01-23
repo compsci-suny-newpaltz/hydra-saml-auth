@@ -12,6 +12,12 @@ llvm-vs-code-extensions.vscode-clangd
 # Python - essential for CS courses
 ms-python.python
 
+# Java Extension Pack - essential for CS courses
+redhat.java
+vscjava.vscode-java-debug
+vscjava.vscode-java-test
+vscjava.vscode-maven
+
 # Code Runner - run code snippets quickly
 formulahendry.code-runner
 
@@ -36,16 +42,19 @@ webfreak.debug
 # Path Intellisense - autocomplete paths
 christian-kohler.path-intellisense
 
+# Jenkins/CI-CD
+secanis.jenkinsfile-support
+janjoerke.jenkins-pipeline-linter-connector
+
 # ----- CUSTOM (built from source) -----
 # LCC Tools - Built from GitHub source
 # See Dockerfile for build step
 
 # ===========================================
-# REMOVED FROM PRE-INSTALL (available on-demand)
+# OPTIONAL (available on-demand)
 # Students can install these from Extensions panel
 # They appear in "Recommended" section
 # ===========================================
-# vscjava.vscode-java-pack      # Java (~150MB) - install if needed
 # James-Yu.latex-workshop       # LaTeX (~80MB) - install if needed
 # Vue.volar                     # Vue.js - install if needed
 # bmewburn.vscode-intelephense-client  # PHP - install if needed
@@ -54,8 +63,6 @@ christian-kohler.path-intellisense
 # ms-vscode.cmake-tools         # CMake Tools - install if needed
 # github.vscode-github-actions  # GitHub Actions - install if needed
 # vscjava.vscode-gradle         # Gradle - install if needed
-# vscjava.vscode-maven          # Maven - install if needed
 # ritwickdey.liveserver         # Live Server - install if needed
 # ecmel.vscode-html-css         # HTML/CSS - install if needed
 # dsznajder.es7-react-js-snippets # React - install if needed
-# slevesque.vscode-hexdump      # Hex dump (duplicate) - removed

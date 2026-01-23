@@ -92,9 +92,9 @@ module.exports = {
     minimal: {
       id: 'minimal',
       label: 'Minimal',
-      description: 'Basic coding - auto-approved',
-      memory_mb: 256,
-      memory_gb: 0.25,
+      description: 'Basic coding without Java - auto-approved',
+      memory_mb: 1024,
+      memory_gb: 1,
       cpus: 0.5,
       storage_gb: 5,
       gpu_count: 0,
@@ -103,10 +103,10 @@ module.exports = {
     },
     conservative: {
       id: 'conservative',
-      label: 'Conservative (Default)',
-      description: 'Default allocation - auto-approved',
-      memory_mb: 512,
-      memory_gb: 0.5,
+      label: 'Conservative',
+      description: 'Light workloads - auto-approved',
+      memory_mb: 1536,
+      memory_gb: 1.5,
       cpus: 1,
       storage_gb: 10,
       gpu_count: 0,
@@ -115,10 +115,10 @@ module.exports = {
     },
     standard: {
       id: 'standard',
-      label: 'Standard',
-      description: 'More resources - auto-approved',
-      memory_mb: 1024,
-      memory_gb: 1,
+      label: 'Standard (Default)',
+      description: 'Default with Java support - auto-approved',
+      memory_mb: 2048,
+      memory_gb: 2,
       cpus: 1,
       storage_gb: 20,
       gpu_count: 0,
@@ -128,13 +128,13 @@ module.exports = {
     enhanced: {
       id: 'enhanced',
       label: 'Enhanced',
-      description: 'Heavy workloads - requires approval',
-      memory_mb: 2048,
-      memory_gb: 2,
+      description: 'Heavy workloads - auto-approved',
+      memory_mb: 4096,
+      memory_gb: 4,
       cpus: 2,
       storage_gb: 40,
       gpu_count: 0,
-      autoApproveOnHydra: false,
+      autoApproveOnHydra: true,
       allowedNodes: ['hydra', 'chimera', 'cerberus']
     },
     gpu_inference: {
@@ -177,13 +177,12 @@ module.exports = {
   ],
 
   // Memory tier options (for dropdown)
-  // Conservative for 500 students - most just need VS Code + compiler
+  // Java/VS Code need at least 1GB, 2GB recommended
   memoryTiers: [
-    { value: 0.25, label: '256 MB', requiresApproval: false },
-    { value: 0.5, label: '512 MB (Default)', requiresApproval: false },
-    { value: 1, label: '1 GB', requiresApproval: false },
-    { value: 2, label: '2 GB', requiresApproval: false },
-    { value: 4, label: '4 GB', requiresApproval: true },
+    { value: 1, label: '1 GB (Minimal)', requiresApproval: false },
+    { value: 1.5, label: '1.5 GB', requiresApproval: false },
+    { value: 2, label: '2 GB (Default)', requiresApproval: false },
+    { value: 4, label: '4 GB', requiresApproval: false },
     { value: 8, label: '8 GB', requiresApproval: true },
     { value: 16, label: '16 GB', requiresApproval: true },
     { value: 32, label: '32 GB (GPU)', requiresApproval: true }
@@ -213,14 +212,14 @@ module.exports = {
   // Default duration for resource allocations (in days)
   defaultDurationDays: 1,
 
-  // Default quota for new users (minimal to conserve storage - 500 students)
+  // Default quota for new users
   defaults: {
-    storage_gb: 5,      // Reduced from 10 - sufficient for basic coding
-    memory_gb: 0.25,    // 256 MB - enough for VS Code + compiler
-    memory_mb: 256,
-    cpus: 0.5,
+    storage_gb: 10,     // 10GB default for projects
+    memory_gb: 2,       // 2GB - needed for VS Code + Java extensions
+    memory_mb: 2048,
+    cpus: 1,
     gpu_count: 0,
-    preset: 'minimal',  // Changed from 'conservative' - smaller default
+    preset: 'standard', // Standard preset - 1GB min for Java
     node: 'hydra',
     image: process.env.STUDENT_IMAGE || 'hydra-student-container:latest'
   },
@@ -239,11 +238,11 @@ module.exports = {
     adminEmail: process.env.APPROVAL_EMAIL || 'cslab@newpaltz.edu',
     requestExpiryDays: 7,
     autoApproveConservativeOnHydra: true,
-    // Thresholds for auto-approval on Hydra (conservative for 500 students)
+    // Thresholds for auto-approval on Hydra
     autoApproveThresholds: {
-      maxMemory_gb: 2,      // Up to 2GB auto-approved
+      maxMemory_gb: 4,      // Up to 4GB auto-approved
       maxCpus: 2,           // Up to 2 cores auto-approved
-      maxStorage_gb: 20     // Up to 20GB auto-approved
+      maxStorage_gb: 40     // Up to 40GB auto-approved
     }
   },
 
@@ -257,19 +256,19 @@ module.exports = {
   // Kubernetes resource quota mappings for presets
   k8sResourceQuotas: {
     minimal: {
-      requests: { memory: '256Mi', cpu: '500m' },
-      limits: { memory: '512Mi', cpu: '1' }
-    },
-    conservative: {
-      requests: { memory: '512Mi', cpu: '500m' },
+      requests: { memory: '512Mi', cpu: '250m' },
       limits: { memory: '1Gi', cpu: '1' }
     },
+    conservative: {
+      requests: { memory: '768Mi', cpu: '500m' },
+      limits: { memory: '1536Mi', cpu: '1' }
+    },
     standard: {
-      requests: { memory: '1Gi', cpu: '1' },
+      requests: { memory: '1Gi', cpu: '500m' },
       limits: { memory: '2Gi', cpu: '2' }
     },
     enhanced: {
-      requests: { memory: '2Gi', cpu: '2' },
+      requests: { memory: '2Gi', cpu: '1' },
       limits: { memory: '4Gi', cpu: '4' }
     },
     gpu_inference: {
