@@ -1,0 +1,27 @@
+services:
+  sshpiper:
+    image: farmer1992/sshpiper:latest
+    container_name: sshpiper
+    ports:
+      - "2222:2222"
+    volumes:
+      # sshpiper working directory with upstream configs
+      - ./config:/var/sshpiper
+      # SSH keys for authentication (read-only)
+      - ../data/ssh-keys:/ssh-keys:ro
+    networks:
+      - hydra_students_net
+    restart: unless-stopped
+    command: >
+      /sshpiperd
+      --workingdir=/var/sshpiper
+      --log-level=info
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "2222"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+networks:
+  hydra_students_net:
+    external: true
