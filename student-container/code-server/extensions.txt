@@ -42,9 +42,11 @@ webfreak.debug
 # Path Intellisense - autocomplete paths
 christian-kohler.path-intellisense
 
-# Jenkins/CI-CD
+# Jenkins/CI-CD & Groovy
 secanis.jenkinsfile-support
 janjoerke.jenkins-pipeline-linter-connector
+marlon407.code-groovy
+NicolasVuillamy.vscode-groovy-lint
 
 # ----- CUSTOM (built from source) -----
 # LCC Tools - Built from GitHub source
