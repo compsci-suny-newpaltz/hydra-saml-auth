@@ -106,6 +106,9 @@ function renderHydra(server) {
 
   // ZFS
   document.getElementById('hydra-zfs').textContent = server.zfs_status || 'ONLINE';
+
+  // Storage Cluster
+  renderStorageCluster(server.storage_cluster);
 }
 
 // Chimera (Inference Node)
@@ -262,6 +265,65 @@ function updateServerStatus(server, status) {
       statusEl.classList.add('online');
       statusEl.textContent = 'ONLINE';
   }
+}
+
+// Render storage cluster visualization
+function renderStorageCluster(data) {
+  const grid = document.getElementById('hydra-storage-grid');
+  const totalEl = document.getElementById('hydra-storage-total');
+  const usedEl = document.getElementById('hydra-storage-used');
+  const availEl = document.getElementById('hydra-storage-available');
+
+  if (!data || !data.students) {
+    grid.innerHTML = '<div class="loading">No storage data</div>';
+    return;
+  }
+
+  // Clear grid
+  grid.innerHTML = '';
+
+  // Sort students by usage (highest first)
+  const students = data.students.sort((a, b) => b.used_gb - a.used_gb);
+
+  // Create cubes for each student
+  students.forEach(student => {
+    const cube = document.createElement('div');
+    cube.className = 'cube';
+
+    const usagePercent = student.quota_gb > 0
+      ? (student.used_gb / student.quota_gb) * 100
+      : 0;
+
+    // Color based on usage
+    if (usagePercent >= 80) {
+      cube.classList.add('used-high');
+    } else if (usagePercent >= 50) {
+      cube.classList.add('used-med');
+    } else if (usagePercent > 0) {
+      cube.classList.add('used-low');
+    } else {
+      cube.classList.add('empty');
+    }
+
+    // Tooltip with student info
+    cube.title = student.username + ': ' + student.used_gb.toFixed(1) + 'GB / ' + student.quota_gb + 'GB (' + usagePercent.toFixed(0) + '%)';
+
+    grid.appendChild(cube);
+  });
+
+  // Add empty cubes for available capacity (up to 100 total)
+  const emptySlots = Math.min(100 - students.length, Math.floor(data.available_tb * 10));
+  for (let i = 0; i < emptySlots && students.length + i < 100; i++) {
+    const cube = document.createElement('div');
+    cube.className = 'cube empty';
+    cube.title = 'Available slot';
+    grid.appendChild(cube);
+  }
+
+  // Update summary
+  totalEl.textContent = students.length + ' students';
+  usedEl.textContent = data.total_used_gb.toFixed(0) + ' GB used';
+  availEl.textContent = data.available_tb.toFixed(1) + ' TB available';
 }
 
 // Clean up on page unload

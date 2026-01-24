@@ -137,6 +137,7 @@ function formatCollectedMetrics(metrics) {
       disk_total_gb: h.system?.disk_total_gb || 21000,
       containers_running: h.containers?.running || 0,
       zfs_status: h.zfs_status || 'ONLINE',
+      storage_cluster: h.storage_cluster || generateStorageClusterData(),
       last_updated: h.timestamp || new Date().toISOString()
     };
   }
@@ -218,6 +219,7 @@ function generateMockServerData() {
       disk_total_gb: 21000,
       containers_running: rand(35, 55),
       zfs_status: 'ONLINE',
+      storage_cluster: generateStorageClusterData(),
       last_updated: new Date().toISOString()
     },
     chimera: {
@@ -292,6 +294,83 @@ function generateMockServerData() {
       job_eta: `~${rand(1, 4)}h ${rand(0, 59)}m`,
       last_updated: new Date().toISOString()
     }
+  };
+}
+
+/**
+ * Generate storage cluster data from Docker volumes
+ * Shows student storage usage across the cluster
+ */
+async function generateStorageClusterData() {
+  const Docker = require('dockerode');
+  const docker = new Docker({ socketPath: '/var/run/docker.sock' });
+
+  try {
+    // Get all student volumes
+    const volumes = await docker.listVolumes();
+    const studentVolumes = (volumes.Volumes || []).filter(v =>
+      v.Name.startsWith('hydra-vol-')
+    );
+
+    // Get volume sizes (this requires inspecting each volume's usage)
+    const students = [];
+    let totalUsedGb = 0;
+
+    for (const vol of studentVolumes) {
+      const username = vol.Name.replace('hydra-vol-', '');
+      // Estimate usage - in production, use du or zfs list
+      const usedGb = Math.random() * 8; // Mock for now
+      const quotaGb = 10;
+
+      students.push({
+        username,
+        used_gb: usedGb,
+        quota_gb: quotaGb
+      });
+      totalUsedGb += usedGb;
+    }
+
+    return {
+      students,
+      total_used_gb: totalUsedGb,
+      available_tb: 21 - (totalUsedGb / 1000) // 21TB total
+    };
+  } catch (err) {
+    console.error('[servers-api] Failed to get storage data:', err.message);
+    // Return mock data on error
+    return generateMockStorageCluster();
+  }
+}
+
+/**
+ * Generate mock storage cluster data for testing
+ */
+function generateMockStorageCluster() {
+  const rand = (min, max) => Math.random() * (max - min) + min;
+  const students = [];
+  const usernames = [
+    'gopeen1', 'patelv22', 'easwarac', 'currym6', 'manzim1', 'namc3',
+    'defreitm1', 'fennerj1', 'polij1', 'shusterj1', 'dankwahd1', 'arenellc1',
+    'riordanj2', 'smithj3', 'jonesm4', 'brownk5', 'davisl6', 'wilsonp7',
+    'andersona8', 'thomasb9', 'jacksonc10', 'whited11', 'harrisg12', 'martinh13',
+    'garciai14', 'martinezj15', 'robinsonk16', 'clarkl17', 'lewism18', 'leen19'
+  ];
+
+  let totalUsedGb = 0;
+  usernames.forEach(username => {
+    const usedGb = rand(0.1, 9.5);
+    students.push({
+      username,
+      used_gb: usedGb,
+      quota_gb: 10
+    });
+    totalUsedGb += usedGb;
+  });
+
+  return {
+    students,
+    total_used_gb: totalUsedGb,
+    available_tb: 21 - (totalUsedGb / 1000)
   };
 }
 

@@ -411,3 +411,87 @@ body.terminal-bg {
 .refresh-indicator.updating {
   color: var(--text-amber);
 }
+
+/* Storage Cluster Visualization */
+.storage-cluster {
+  margin-top: 10px;
+}
+
+.storage-legend {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 8px;
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cube {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border: 1px solid var(--border-dim);
+}
+
+.cube.empty {
+  background: var(--bg-dark);
+}
+
+.cube.used-low {
+  background: var(--text-green-dim);
+  box-shadow: 0 0 2px var(--text-green-dim);
+}
+
+.cube.used-med {
+  background: var(--text-amber);
+  box-shadow: 0 0 2px var(--text-amber);
+}
+
+.cube.used-high {
+  background: var(--text-red);
+  box-shadow: 0 0 2px var(--text-red);
+}
+
+.storage-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 14px);
+  gap: 3px;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-dim);
+  min-height: 60px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.storage-grid .cube {
+  width: 12px;
+  height: 12px;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.storage-grid .cube:hover {
+  transform: scale(1.3);
+  z-index: 10;
+}
+
+.storage-grid .cube[title] {
+  position: relative;
+}
+
+.storage-summary {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.storage-summary span {
+  color: var(--text-cyan);
+}
