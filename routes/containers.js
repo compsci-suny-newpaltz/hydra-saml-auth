@@ -193,9 +193,23 @@ const SSHPIPER_CONFIG_DIR = process.env.SSHPIPER_CONFIG_DIR || '/app/sshpiper/co
 const SSHPIPER_PORT = 2222;
 
 // Create sshpiper upstream config for a user
-async function createSSHPiperConfig(username) {
+// node: 'hydra' (default), 'chimera', or 'cerberus'
+// sshPort: external SSH port (only needed for remote nodes)
+async function createSSHPiperConfig(username, node = 'hydra', sshPort = null) {
     const containerName = `student-${username}`;
     const userDir = path.join(SSHPIPER_CONFIG_DIR, username);
+
+    // Determine upstream target based on node
+    let upstreamTarget;
+    if (node === 'hydra' || !node) {
+        // Local container - use Docker network name
+        upstreamTarget = `${containerName}:22`;
+    } else {
+        // Remote node - use node hostname and exposed port
+        const nodeConfig = resourceConfig.nodes[node];
+        const nodeHost = nodeConfig?.host || node;
+        upstreamTarget = `${nodeHost}:${sshPort || 22}`;
+    }
 
     try {
         // Create user directory
@@ -204,9 +218,10 @@ async function createSSHPiperConfig(username) {
         // Create sshpiper_upstream file - points to container's SSH port
         await fs.writeFile(
             path.join(userDir, 'sshpiper_upstream'),
-            `${containerName}:22\n`,
+            `${upstreamTarget}\n`,
             { mode: 0o644 }
         );
+        console.log(`[sshpiper] Upstream for ${username}: ${upstreamTarget}`);
 
         // Copy private key for sshpiper to use when connecting upstream
         const privateKeyPath = path.join(SSH_KEYS_DIR, `${username}_id_ed25519`);
@@ -951,8 +966,24 @@ router.post('/migrate', async (req, res) => {
             });
         }
 
-        // Step 3: Create container on target node with GPU support
+        // Step 3: Clean up any existing container on target node
         const containerName = `student-${username}`;
+        try {
+            const existingContainer = targetDocker.getContainer(containerName);
+            const existingInfo = await existingContainer.inspect();
+            console.log(`[containers] Found existing container on ${target_node}, removing...`);
+            if (existingInfo.State.Running) {
+                await existingContainer.stop();
+            }
+            await existingContainer.remove();
+        } catch (err) {
+            // Container doesn't exist on target - that's fine
+            if (err.statusCode !== 404) {
+                console.warn(`[containers] Could not check/remove existing container on ${target_node}:`, err.message);
+            }
+        }
+
+        // Step 4: Create container on target node with GPU support
         const { publicKey } = await generateSSHKeys(username);
 
         // Calculate SSH port
@@ -995,7 +1026,10 @@ router.post('/migrate', async (req, res) => {
         await newContainer.start();
         console.log(`[containers] Container started on ${target_node}`);
 
-        // Step 5: Update container config in database
+        // Step 5: Update sshpiper config to route to new node
+        await createSSHPiperConfig(username, target_node, sshPort);
+
+        // Step 6: Update container config in database
         await updateContainerConfig(username, {
             current_node: target_node,
             last_migration_at: new Date().toISOString()
@@ -1005,7 +1039,10 @@ router.post('/migrate', async (req, res) => {
             success: true,
             message: `Successfully migrated to ${target_node}`,
             target_node,
-            gpu_count: containerConfig.gpu_count
+            gpu_count: containerConfig.gpu_count,
+            sshPort: SSHPIPER_PORT,
+            sshHost: 'hydra.newpaltz.edu',
+            sshUser: username
         });
 
     } catch (err) {

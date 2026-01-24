@@ -78,6 +78,25 @@
             <span class="metric-label">ZFS POOL:</span>
             <span class="metric-value" id="hydra-zfs">--</span>
           </div>
+
+          <div class="section-header">STORAGE CLUSTER</div>
+          <div class="storage-cluster" id="hydra-storage-cluster">
+            <div class="storage-legend">
+              <span class="legend-item"><span class="cube empty"></span> Free</span>
+              <span class="legend-item"><span class="cube used-low"></span> &lt;50%</span>
+              <span class="legend-item"><span class="cube used-med"></span> 50-80%</span>
+              <span class="legend-item"><span class="cube used-high"></span> &gt;80%</span>
+            </div>
+            <div class="storage-grid" id="hydra-storage-grid">
+              <!-- Storage cubes will be inserted here by JS -->
+              <div class="loading">Loading storage data...</div>
+            </div>
+            <div class="storage-summary">
+              <span id="hydra-storage-total">-- students</span> |
+              <span id="hydra-storage-used">-- GB used</span> /
+              <span id="hydra-storage-available">-- TB available</span>
+            </div>
+          </div>
         </div>
       </div>
 
