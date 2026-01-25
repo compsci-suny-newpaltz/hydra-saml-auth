@@ -81,11 +81,34 @@ class K8sClient {
     return response.body.items;
   }
 
-  // Delete a pod
-  async deletePod(name, namespace = this.namespace) {
+  // Delete a pod with optional delete options (gracePeriodSeconds, propagationPolicy)
+  async deletePod(name, optionsOrNamespace = this.namespace) {
     this.init();
     try {
-      await this.coreApi.deleteNamespacedPod(name, namespace);
+      // Handle both old signature (name, namespace) and new signature (name, options)
+      let namespace = this.namespace;
+      let deleteOptions = undefined;
+
+      if (typeof optionsOrNamespace === 'string') {
+        namespace = optionsOrNamespace;
+      } else if (typeof optionsOrNamespace === 'object' && optionsOrNamespace !== null) {
+        // New options object with gracePeriodSeconds etc.
+        deleteOptions = {
+          gracePeriodSeconds: optionsOrNamespace.gracePeriodSeconds,
+          propagationPolicy: optionsOrNamespace.propagationPolicy || 'Background'
+        };
+      }
+
+      await this.coreApi.deleteNamespacedPod(
+        name,
+        namespace,
+        undefined, // pretty
+        undefined, // dryRun
+        deleteOptions?.gracePeriodSeconds, // gracePeriodSeconds
+        undefined, // orphanDependents (deprecated)
+        deleteOptions?.propagationPolicy, // propagationPolicy
+        deleteOptions ? { gracePeriodSeconds: deleteOptions.gracePeriodSeconds } : undefined // body (V1DeleteOptions)
+      );
       return true;
     } catch (err) {
       if (err.statusCode === 404) return false;

@@ -119,6 +119,26 @@
       background: #4b5563 !important;
     }
 
+    /* Mobile-first responsive fixes */
+    @media (max-width: 640px) {
+      #admin-panel {
+        right: 0.5rem;
+        bottom: 0.75rem;
+      }
+      main {
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+      }
+      h2.text-2xl {
+        font-size: 1.25rem;
+      }
+      .tutorial-tooltip {
+        max-width: calc(100vw - 2rem) !important;
+        left: 1rem !important;
+        right: 1rem !important;
+      }
+    }
+
     /* Tutorial Overlay Styles */
     .tutorial-overlay {
       position: fixed;
@@ -353,7 +373,7 @@
   <!-- Admin Approval Panel -->
   <div id="admin-panel" class="fixed bottom-4 right-4 z-50">
     <!-- Dropdown Panel (opens upward) -->
-    <div id="admin-dropdown" class="hidden absolute right-0 bottom-14 w-96 bg-white rounded-lg shadow-xl border border-gray-200">
+    <div id="admin-dropdown" class="hidden absolute right-0 bottom-14 w-[calc(100vw-2rem)] sm:w-96 max-w-[384px] bg-white rounded-lg shadow-xl border border-gray-200">
       <div class="p-4 border-b bg-gray-50 rounded-t-lg">
         <h3 class="font-bold text-gray-800"><i class="fas fa-clipboard-check mr-2"></i>Pending Approvals</h3>
       </div>
@@ -568,7 +588,7 @@
           </div>
           <!-- Resource Info Display -->
           <div id="container-resources" class="hidden mb-4 p-3 bg-white rounded border">
-            <div class="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-3 text-xs sm:text-sm">
               <div class="flex items-center gap-2">
                 <i class="fas fa-microchip text-blue-500"></i>
                 <span><strong id="res-cpu">-</strong> CPU</span>
@@ -689,7 +709,7 @@
 
         <!-- Resource Configuration Modal -->
         <div id="resource-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
-          <div class="relative top-10 mx-auto p-5 border w-11/12 max-w-2xl shadow-lg rounded-md bg-white">
+          <div class="relative top-4 sm:top-10 mx-auto p-3 sm:p-5 border w-[95%] sm:w-11/12 max-w-lg sm:max-w-2xl shadow-lg rounded-md bg-white">
             <div class="flex items-center justify-between mb-4">
               <h3 class="text-xl font-semibold text-gray-900"><i class="fas fa-cog text-purple-600"></i> Configure Resources</h3>
               <button onclick="hideResourceModal()" class="text-gray-500 hover:text-gray-700">
