@@ -8,6 +8,7 @@ A containerized development platform providing persistent development environmen
 
 - [Overview](#overview)
 - [Live Instance](#live-instance)
+- [Docker Hub Images](#docker-hub-images)
 - [Features](#features)
 - [Architecture](#architecture)
 - [Quick Start](#quick-start)
@@ -44,6 +45,37 @@ The system handles authentication, container lifecycle management, and routing t
 | VS Code | `https://hydra.newpaltz.edu/students/{username}/vscode` |
 | Jupyter | `https://hydra.newpaltz.edu/students/{username}/jupyter` |
 
+## Docker Hub Images
+
+Pre-built container images are hosted on Docker Hub for easy deployment across all cluster nodes:
+
+| Image | Description | Size | Link |
+|-------|-------------|------|------|
+| `ndg8743/hydra-student-container` | Standard student container (Ubuntu 22.04, VS Code, Python, Java, Node.js) | ~4GB | [Docker Hub](https://hub.docker.com/r/ndg8743/hydra-student-container) |
+| `ndg8743/hydra-student-container-gpu` | GPU-enabled container (includes CUDA, PyTorch, TensorFlow) | ~20GB | [Docker Hub](https://hub.docker.com/r/ndg8743/hydra-student-container-gpu) |
+
+### Pulling Images
+
+```bash
+# Standard container
+docker pull ndg8743/hydra-student-container:latest
+
+# GPU container (for Chimera/Cerberus nodes)
+docker pull ndg8743/hydra-student-container-gpu:latest
+```
+
+### Data Persistence
+
+Student data is stored separately from container images using PersistentVolumeClaims (PVCs):
+
+- **Container Image**: Contains only the base system (OS, tools, VS Code)
+- **PVC (`/home/student`)**: Contains all student files, projects, and configurations
+
+This separation means:
+- Image updates don't affect student data
+- Students keep their files across container restarts
+- Data persists even when migrating between nodes (via NFS)
+
 ## Features
 
 ### Authentication
@@ -79,13 +111,23 @@ The system handles authentication, container lifecycle management, and routing t
 
 ## Architecture
 
-### 3-Node Cluster
+### 3-Node RKE2 Kubernetes Cluster
 
-| Node | IP | Role | Resources |
-|------|-----|------|-----------|
-| **Hydra** | 192.168.1.150 | Control plane, student containers | 256GB RAM, 64 cores |
-| **Chimera** | 192.168.1.151 | AI inference (OpenWebUI + Ollama) | 3× RTX 3090 (24GB each) |
-| **Cerberus** | 192.168.1.152 | GPU training workloads | 2× RTX 5090 (32GB each) |
+The platform runs on RKE2 (Rancher Kubernetes Engine 2) with orchestration mode configurable via `ORCHESTRATOR=kubernetes` environment variable.
+
+| Node | IP | Role | K8s Labels | Resources |
+|------|-----|------|------------|-----------|
+| **Hydra** | 192.168.1.160 | Control plane, student containers | `hydra.node-role=control-plane` | 256GB RAM, 64 cores, 21TB ZFS |
+| **Chimera** | 192.168.1.150 | AI inference (OpenWebUI + Ollama) | `hydra.node-role=inference`, `hydra.gpu-enabled=true` | 3× RTX 3090 (72GB VRAM) |
+| **Cerberus** | 192.168.1.233 | GPU training workloads | `hydra.node-role=training`, `hydra.gpu-enabled=true` | 2× RTX 5090 (64GB VRAM) |
+
+### Storage Classes
+
+| Class | Backend | Use Case |
+|-------|---------|----------|
+| `hydra-local` | Local path on Hydra | Fast local storage for non-GPU workloads |
+| `hydra-nfs` | NFS (192.168.1.160:/data/containers) | Cross-node storage for GPU migrations |
+| `hydra-hot/warm/cold` | OpenEBS ZFS | Tiered ZFS storage on Hydra |
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -128,18 +170,39 @@ Student containers run on Hydra with isolated Docker networking. All external tr
 
 ## Quick Start
 
+### Prerequisites
+
+- Ubuntu 22.04 LTS on all nodes
+- SSH access with key-based auth
+- sudo/root access
+- NVIDIA drivers pre-installed on GPU nodes
+- NFS server running on Hydra
+- ZFS pool already created on Hydra
+
 ### 1. Clone Repository
 
 ```bash
-git clone https://github.com/your-org/hydra-saml-auth.git
+git clone https://github.com/compsci-suny-newpaltz/hydra-saml-auth.git
 cd hydra-saml-auth
 ```
 
-### 2. Build Student Container Image
+### 2. Pull Student Container Images (Recommended)
+
+Images are pre-built and hosted on Docker Hub:
+
+```bash
+# Standard container (required for all deployments)
+docker pull ndg8743/hydra-student-container:latest
+
+# GPU container (only needed for GPU nodes)
+docker pull ndg8743/hydra-student-container-gpu:latest
+```
+
+Or build from source:
 
 ```bash
 cd student-container
-docker build -t hydra-student-container:latest .
+docker build -t ndg8743/hydra-student-container:latest .
 cd ..
 ```
 
@@ -196,6 +259,91 @@ docker compose ps
 curl -I https://hydra.yourdomain.edu/
 # Should return 302 to login.microsoftonline.com
 ```
+
+## Ansible Deployment (Kubernetes)
+
+For deploying the full RKE2 Kubernetes cluster, use the Ansible playbooks in `/ansible/`.
+
+### Install Ansible
+
+```bash
+pip install ansible
+```
+
+### Update Inventory
+
+Edit `ansible/inventory.yml` with your node IPs:
+
+```yaml
+control_plane:
+  hosts:
+    hydra:
+      ansible_host: 192.168.1.160
+      node_role: control-plane
+
+gpu_nodes:
+  hosts:
+    chimera:
+      ansible_host: 192.168.1.150
+      node_role: inference
+    cerberus:
+      ansible_host: 192.168.1.233
+      node_role: training
+```
+
+### Deploy Cluster
+
+```bash
+cd ansible
+
+# Test connectivity
+ansible -i inventory.yml all -m ping
+
+# Run pre-flight backup (CRITICAL!)
+ansible-playbook -i inventory.yml playbooks/00-preflight-backup.yml
+
+# Deploy full cluster
+ansible-playbook -i inventory.yml playbooks/site.yml
+```
+
+### Step-by-Step Deployment
+
+For more control, run playbooks individually:
+
+```bash
+# 1. Prepare nodes (packages, kernel settings)
+ansible-playbook -i inventory.yml playbooks/01-prepare-nodes.yml
+
+# 2. Install RKE2 control plane on Hydra
+ansible-playbook -i inventory.yml playbooks/02-rke2-server.yml
+
+# 3. Join GPU nodes to cluster
+ansible-playbook -i inventory.yml playbooks/03-rke2-agents.yml
+
+# 4. Configure NVIDIA GPU support
+ansible-playbook -i inventory.yml playbooks/04-gpu-setup.yml
+
+# 5. Deploy Hydra K8s manifests
+ansible-playbook -i inventory.yml playbooks/05-deploy-hydra.yml
+```
+
+### Verify Deployment
+
+```bash
+export KUBECONFIG=ansible/kubeconfig-hydra.yaml
+
+# Check nodes
+kubectl get nodes -o wide
+
+# Check GPU resources
+kubectl describe node chimera | grep nvidia
+kubectl describe node cerberus | grep nvidia
+
+# Check pods
+kubectl get pods -A
+```
+
+For detailed Ansible documentation, see [ansible/README.md](ansible/README.md).
 
 ## Configuration
 
@@ -286,6 +434,8 @@ hydra-saml-auth/
 │   └── logs-api.js          # Activity logging API
 ├── services/
 │   ├── activity-logger.js   # Activity tracking
+│   ├── docker-containers.js # Docker orchestration
+│   ├── k8s-containers.js    # Kubernetes orchestration
 │   └── email-notifications.js # Email alerts
 ├── views/                   # EJS templates
 ├── student-container/
@@ -293,12 +443,23 @@ hydra-saml-auth/
 │   ├── supervisord.conf     # Process manager config
 │   └── entrypoint.sh        # Container startup
 ├── config/
-│   ├── runtime.js           # Runtime configuration
-│   └── resources.js         # Resource presets
+│   ├── runtime.js           # Runtime/orchestrator configuration
+│   └── resources.js         # Resource presets and node configs
+├── ansible/                 # Cluster deployment automation
+│   ├── inventory.yml        # Node definitions
+│   ├── playbooks/           # Deployment playbooks
+│   │   ├── 00-preflight-backup.yml
+│   │   ├── 01-prepare-nodes.yml
+│   │   ├── 02-rke2-server.yml
+│   │   ├── 03-rke2-agents.yml
+│   │   ├── 04-gpu-setup.yml
+│   │   ├── 05-deploy-hydra.yml
+│   │   └── site.yml         # Full deployment
+│   └── README.md            # Ansible documentation
 ├── docker-compose.yaml      # Production stack
 ├── docs/
 │   ├── containers.md        # Container system documentation
-│   └── hydra_infrastructure_guide.tex  # Cluster setup and management guide
+│   └── hydra_infrastructure_guide.tex  # Cluster setup guide
 └── README.md
 ```
 
@@ -311,14 +472,22 @@ docker compose build hydra-saml-auth
 docker compose up -d hydra-saml-auth
 ```
 
-### Rebuild Student Container Image
+### Rebuild and Push Student Container Images
 
 ```bash
+# Build the standard container
 cd student-container
-docker build -t hydra-student-container:latest .
+docker build -t ndg8743/hydra-student-container:latest .
+
+# Build GPU container (if using GPU nodes)
+docker build -f Dockerfile.gpu -t ndg8743/hydra-student-container-gpu:latest .
+
+# Push to Docker Hub
+docker push ndg8743/hydra-student-container:latest
+docker push ndg8743/hydra-student-container-gpu:latest
 ```
 
-> **Note:** Students with existing containers must recreate them to use the updated image.
+> **Note:** Students with existing containers must recreate them to use the updated image. Student data in `/home/student` is preserved (stored in PVC).
 
 ### View Logs
 

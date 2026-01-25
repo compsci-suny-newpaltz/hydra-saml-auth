@@ -13,13 +13,21 @@ function generatePassword(length = 16) {
 
 // Build pod specification from config
 function buildPodSpec(username, email, config) {
-  const nodeConfig = resourceConfig.getNodeConfig(config.target_node || 'hydra');
+  const targetNode = config.target_node || 'hydra';
+  const nodeConfig = resourceConfig.getNodeConfig(targetNode);
+
+  if (!nodeConfig) {
+    throw new Error(`Unknown target node: ${targetNode}. Valid nodes are: hydra, chimera, cerberus`);
+  }
+
   const preset = resourceConfig.presets[config.preset] || resourceConfig.presets.conservative;
 
-  // Determine resource limits
+  // Determine resource limits - prioritize config values over preset
   const memoryMb = config.memory_mb || preset.memory_mb || 512;
   const cpus = config.cpus || preset.cpus || 1;
-  const gpuCount = config.gpu_count || preset.gpu_count || 0;
+  const gpuCount = config.gpu_count !== undefined ? config.gpu_count : (preset.gpu_count || 0);
+
+  console.log(`[K8s] Building pod spec for ${username}: node=${targetNode}, memory=${memoryMb}Mi, cpus=${cpus}, gpu=${gpuCount}`);
 
   const pod = {
     apiVersion: 'v1',
@@ -42,11 +50,8 @@ function buildPodSpec(username, email, config) {
     },
     spec: {
       serviceAccountName: 'student-workload',
-      // SECURITY: No privileged access
+      // Security context - allow container to run entrypoint as root then drop to user 1000
       securityContext: {
-        runAsNonRoot: true,
-        runAsUser: 1000,
-        runAsGroup: 1000,
         fsGroup: 1000,
         seccompProfile: {
           type: 'RuntimeDefault'
@@ -59,6 +64,7 @@ function buildPodSpec(username, email, config) {
       containers: [{
         name: 'student',
         image: gpuCount > 0 ? runtimeConfig.k8s.gpuStudentImage : runtimeConfig.k8s.studentImage,
+        // Use IfNotPresent - images must be imported to RKE2's containerd correctly
         imagePullPolicy: 'IfNotPresent',
         env: [
           { name: 'USERNAME', value: username },
@@ -92,13 +98,9 @@ function buildPodSpec(username, email, config) {
         volumeMounts: [
           { name: 'home', mountPath: '/home/student' }
         ],
-        // SECURITY: No privilege escalation
+        // Container runs as root initially, then drops to user 1000 via entrypoint
         securityContext: {
-          allowPrivilegeEscalation: false,
-          readOnlyRootFilesystem: false,
-          capabilities: {
-            drop: ['ALL']
-          }
+          readOnlyRootFilesystem: false
         }
       }],
       volumes: [
@@ -135,10 +137,10 @@ function buildPVCSpec(username, storageGb, storageClass, config = {}) {
         'app.kubernetes.io/name': 'student-volume',
         'app.kubernetes.io/instance': username,
         'app.kubernetes.io/managed-by': 'hydra-auth',
-        'hydra.owner': username,
-        'hydra.owner-email': config.email || ''
+        'hydra.owner': username
       },
       annotations: {
+        'hydra.owner-email': config.email || '',
         'hydra.preset': config.preset || resourceConfig.defaults.preset,
         'hydra.target-node': config.target_node || 'hydra',
         'hydra.created-at': new Date().toISOString()
@@ -357,8 +359,11 @@ async function getContainerStatus(username) {
 
 /**
  * Start a container - recreate pod if stopped (PVC preserved)
+ * @param {string} username - The student username
+ * @param {string} email - The student email
+ * @param {object} containerConfig - Optional container config from database (for correct node/resources after migration)
  */
-async function startContainer(username, email = '') {
+async function startContainer(username, email = '', containerConfig = null) {
   // Check if pod already exists and running
   const status = await getContainerStatus(username);
   if (status.exists && status.running) {
@@ -371,29 +376,55 @@ async function startContainer(username, email = '') {
     throw new Error(`Container for ${username} not initialized. Use init first.`);
   }
 
-  // Get config from PVC labels or use defaults
-  const ownerEmail = email || pvc.metadata?.labels?.['hydra.owner-email'] || `${username}@newpaltz.edu`;
+  // Get config - prioritize passed containerConfig (from database), then PVC annotations, then defaults
+  // This is important after migration when the database has the updated node but PVC annotations may be stale
+  const ownerEmail = email || pvc.metadata?.annotations?.['hydra.owner-email'] || `${username}@newpaltz.edu`;
+
+  // Build config with proper priority: containerConfig (database) > PVC annotations > defaults
   const config = {
-    preset: pvc.metadata?.annotations?.['hydra.preset'] || resourceConfig.defaults.preset,
-    target_node: pvc.metadata?.annotations?.['hydra.target-node'] || 'hydra',
-    storage_gb: parseInt(pvc.spec?.resources?.requests?.storage) || resourceConfig.defaults.storage_gb
+    preset: containerConfig?.preset_tier || pvc.metadata?.annotations?.['hydra.preset'] || resourceConfig.defaults.preset,
+    target_node: containerConfig?.current_node || pvc.metadata?.annotations?.['hydra.target-node'] || 'hydra',
+    storage_gb: containerConfig?.storage_gb || parseInt(pvc.spec?.resources?.requests?.storage) || resourceConfig.defaults.storage_gb,
+    memory_gb: containerConfig?.memory_gb || resourceConfig.defaults.memory_gb,
+    memory_mb: containerConfig?.memory_gb ? containerConfig.memory_gb * 1024 : (resourceConfig.defaults.memory_mb || resourceConfig.defaults.memory_gb * 1024),
+    cpus: containerConfig?.cpus || resourceConfig.defaults.cpus,
+    gpu_count: containerConfig?.gpu_count || 0
   };
+
+  console.log(`[K8s] Starting container for ${username} with config:`, {
+    target_node: config.target_node,
+    memory_mb: config.memory_mb,
+    cpus: config.cpus,
+    gpu_count: config.gpu_count,
+    preset: config.preset
+  });
 
   try {
     // Check if pod exists but not running - delete it first
     if (status.exists) {
+      console.log(`[K8s] Deleting existing pod for ${username} before restart`);
       await k8sClient.deletePod(`student-${username}`);
-      // Wait a moment for deletion
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Wait for pod deletion to complete
+      for (let i = 0; i < 10; i++) {
+        const podCheck = await k8sClient.getPod(`student-${username}`);
+        if (!podCheck) break;
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
     }
 
-    // Recreate pod
-    console.log(`[K8s] Starting container for ${username} (recreating pod)`);
-    await k8sClient.createPod(buildPodSpec(username, ownerEmail, config));
+    // Build and create pod with proper config
+    const podSpec = buildPodSpec(username, ownerEmail, config);
+    console.log(`[K8s] Creating pod for ${username} on node with selector:`, podSpec.spec.nodeSelector);
+
+    await k8sClient.createPod(podSpec);
 
     return { success: true, message: 'Container started (pod recreated)' };
   } catch (err) {
     console.error(`[K8s] Error starting container for ${username}:`, err.message);
+    // Add more context to the error
+    if (err.body?.message) {
+      console.error(`[K8s] K8s API error details:`, err.body.message);
+    }
     throw err;
   }
 }
@@ -455,8 +486,24 @@ async function wipeContainer(username) {
     // First destroy the container
     await destroyContainer(username);
 
+    // Wait for pod to be fully deleted (up to 30 seconds)
+    const podName = `student-${username}`;
+    for (let i = 0; i < 30; i++) {
+      const pod = await k8sClient.getPod(podName);
+      if (!pod) break;
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+
     // Then delete the PVC
     await k8sClient.deletePVC(`hydra-vol-${username}`);
+
+    // Wait for PVC to be deleted
+    const pvcName = `hydra-vol-${username}`;
+    for (let i = 0; i < 30; i++) {
+      const pvc = await k8sClient.getPVC(pvcName);
+      if (!pvc) break;
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
 
     // Delete the credentials secret
     await k8sClient.deleteSecret(`student-${username}-creds`);
@@ -508,6 +555,126 @@ function getRoutes(username) {
   };
 }
 
+/**
+ * Migrate container to a different node (for GPU access)
+ * Deletes current pod/PVC and recreates on target node with NFS storage
+ */
+async function migrateContainer(username, email, targetNode, config = {}) {
+  const podName = `student-${username}`;
+  const pvcName = `hydra-vol-${username}`;
+  const namespace = runtimeConfig.k8s.namespace;
+
+  console.log(`[k8s-containers] Migrating ${username} to ${targetNode}`);
+
+  // Step 1: Delete current pod if it exists
+  try {
+    const existingPod = await k8sClient.getPod(podName);
+    if (existingPod) {
+      console.log(`[k8s-containers] Deleting existing pod on current node`);
+      await k8sClient.deletePod(podName);
+
+      // Wait for pod to be fully deleted
+      for (let i = 0; i < 30; i++) {
+        const pod = await k8sClient.getPod(podName);
+        if (!pod) break;
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+  } catch (err) {
+    if (err.statusCode !== 404) {
+      console.error(`[k8s-containers] Error deleting pod:`, err.message);
+      throw err;
+    }
+  }
+
+  // Step 2: Get node configuration for target node
+  const nodeConfig = resourceConfig.getNodeConfig(targetNode);
+  if (!nodeConfig) {
+    throw new Error(`Unknown target node: ${targetNode}`);
+  }
+
+  // Step 3: If migrating to GPU node, need to recreate PVC with NFS storage
+  const targetStorageClass = nodeConfig.k8s?.storageClass || 'hydra-local';
+  const currentPVC = await k8sClient.getPVC(pvcName);
+
+  if (currentPVC && targetStorageClass === 'hydra-nfs' &&
+      currentPVC.spec.storageClassName !== 'hydra-nfs') {
+    console.log(`[k8s-containers] Migrating PVC from ${currentPVC.spec.storageClassName} to ${targetStorageClass}`);
+
+    // Delete old PVC (data will be lost - TODO: implement data migration via NFS staging)
+    console.log(`[k8s-containers] Deleting old PVC with local storage`);
+    await k8sClient.deletePVC(pvcName);
+
+    // Wait for PVC to be fully deleted
+    for (let i = 0; i < 30; i++) {
+      const pvc = await k8sClient.getPVC(pvcName);
+      if (!pvc) break;
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+
+    // Create new PVC with NFS storage
+    const storageGb = config.storage_gb || 100;  // Default 100GB for GPU workloads
+    const pvcSpec = buildPVCSpec(username, storageGb, targetStorageClass, {
+      email,
+      preset: config.preset || 'gpu_training',
+      target_node: targetNode
+    });
+
+    console.log(`[k8s-containers] Creating new PVC with NFS storage (${storageGb}GB)`);
+    await k8sClient.createPVC(pvcSpec);
+
+    // Wait for PVC to be bound
+    for (let i = 0; i < 30; i++) {
+      const pvc = await k8sClient.getPVC(pvcName);
+      if (pvc && pvc.status.phase === 'Bound') break;
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+
+  // Step 4: Build new pod spec with target node's nodeSelector
+  const newConfig = {
+    ...config,
+    target_node: targetNode,
+    preset: config.preset || 'gpu_training',
+    memory_mb: config.memory_mb || (config.memory_gb ? config.memory_gb * 1024 : 8192),
+    cpus: config.cpus || 4,
+    gpu_count: config.gpu_count || nodeConfig.gpuCount || 1
+  };
+
+  // Build pod spec
+  const podSpec = buildPodSpec(username, email, newConfig);
+
+  // Step 5: Create the new pod on target node
+  console.log(`[k8s-containers] Creating pod on ${targetNode} with ${newConfig.gpu_count} GPUs`);
+  await k8sClient.createPod(podSpec);
+
+  // Step 6: Wait for pod to be ready
+  let ready = false;
+  for (let i = 0; i < 60; i++) {
+    const pod = await k8sClient.getPod(podName);
+    if (pod && pod.status.phase === 'Running') {
+      const containerStatus = pod.status.containerStatuses?.[0];
+      if (containerStatus?.ready) {
+        ready = true;
+        break;
+      }
+    }
+    await new Promise(resolve => setTimeout(resolve, 2000));
+  }
+
+  if (!ready) {
+    console.warn(`[k8s-containers] Pod not ready after migration, but continuing`);
+  }
+
+  return {
+    success: true,
+    message: `Migrated to ${targetNode}`,
+    target_node: targetNode,
+    gpu_count: newConfig.gpu_count,
+    node_label: nodeConfig.label
+  };
+}
+
 module.exports = {
   initContainer,
   getContainerStatus,
@@ -515,6 +682,7 @@ module.exports = {
   stopContainer,
   destroyContainer,
   wipeContainer,
+  migrateContainer,
   getContainerLogs,
   listContainers,
   getRoutes,

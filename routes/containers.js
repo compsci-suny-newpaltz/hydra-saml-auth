@@ -260,9 +260,44 @@ async function removeSSHPiperConfig(username) {
     }
 }
 
-// Helper to get student's container
+// Helper to get student's container (works in both Docker and K8s mode)
 async function getStudentContainer(username) {
     const containerName = `student-${username}`;
+
+    // Kubernetes mode - use K8s container service
+    if (runtimeConfig.isKubernetes()) {
+        try {
+            const status = await k8sContainers.getContainerStatus(username);
+            if (!status.exists) {
+                return null;
+            }
+            // Return a compatible structure for K8s
+            return {
+                container: null, // No Docker container object in K8s mode
+                info: {
+                    Name: `/${containerName}`,
+                    State: {
+                        Status: status.status,
+                        Running: status.running
+                    },
+                    NetworkSettings: {
+                        IPAddress: status.ip || ''
+                    },
+                    Config: {
+                        Labels: {
+                            'hydra.owner': username
+                        }
+                    }
+                },
+                k8sStatus: status
+            };
+        } catch (err) {
+            console.error(`[K8s] Error getting container status for ${username}:`, err.message);
+            return null;
+        }
+    }
+
+    // Docker mode - use Docker API
     try {
         const container = docker.getContainer(containerName);
         const info = await container.inspect();
@@ -772,6 +807,20 @@ router.post('/start', async (req, res) => {
         }
 
         const username = String(req.user.email).split('@')[0];
+
+        // ========== KUBERNETES MODE ==========
+        if (runtimeConfig.isKubernetes()) {
+            // Get container config from database to ensure we use correct node/resources after migration
+            const { getOrCreateContainerConfig } = require('../services/db-init');
+            const containerConfig = await getOrCreateContainerConfig(username, `student-${username}`);
+
+            console.log(`[containers] Starting container for ${username}, current_node: ${containerConfig.current_node}`);
+
+            const result = await k8sContainers.startContainer(username, req.user.email, containerConfig);
+            return res.json(result);
+        }
+
+        // ========== DOCKER MODE ==========
         const result = await getStudentContainer(username);
 
         if (!result) {
@@ -788,7 +837,18 @@ router.post('/start', async (req, res) => {
         return res.json({ success: true });
     } catch (err) {
         console.error('[containers] start error:', err);
-        return res.status(500).json({ success: false, message: 'Failed to start container' });
+        // Provide better error context for K8s errors
+        let errorMessage = err.message || 'Failed to start container';
+        if (err.body?.message) {
+            console.error('[containers] K8s API error:', err.body.message);
+            errorMessage = `K8s error: ${err.body.message}`;
+        }
+        if (err.statusCode === 409) {
+            errorMessage = 'Container already exists. Please wait a moment and try again.';
+        } else if (err.statusCode === 422) {
+            errorMessage = 'Invalid container configuration. Please contact support.';
+        }
+        return res.status(500).json({ success: false, message: errorMessage });
     }
 });
 
@@ -801,6 +861,14 @@ router.post('/stop', async (req, res) => {
         }
 
         const username = String(req.user.email).split('@')[0];
+
+        // ========== KUBERNETES MODE ==========
+        if (runtimeConfig.isKubernetes()) {
+            const result = await k8sContainers.stopContainer(username);
+            return res.json(result);
+        }
+
+        // ========== DOCKER MODE ==========
         const result = await getStudentContainer(username);
 
         if (!result) {
@@ -817,7 +885,7 @@ router.post('/stop', async (req, res) => {
         return res.json({ success: true });
     } catch (err) {
         console.error('[containers] stop error:', err);
-        return res.status(500).json({ success: false, message: 'Failed to stop container' });
+        return res.status(500).json({ success: false, message: err.message || 'Failed to stop container' });
     }
 });
 
@@ -834,14 +902,38 @@ router.get('/status', async (req, res) => {
         // ========== KUBERNETES MODE ==========
         if (runtimeConfig.isKubernetes()) {
             const status = await k8sContainers.getContainerStatus(username);
+
+            // Get container config for resource info (same as Docker mode)
+            const { getOrCreateContainerConfig, getOrCreateUserQuota } = require('../services/db-init');
+            const containerConfig = await getOrCreateContainerConfig(username, `student-${username}`);
+            const userQuota = await getOrCreateUserQuota(username, req.user.email);
+
+            // Check if user has approved GPU access to a different node
+            let approvedTargetNode = null;
+            if (userQuota.cerberus_approved && containerConfig.current_node !== 'cerberus') {
+                approvedTargetNode = 'cerberus';
+            } else if (userQuota.chimera_approved && containerConfig.current_node !== 'chimera') {
+                approvedTargetNode = 'chimera';
+            }
+
             return res.json({
                 success: true,
                 exists: status.exists,
-                state: status.status || 'not_created',
+                state: status.exists ? status.status : 'not_created',
                 running: status.running || false,
                 startedAt: status.startedAt,
-                node: status.node,
-                restartCount: status.restartCount
+                node: status.node || containerConfig.current_node,
+                restartCount: status.restartCount,
+                resources: {
+                    cpu: containerConfig.cpus,
+                    memory_gb: containerConfig.memory_gb,
+                    storage_gb: containerConfig.storage_gb,
+                    gpu_count: containerConfig.gpu_count,
+                    node: status.node || containerConfig.current_node,
+                    preset: containerConfig.preset_tier,
+                    approved_target_node: approvedTargetNode
+                },
+                k8sMode: true
             });
         }
 
@@ -939,6 +1031,35 @@ router.post('/migrate', async (req, res) => {
 
         console.log(`[containers] Migrating ${username} from ${containerConfig.current_node} to ${target_node}`);
 
+        // ========== KUBERNETES MODE ==========
+        if (runtimeConfig.isKubernetes()) {
+            // Use K8s migration - deletes pod and recreates on target node
+            const result = await k8sContainers.migrateContainer(username, req.user.email, target_node, {
+                memory_gb: containerConfig.memory_gb,
+                memory_mb: containerConfig.memory_gb * 1024,
+                cpus: containerConfig.cpus,
+                gpu_count: containerConfig.gpu_count,
+                storage_gb: containerConfig.storage_gb,
+                preset: containerConfig.preset_tier
+            });
+
+            // Update container config in database
+            await updateContainerConfig(username, {
+                current_node: target_node,
+                last_migration_at: new Date().toISOString()
+            });
+
+            return res.json({
+                success: true,
+                message: result.message,
+                target_node: result.target_node,
+                gpu_count: result.gpu_count,
+                node_label: result.node_label,
+                k8sMode: true
+            });
+        }
+
+        // ========== DOCKER MODE ==========
         // Step 1: Stop and remove current container on Hydra (if exists)
         const currentContainer = await getStudentContainer(username);
         if (currentContainer) {
@@ -1060,6 +1181,26 @@ router.get('/services', async (req, res) => {
         }
 
         const username = String(req.user.email).split('@')[0];
+
+        // ========== KUBERNETES MODE ==========
+        if (runtimeConfig.isKubernetes()) {
+            const status = await k8sContainers.getContainerStatus(username);
+            if (!status.exists) {
+                return res.status(404).json({ success: false, message: 'Container not found' });
+            }
+            // In K8s mode, services are managed by the pod - return running state based on pod status
+            return res.json({
+                success: true,
+                services: status.running ? [
+                    { name: 'code-server', running: true, state: 'RUNNING' },
+                    { name: 'jupyter', running: true, state: 'RUNNING' }
+                ] : [],
+                containerRunning: status.running,
+                k8sMode: true
+            });
+        }
+
+        // ========== DOCKER MODE ==========
         const result = await getStudentContainer(username);
 
         if (!result) {
@@ -1148,6 +1289,19 @@ router.post('/services/:service/start', async (req, res) => {
         }
 
         const username = String(req.user.email).split('@')[0];
+
+        // ========== KUBERNETES MODE ==========
+        if (runtimeConfig.isKubernetes()) {
+            // In K8s mode, services are managed by the pod's supervisor
+            // Return success since services auto-start with the pod
+            return res.json({
+                success: true,
+                message: 'Services are managed automatically in Kubernetes mode',
+                k8sMode: true
+            });
+        }
+
+        // ========== DOCKER MODE ==========
         const result = await getStudentContainer(username);
 
         if (!result) {
@@ -1213,6 +1367,19 @@ router.post('/services/:service/stop', async (req, res) => {
         }
 
         const username = String(req.user.email).split('@')[0];
+
+        // ========== KUBERNETES MODE ==========
+        if (runtimeConfig.isKubernetes()) {
+            // In K8s mode, services are managed by the pod's supervisor
+            // Individual service control not available - use container stop/start
+            return res.json({
+                success: true,
+                message: 'Individual service control not available in Kubernetes mode. Use Stop Container to stop all services.',
+                k8sMode: true
+            });
+        }
+
+        // ========== DOCKER MODE ==========
         const result = await getStudentContainer(username);
 
         if (!result) {
@@ -1273,6 +1440,21 @@ router.get('/routes', async (req, res) => {
         }
 
         const username = String(req.user.email).split('@')[0];
+        const host = 'hydra.newpaltz.edu';
+        const publicBase = (process.env.PUBLIC_STUDENTS_BASE || `https://${host}/students`).replace(/\/$/, '');
+
+        // ========== KUBERNETES MODE ==========
+        if (runtimeConfig.isKubernetes()) {
+            const routes = k8sContainers.getRoutes(username);
+            // Format as array with URLs
+            const routesWithUrls = [
+                { endpoint: 'vscode', port: 8443, url: `${publicBase}/${username}/vscode/` },
+                { endpoint: 'jupyter', port: 8888, url: `${publicBase}/${username}/jupyter/` }
+            ];
+            return res.json({ success: true, routes: routesWithUrls, k8sMode: true });
+        }
+
+        // ========== DOCKER MODE ==========
         const result = await getStudentContainer(username);
 
         if (!result) {
@@ -1314,9 +1496,6 @@ router.get('/routes', async (req, res) => {
                 console.error('[containers] Failed to parse port_routes:', e);
             }
         }
-
-        const host = 'hydra.newpaltz.edu';
-        const publicBase = (process.env.PUBLIC_STUDENTS_BASE || `https://${host}/students`).replace(/\/$/, '');
 
         // Add URLs to routes
         const routesWithUrls = routes.map(route => ({
@@ -1677,6 +1856,30 @@ router.get('/logs/stream', async (req, res) => {
         }
 
         const username = String(req.user.email).split('@')[0];
+
+        // ========== KUBERNETES MODE ==========
+        if (runtimeConfig.isKubernetes()) {
+            res.setHeader('Content-Type', 'text/event-stream');
+            res.setHeader('Cache-Control', 'no-cache');
+            res.setHeader('Connection', 'keep-alive');
+
+            try {
+                const logs = await k8sContainers.getContainerLogs(username, 200);
+                const lines = logs.split('\n');
+                lines.forEach(line => {
+                    if (line) res.write(`data: ${line}\n\n`);
+                });
+            } catch (e) {
+                res.write(`data: [K8s] Unable to fetch logs: ${e.message}\n\n`);
+            }
+
+            // K8s log streaming is more complex - for now just send current logs and close
+            res.write(`data: [K8s] Log streaming ended - refresh for new logs\n\n`);
+            res.end();
+            return;
+        }
+
+        // ========== DOCKER MODE ==========
         const result = await getStudentContainer(username);
 
         if (!result) {

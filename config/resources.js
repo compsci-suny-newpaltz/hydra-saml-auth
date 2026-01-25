@@ -12,7 +12,7 @@ module.exports = {
       maxContainers: 100,
       gpuEnabled: false,
       gpuCount: 0,
-      defaultImage: process.env.STUDENT_IMAGE || 'hydra-student-container:latest',
+      defaultImage: process.env.STUDENT_IMAGE || 'ndg8743/hydra-student-container:latest',
       network: 'hydra_students_net',
       storageBackend: 'zfs',
       storagePath: '/srv/student-volumes',
@@ -20,7 +20,7 @@ module.exports = {
       k8s: {
         nodeSelector: { 'hydra.node-role': 'control-plane' },
         tolerations: [],
-        storageClass: 'hydra-hot'
+        storageClass: 'hydra-local'
       }
     },
     chimera: {
@@ -35,7 +35,7 @@ module.exports = {
       gpuModel: 'RTX 3090',
       gpuVramPerCard: 24, // GB
       gpuVramTotal: 72, // GB total (3x24GB)
-      defaultImage: process.env.GPU_STUDENT_IMAGE || 'hydra-student-container-gpu:latest',
+      defaultImage: process.env.GPU_STUDENT_IMAGE || 'ndg8743/hydra-student-container-gpu:latest',
       network: 'chimera_students_net',
       nfsPath: '/mnt/hydra-nfs',
       requiresApproval: true,
@@ -51,7 +51,7 @@ module.exports = {
         tolerations: [
           { key: 'nvidia.com/gpu', operator: 'Exists', effect: 'NoSchedule' }
         ],
-        storageClass: 'hydra-gpu'
+        storageClass: 'hydra-nfs'  // NFS for cross-node access
       }
     },
     cerberus: {
@@ -66,7 +66,7 @@ module.exports = {
       gpuModel: 'RTX 5090',
       gpuVramPerCard: 32, // GB
       gpuVramTotal: 64, // GB total (2x32GB)
-      defaultImage: process.env.GPU_STUDENT_IMAGE || 'hydra-student-container-gpu:latest',
+      defaultImage: process.env.GPU_STUDENT_IMAGE || 'ndg8743/hydra-student-container-gpu:latest',
       network: 'cerberus_students_net',
       nfsPath: '/mnt/hydra-nfs',
       requiresApproval: true,
@@ -81,7 +81,7 @@ module.exports = {
         tolerations: [
           { key: 'nvidia.com/gpu', operator: 'Exists', effect: 'NoSchedule' }
         ],
-        storageClass: 'hydra-gpu'
+        storageClass: 'hydra-nfs'  // NFS for cross-node access
       }
     }
   },
