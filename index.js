@@ -603,6 +603,27 @@ const ensureAuthenticated = (req, res, next) =>
     // Admin users list for approval panel
     const ADMIN_USERS = (process.env.ADMIN_USERS || '').split(',').map(u => u.trim().toLowerCase()).filter(Boolean);
 
+    // ============================================================================
+    // FUTURE: Department-based access restriction (currently DISABLED - all students allowed)
+    // To enable CS-only access later, uncomment and configure:
+    // ============================================================================
+    // const CS_DEPARTMENTS = ['Computer Science', 'CS', 'CIS'];
+    // const ALLOWED_GROUPS = (process.env.ALLOWED_GROUPS || '').split(',').filter(Boolean);
+    //
+    // function isAllowedStudent(user) {
+    //   const dept = (user.department || '').toLowerCase();
+    //   if (CS_DEPARTMENTS.some(d => dept.includes(d.toLowerCase()))) return true;
+    //   const groups = user.groups || [];
+    //   if (ALLOWED_GROUPS.some(g => groups.includes(g))) return true;
+    //   return false;
+    // }
+    //
+    // // Add this check in dashboard route before rendering:
+    // // if (req.user.affiliation === 'student' && !isAllowedStudent(req.user)) {
+    // //   return res.status(403).render('error', { message: 'Access restricted to CS students' });
+    // // }
+    // ============================================================================
+
     app.get('/dashboard', (req, res) => {
       if (!req.isAuthenticated()) return res.redirect('/login');
       const viewUser = {

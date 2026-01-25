@@ -49,6 +49,8 @@ function buildPodSpec(username, email, config) {
       }
     },
     spec: {
+      // Use NVIDIA runtime for GPU pods - required for GPU device access
+      ...(gpuCount > 0 && { runtimeClassName: 'nvidia' }),
       serviceAccountName: 'student-workload',
       // Security context - allow container to run entrypoint as root then drop to user 1000
       securityContext: {
@@ -400,15 +402,50 @@ async function startContainer(username, email = '', containerConfig = null) {
   });
 
   try {
-    // Check if pod exists but not running - delete it first
-    if (status.exists) {
-      console.log(`[K8s] Deleting existing pod for ${username} before restart`);
-      await k8sClient.deletePod(`student-${username}`);
-      // Wait for pod deletion to complete
-      for (let i = 0; i < 10; i++) {
-        const podCheck = await k8sClient.getPod(`student-${username}`);
-        if (!podCheck) break;
+    // Check if pod exists - delete it first (handle "being deleted" state)
+    const podName = `student-${username}`;
+    let existingPod = await k8sClient.getPod(podName);
+
+    if (existingPod) {
+      console.log(`[K8s] Pod ${podName} exists, deleting before restart`);
+
+      // Force delete with grace period 0 to avoid stuck "Terminating" pods
+      try {
+        await k8sClient.deletePod(podName, { gracePeriodSeconds: 0 });
+      } catch (delErr) {
+        // Ignore 404 - pod already deleted
+        if (delErr.statusCode !== 404) {
+          console.warn(`[K8s] Delete warning for ${podName}:`, delErr.message);
+        }
+      }
+
+      // Wait for pod deletion to complete (up to 30 seconds)
+      console.log(`[K8s] Waiting for pod ${podName} to be fully deleted...`);
+      for (let i = 0; i < 60; i++) {
+        const podCheck = await k8sClient.getPod(podName);
+        if (!podCheck) {
+          console.log(`[K8s] Pod ${podName} deleted successfully`);
+          break;
+        }
+        // Check if pod is stuck in Terminating with deletionTimestamp
+        if (podCheck.metadata?.deletionTimestamp) {
+          console.log(`[K8s] Pod ${podName} is terminating, waiting...`);
+        }
         await new Promise(resolve => setTimeout(resolve, 500));
+
+        // After 15 seconds, try force delete again
+        if (i === 30) {
+          console.log(`[K8s] Pod ${podName} still exists after 15s, force deleting...`);
+          try {
+            await k8sClient.deletePod(podName, { gracePeriodSeconds: 0 });
+          } catch (e) { /* ignore */ }
+        }
+      }
+
+      // Final check - if pod still exists, throw an error
+      const finalCheck = await k8sClient.getPod(podName);
+      if (finalCheck) {
+        throw new Error(`Pod ${podName} is stuck in terminating state. Please try again in a moment.`);
       }
     }
 
