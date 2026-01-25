@@ -3302,26 +3302,32 @@
       },
       <% if (typeof isAdmin !== 'undefined' && isAdmin) { %>
       {
-        type: 'highlight',
-        target: '#admin-panel',
+        type: 'info',
         title: 'Admin Panel',
+        icon: '<i class="fas fa-shield-alt" style="color: white;"></i>',
         content: `
-          <p>As an admin, you can approve resource requests from users.</p>
+          <p style="color: #6b7280; margin-bottom: 16px;">As an admin, you can approve resource requests from users.</p>
+          <div style="background: #fef3c7; border: 1px solid #fcd34d; border-radius: 12px; padding: 16px; margin-bottom: 16px;">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+              <i class="fas fa-bell" style="color: #d97706; font-size: 24px;"></i>
+              <div>
+                <p style="font-weight: 600; color: #92400e;">Look for the bell icon</p>
+                <p style="font-size: 12px; color: #a16207;">Bottom-right corner of the screen</p>
+              </div>
+            </div>
+          </div>
           <ul class="tutorial-feature-list" style="margin: 12px 0;">
             <li><i class="fas fa-check"></i> Approve GPU/resource requests</li>
             <li><i class="fas fa-times"></i> Deny with feedback</li>
             <li><i class="fas fa-users"></i> Monitor all pending requests</li>
+            <li><i class="fas fa-check-double"></i> Bulk approve all requests</li>
           </ul>
-          <p style="color: #6b7280; font-size: 13px;">
-            Click the bell icon to view pending approvals
-          </p>
         `,
         route: {
           method: 'GET',
           path: '/dashboard/api/admin/requests',
           desc: 'List all pending approval requests'
-        },
-        position: 'left'
+        }
       },
       <% } %>
       {
