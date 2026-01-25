@@ -24,10 +24,10 @@ module.exports = {
     kubeconfigPath: process.env.KUBECONFIG || null,
     // Default storage class for student volumes
     defaultStorageClass: process.env.K8S_STORAGE_CLASS || 'hydra-hot',
-    // Student container image
-    studentImage: process.env.STUDENT_IMAGE || 'hydra-student-container:latest',
+    // Student container image (use docker.io prefix for containerd compatibility)
+    studentImage: process.env.STUDENT_IMAGE || 'docker.io/ndg8743/hydra-student-container:latest',
     // GPU student container image
-    gpuStudentImage: process.env.GPU_STUDENT_IMAGE || 'hydra-student-container-gpu:latest'
+    gpuStudentImage: process.env.GPU_STUDENT_IMAGE || 'docker.io/ndg8743/hydra-student-container-gpu:latest'
   },
 
   // Helper to check if running in K8s mode

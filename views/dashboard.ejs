@@ -1672,8 +1672,12 @@
         return null;
       }
 
-      // Show migration in progress UI
-      function showMigrationProgress(targetNode) {
+      // Migration timer state
+      let migrationTimerInterval = null;
+      const MIGRATION_ESTIMATED_SECONDS = 120; // 2 minutes estimated migration time
+
+      // Show migration in progress UI with countdown timer and progress bar
+      function showMigrationProgress(targetNode, startTime = null) {
         const msg = document.getElementById('container-message');
         const migrateBtn = document.getElementById('migrate-btn');
         const migrationBanner = document.getElementById('migration-banner');
@@ -1685,12 +1689,103 @@
         if (migrationBanner) {
           migrationBanner.classList.remove('hidden');
         }
-        msg.innerHTML = `<p class="text-blue-600 bg-blue-50 border border-blue-200 rounded p-2"><i class="fas fa-sync fa-spin mr-2"></i>Migrating container to ${targetNode || 'GPU node'}... This may take a few minutes.</p>`;
+
+        // Calculate elapsed time if startTime provided
+        const elapsed = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0;
+        const remaining = Math.max(0, MIGRATION_ESTIMATED_SECONDS - elapsed);
+
+        msg.innerHTML = `
+          <div class="text-blue-600 bg-blue-50 border border-blue-200 rounded p-4">
+            <div class="flex items-center mb-3">
+              <i class="fas fa-sync fa-spin mr-2"></i>
+              <span>Migrating container to <strong>${targetNode || 'GPU node'}</strong>...</span>
+            </div>
+            <div class="mb-2">
+              <div class="flex justify-between text-sm mb-1">
+                <span id="migration-status-text">Preparing migration...</span>
+                <span id="migration-timer">${formatMigrationTime(remaining)} remaining</span>
+              </div>
+              <div class="w-full bg-blue-200 rounded-full h-2.5">
+                <div id="migration-progress-bar" class="bg-blue-600 h-2.5 rounded-full transition-all duration-1000" style="width: ${Math.min(100, (elapsed / MIGRATION_ESTIMATED_SECONDS) * 100)}%"></div>
+              </div>
+            </div>
+            <p class="text-xs text-blue-500 mt-2">
+              <i class="fas fa-info-circle mr-1"></i>
+              Your files will be preserved. Please do not close this page.
+            </p>
+          </div>
+        `;
+
+        // Start or continue the timer
+        startMigrationTimer(startTime || Date.now());
       }
 
-      // Clear migration progress state
+      // Format seconds into mm:ss format
+      function formatMigrationTime(seconds) {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+      }
+
+      // Start the migration countdown timer
+      function startMigrationTimer(startTime) {
+        // Clear any existing timer
+        if (migrationTimerInterval) {
+          clearInterval(migrationTimerInterval);
+        }
+
+        migrationTimerInterval = setInterval(() => {
+          const elapsed = Math.floor((Date.now() - startTime) / 1000);
+          const remaining = Math.max(0, MIGRATION_ESTIMATED_SECONDS - elapsed);
+          const progress = Math.min(100, (elapsed / MIGRATION_ESTIMATED_SECONDS) * 100);
+
+          const timerEl = document.getElementById('migration-timer');
+          const progressBar = document.getElementById('migration-progress-bar');
+          const statusText = document.getElementById('migration-status-text');
+
+          if (timerEl) {
+            if (remaining > 0) {
+              timerEl.textContent = `${formatMigrationTime(remaining)} remaining`;
+            } else {
+              timerEl.textContent = 'Finishing up...';
+            }
+          }
+
+          if (progressBar) {
+            progressBar.style.width = `${progress}%`;
+          }
+
+          // Update status text based on progress
+          if (statusText) {
+            if (elapsed < 10) {
+              statusText.textContent = 'Preparing migration...';
+            } else if (elapsed < 30) {
+              statusText.textContent = 'Stopping current container...';
+            } else if (elapsed < 60) {
+              statusText.textContent = 'Transferring configuration...';
+            } else if (elapsed < 90) {
+              statusText.textContent = 'Creating container on new node...';
+            } else if (elapsed < 110) {
+              statusText.textContent = 'Starting container with GPU access...';
+            } else {
+              statusText.textContent = 'Finalizing migration...';
+            }
+          }
+        }, 1000);
+      }
+
+      // Stop the migration timer
+      function stopMigrationTimer() {
+        if (migrationTimerInterval) {
+          clearInterval(migrationTimerInterval);
+          migrationTimerInterval = null;
+        }
+      }
+
+      // Clear migration progress state and stop the timer
       function clearMigrationProgress() {
         localStorage.removeItem('hydra_migration_in_progress');
+        stopMigrationTimer();
       }
 
       // Check for migration completion based on container status
@@ -1713,11 +1808,13 @@
           `;
           if (migrationBanner) migrationBanner.classList.add('hidden');
           setTimeout(() => { msg.innerHTML = ''; }, 5000);
+          // Refresh pending requests to clear the approved request from UI
+          loadPendingRequests();
           return true;
         }
 
-        // If still pending/not running, keep showing progress
-        showMigrationProgress(migrationState.targetNode);
+        // If still pending/not running, keep showing progress with the original start time
+        showMigrationProgress(migrationState.targetNode, migrationState.startTime);
         return true;
       }
 
@@ -1741,13 +1838,14 @@
         const migrateBtn = document.getElementById('migrate-btn');
 
         // Save migration state to localStorage for persistence across page refresh
+        const startTime = Date.now();
         localStorage.setItem('hydra_migration_in_progress', JSON.stringify({
           targetNode: targetNode,
-          startTime: Date.now()
+          startTime: startTime
         }));
 
-        // Disable button and show progress
-        showMigrationProgress(targetNode);
+        // Disable button and show progress with timer
+        showMigrationProgress(targetNode, startTime);
 
         try {
           const res = await fetch('/dashboard/api/containers/migrate', {
@@ -1780,6 +1878,9 @@
             migrationBanner.classList.add('hidden');
           }
 
+          // Refresh pending requests to clear the approved request from UI
+          loadPendingRequests();
+
           // Refresh container status
           setTimeout(() => {
             msg.innerHTML = '';
@@ -1797,6 +1898,12 @@
             migrateBtn.disabled = false;
             migrateBtn.innerHTML = '<i class="fas fa-rocket mr-2"></i>Migrate Now';
           }
+
+          // Refresh container status and pending requests after error
+          setTimeout(() => {
+            loadContainerStatus();
+            loadPendingRequests();
+          }, 3000);
         }
       };
 
