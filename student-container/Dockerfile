@@ -77,6 +77,15 @@ RUN install -m 0755 -d /etc/apt/keyrings && \
         docker-compose-plugin && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
+# Install Jenkins (uses Java 21 already installed above)
+RUN curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key | tee \
+    /usr/share/keyrings/jenkins-keyring.asc > /dev/null && \
+    echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/" | \
+    tee /etc/apt/sources.list.d/jenkins.list > /dev/null && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends jenkins && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
 # Create student user with docker group access
 RUN groupadd -f docker && \
     useradd -m -s /bin/bash -u 1000 student && \
@@ -188,6 +197,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends unzip && \
     chown -R root:root /etc/skel/cuh63 && \
     chmod -R 755 /etc/skel/cuh63 && \
     rm /tmp/cuh63.zip
+
+# Install interactive LCC (ilcc) - interactive debugger/visualizer for LCC
+RUN curl -L -o /usr/local/bin/ilcc \
+    "https://github.com/ItBeCharlie/interactive_lccjs/releases/download/v1.0.1/ilcc_LINUX" && \
+    chmod +x /usr/local/bin/ilcc && \
+    echo "Interactive LCC installed"
 
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY entrypoint.sh /entrypoint.sh

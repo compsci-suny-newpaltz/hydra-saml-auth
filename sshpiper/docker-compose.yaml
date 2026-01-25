@@ -1,6 +1,6 @@
 services:
   sshpiper:
-    image: farmer1992/sshpiper:latest
+    image: farmer1992/sshpiperd:latest
     container_name: sshpiper
     ports:
       - "2222:2222"
@@ -12,10 +12,7 @@ services:
     networks:
       - hydra_students_net
     restart: unless-stopped
-    command: >
-      /sshpiperd
-      --workingdir=/var/sshpiper
-      --log-level=info
+    command: /sshpiperd/plugins/workingdir --root /var/sshpiper
     healthcheck:
       test: ["CMD", "nc", "-z", "localhost", "2222"]
       interval: 30s
