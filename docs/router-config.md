@@ -179,3 +179,9 @@ netstat -tlnp | grep 2222
 
 1. Check `sshpiper_upstream` file points to correct container
 2. Verify container is running: `docker ps | grep student-[username]`
+
+---
+
+## Related Documentation
+
+- [RDMA, SR-IOV & GPUDirect Setup](./rdma-gpudirect-setup.md) - High-performance networking for GPU nodes

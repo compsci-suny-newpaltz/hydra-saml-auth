@@ -194,6 +194,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends unzip && \
     chmod -R 755 /etc/skel/cuh63 && \
     rm /tmp/cuh63.zip
 
+# Install interactive LCC (ilcc) - interactive debugger/visualizer for LCC
+RUN curl -L -o /usr/local/bin/ilcc \
+    "https://github.com/ItBeCharlie/interactive_lccjs/releases/download/v1.0.1/ilcc_LINUX" && \
+    chmod +x /usr/local/bin/ilcc && \
+    echo "Interactive LCC installed"
+
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

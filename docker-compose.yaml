@@ -6,11 +6,14 @@ services:
     container_name: hydra-saml-auth
     env_file:
       - .env
+    environment:
+      - KUBECONFIG=/etc/rancher/rke2/rke2.yaml
     command: ["npm", "start"]
     network_mode: host # required for access to chimera:7070 for openwebui password reset
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - /etc/rancher/rke2/rke2.yaml:/etc/rancher/rke2/rke2.yaml:ro
       - ./traefik-dynamic:/etc/traefik/dynamic
       - ./jwt-private.pem:/app/jwt-private.pem:ro
       - ./jwt-public.pem:/app/jwt-public.pem:ro
@@ -24,21 +27,20 @@ services:
       - "traefik.http.services.hydra-auth.loadbalancer.server.port=6969"
 
   traefik:
-    image: traefik:v2.11
+    image: traefik:v3.6
     container_name: traefik
     command:
-      - --providers.docker=true
-      - --providers.docker.exposedbydefault=false
       - --providers.file.directory=/etc/traefik/dynamic
       - --providers.file.watch=true
       - --entrypoints.web.address=:8082
       - --entrypoints.web.forwardedHeaders.trustedIPs=127.0.0.1/32
       - --api.dashboard=true
+      - --api.insecure=true
+      - --log.level=INFO
     ports:
       - "8082:8082"
       - "8081:8080"
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./traefik-dynamic:/etc/traefik/dynamic:ro
     restart: unless-stopped
     networks:
