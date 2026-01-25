@@ -10,18 +10,342 @@
   <title>Hydra Dashboard - SUNY New Paltz</title>
   <style>
     @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+    /* Dark Mode Styles */
+    .dark body,
+    body.dark {
+      background-color: #111827 !important;
+      color: #f3f4f6 !important;
+    }
+    .dark .bg-gray-50 { background-color: #111827 !important; }
+    .dark .bg-white { background-color: #1f2937 !important; }
+    .dark .bg-gray-100 { background-color: #374151 !important; }
+    .dark .text-gray-900 { color: #f3f4f6 !important; }
+    .dark .text-gray-800 { color: #e5e7eb !important; }
+    .dark .text-gray-700 { color: #d1d5db !important; }
+    .dark .text-gray-600 { color: #9ca3af !important; }
+    .dark .text-gray-500 { color: #9ca3af !important; }
+    .dark .text-\[\#052049\] { color: #60a5fa !important; }
+    .dark .border-\[\#052049\] { border-color: #60a5fa !important; }
+    .dark .border { border-color: #374151 !important; }
+    .dark .border-b { border-color: #374151 !important; }
+    .dark .border-gray-200 { border-color: #374151 !important; }
+    .dark .border-gray-300 { border-color: #4b5563 !important; }
+    .dark .shadow { box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 1px 2px 0 rgba(0, 0, 0, 0.2) !important; }
+    .dark .rounded { border-color: #374151; }
+    .dark input, .dark select, .dark textarea {
+      background-color: #374151 !important;
+      border-color: #4b5563 !important;
+      color: #f3f4f6 !important;
+    }
+    .dark input::placeholder { color: #9ca3af !important; }
+    .dark .bg-yellow-50 { background-color: #422006 !important; }
+    .dark .bg-yellow-100 { background-color: #451a03 !important; }
+    .dark .border-yellow-200 { border-color: #854d0e !important; }
+    .dark .text-yellow-800 { color: #fef08a !important; }
+    .dark .text-yellow-700 { color: #fde047 !important; }
+    .dark .text-yellow-600 { color: #facc15 !important; }
+    .dark .bg-blue-50 { background-color: #1e3a5f !important; }
+    .dark .border-blue-200 { border-color: #1d4ed8 !important; }
+    .dark .text-blue-800 { color: #93c5fd !important; }
+    .dark .text-blue-700 { color: #60a5fa !important; }
+    .dark .bg-purple-50 { background-color: #2e1065 !important; }
+    .dark .border-purple-200 { border-color: #7c3aed !important; }
+    .dark .text-purple-800 { color: #c4b5fd !important; }
+    .dark .text-purple-600 { color: #a78bfa !important; }
+    .dark .bg-green-50 { background-color: #14532d !important; }
+    .dark .text-green-600 { color: #4ade80 !important; }
+    .dark .bg-red-100 { background-color: #450a0a !important; }
+    .dark .text-red-700 { color: #fca5a5 !important; }
+    .dark .hover\:text-gray-900:hover { color: #f3f4f6 !important; }
+
+    /* Dark mode for modals */
+    .dark #resource-modal > div,
+    .dark #wipe-modal > div {
+      background-color: #1f2937 !important;
+      border-color: #374151 !important;
+    }
+
+    /* Dark mode header */
+    .dark header {
+      background-color: #0f172a !important;
+    }
+
+    /* Dark mode admin panel */
+    .dark #admin-dropdown {
+      background-color: #1f2937 !important;
+      border-color: #374151 !important;
+    }
+    .dark #admin-dropdown .bg-gray-50 {
+      background-color: #111827 !important;
+    }
+
+    /* Dark mode toast container */
+    .dark #toast-container div {
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Smooth transition for dark mode */
+    body, header, main, .bg-white, .bg-gray-50, input, select, textarea {
+      transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+    }
+
+    /* Dark mode for tutorial */
+    .dark .tutorial-tooltip,
+    .dark .tutorial-welcome {
+      background: #1f2937 !important;
+      color: #f3f4f6 !important;
+    }
+    .dark .tutorial-tooltip::before,
+    .dark .tutorial-welcome::before {
+      background: #1f2937 !important;
+    }
+    .dark .tutorial-tooltip h3,
+    .dark .tutorial-welcome h2 {
+      color: #f3f4f6 !important;
+    }
+    .dark .tutorial-feature-list li {
+      color: #d1d5db !important;
+    }
+    .dark .tutorial-feature-list li i {
+      background: #374151 !important;
+      color: #a78bfa !important;
+    }
+    .dark .tutorial-btn-secondary {
+      background: #374151 !important;
+      color: #e5e7eb !important;
+    }
+    .dark .tutorial-btn-secondary:hover {
+      background: #4b5563 !important;
+    }
+
+    /* Tutorial Overlay Styles */
+    .tutorial-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.75);
+      z-index: 9998;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      pointer-events: none;
+    }
+    .tutorial-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .tutorial-spotlight {
+      position: absolute;
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.75);
+      border-radius: 8px;
+      transition: all 0.4s ease;
+      z-index: 9999;
+      pointer-events: none;
+    }
+    .tutorial-spotlight::after {
+      content: '';
+      position: absolute;
+      inset: -4px;
+      border: 2px solid #8b5cf6;
+      border-radius: 12px;
+      animation: spotlight-pulse 2s infinite;
+    }
+    @keyframes spotlight-pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(1.02); }
+    }
+
+    .tutorial-tooltip {
+      position: fixed;
+      background: white;
+      border-radius: 16px;
+      padding: 24px;
+      max-width: 420px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+      z-index: 10000;
+      transform: translateY(10px);
+      opacity: 0;
+      transition: all 0.3s ease;
+    }
+    .tutorial-tooltip.visible {
+      transform: translateY(0);
+      opacity: 1;
+    }
+    .tutorial-tooltip::before {
+      content: '';
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      background: white;
+      transform: rotate(45deg);
+    }
+    .tutorial-tooltip.arrow-top::before { top: -8px; left: 32px; }
+    .tutorial-tooltip.arrow-bottom::before { bottom: -8px; left: 32px; }
+    .tutorial-tooltip.arrow-left::before { left: -8px; top: 32px; }
+    .tutorial-tooltip.arrow-right::before { right: -8px; top: 32px; }
+
+    .tutorial-progress {
+      display: flex;
+      gap: 6px;
+      margin-top: 16px;
+    }
+    .tutorial-progress-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #e5e7eb;
+      transition: all 0.3s ease;
+    }
+    .tutorial-progress-dot.active {
+      background: #8b5cf6;
+      transform: scale(1.2);
+    }
+    .tutorial-progress-dot.completed {
+      background: #22c55e;
+    }
+
+    .tutorial-btn {
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+    .tutorial-btn-primary {
+      background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+      color: white;
+    }
+    .tutorial-btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+    }
+    .tutorial-btn-secondary {
+      background: #f3f4f6;
+      color: #374151;
+    }
+    .tutorial-btn-secondary:hover {
+      background: #e5e7eb;
+    }
+    .tutorial-btn-skip {
+      background: transparent;
+      color: #9ca3af;
+      padding: 10px 12px;
+    }
+    .tutorial-btn-skip:hover {
+      color: #6b7280;
+    }
+
+    .tutorial-welcome {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0.9);
+      background: white;
+      border-radius: 24px;
+      padding: 40px;
+      max-width: 500px;
+      text-align: center;
+      z-index: 10000;
+      opacity: 0;
+      transition: all 0.4s ease;
+    }
+    .tutorial-welcome.visible {
+      transform: translate(-50%, -50%) scale(1);
+      opacity: 1;
+    }
+
+    .tutorial-icon {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 20px;
+      background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 36px;
+    }
+
+    .tutorial-route-box {
+      background: #1e1e1e;
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin: 12px 0;
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 13px;
+      color: #4ade80;
+      text-align: left;
+    }
+    .tutorial-route-box .route-method {
+      color: #60a5fa;
+      font-weight: bold;
+    }
+    .tutorial-route-box .route-path {
+      color: #fbbf24;
+    }
+
+    .tutorial-feature-list {
+      text-align: left;
+      margin: 16px 0;
+    }
+    .tutorial-feature-list li {
+      padding: 8px 0;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: #4b5563;
+    }
+    .tutorial-feature-list li i {
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #f3f4f6;
+      border-radius: 6px;
+      color: #8b5cf6;
+      font-size: 12px;
+    }
   </style>
 </head>
 
-<body class="bg-gray-50 text-gray-900">
-  <header class="bg-[#052049] text-white">
+<body class="bg-gray-50 text-gray-900 transition-colors duration-300">
+  <!-- Dark Mode Initialization (prevents flash) -->
+  <script>
+    (function() {
+      const darkMode = localStorage.getItem('hydra_dark_mode');
+      if (darkMode === 'true' || (!darkMode && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.body.classList.add('dark');
+      }
+    })();
+  </script>
+  <header class="bg-[#052049] text-white transition-colors duration-300">
     <div class="max-w-5xl mx-auto px-4 py-4 relative flex items-center gap-3">
       <img id="hydra-cat" src="https://hydra.newpaltz.edu/SUNYCAT.png" alt="Hydra" class="h-8 w-8 rounded cursor-pointer select-none" />
       <h1 class="text-xl font-semibold">SUNY New Paltz - Hydra</h1>
-      <a href="https://github.com/lettucegoblin/hydra-saml-auth" target="_blank"
-        class="absolute top-4 right-4 text-white">
-        <i class="fab fa-github text-2xl"></i>
-      </a>
+      <div class="absolute top-4 right-4 flex items-center gap-2">
+        <!-- Demo/Tutorial Button -->
+        <button id="demo-btn" onclick="window.hydra_tutorial && window.hydra_tutorial.reset()"
+          class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-sm font-medium"
+          title="Start interactive tour">
+          <i class="fas fa-graduation-cap"></i>
+          <span class="hidden sm:inline">Demo</span>
+        </button>
+        <!-- Dark Mode Toggle -->
+        <button id="dark-mode-toggle"
+          class="flex items-center justify-center w-9 h-9 rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
+          title="Toggle dark mode">
+          <i id="dark-mode-icon" class="fas fa-moon"></i>
+        </button>
+        <!-- GitHub Link -->
+        <a href="https://github.com/lettucegoblin/hydra-saml-auth" target="_blank"
+          class="flex items-center justify-center w-9 h-9 rounded-lg bg-white/10 hover:bg-white/20 transition-colors">
+          <i class="fab fa-github text-lg"></i>
+        </a>
+      </div>
     </div>
   </header>
 
@@ -929,6 +1253,16 @@
     </div>
   </main>
 
+  <!-- Footer -->
+  <footer class="bg-slate-800 border-t border-slate-700 py-4 mt-8">
+    <div class="text-center">
+      <a href="https://github.com/compsci-suny-newpaltz" target="_blank" rel="noopener noreferrer"
+         class="text-slate-400 hover:text-white transition-colors text-sm">
+        Made by: SUNY Hydra Lab Team 2026 @ SUNY New Paltz
+      </a>
+    </div>
+  </footer>
+
   <script>
     document.addEventListener('DOMContentLoaded', function () {
       const email = "<%= user.email %>";
@@ -969,6 +1303,34 @@
         });
       });
 
+      // ==================== Dark Mode Toggle ====================
+      const darkModeToggle = document.getElementById('dark-mode-toggle');
+      const darkModeIcon = document.getElementById('dark-mode-icon');
+
+      function updateDarkModeIcon() {
+        const isDark = document.body.classList.contains('dark');
+        darkModeIcon.className = isDark ? 'fas fa-sun' : 'fas fa-moon';
+        darkModeToggle.title = isDark ? 'Switch to light mode' : 'Switch to dark mode';
+      }
+
+      // Initialize icon based on current state
+      updateDarkModeIcon();
+
+      darkModeToggle.addEventListener('click', () => {
+        document.body.classList.toggle('dark');
+        const isDark = document.body.classList.contains('dark');
+        localStorage.setItem('hydra_dark_mode', isDark);
+        updateDarkModeIcon();
+      });
+
+      // Listen for system preference changes
+      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+        if (localStorage.getItem('hydra_dark_mode') === null) {
+          document.body.classList.toggle('dark', e.matches);
+          updateDarkModeIcon();
+        }
+      });
+
       // Easter egg: Click cat 20 times to reveal Minecraft tab
       let catClicks = 0;
       const hydraCat = document.getElementById('hydra-cat');
@@ -987,8 +1349,23 @@
       });
 
       // Centralized API helper with 401 redirect
+      let authRedirectInProgress = false;
       function handleAuthError(res) {
-        if (res.status === 401) {
+        if (res && res.status === 401) {
+          if (!authRedirectInProgress) {
+            authRedirectInProgress = true;
+            window.location.href = '/login?returnTo=' + encodeURIComponent(window.location.pathname);
+          }
+          return true;
+        }
+        return false;
+      }
+
+      // Handle fetch errors (often caused by CORS on auth redirect)
+      function handleFetchError(err) {
+        if (err && err.message && err.message.includes('Failed to fetch') && !authRedirectInProgress) {
+          console.warn('[Auth] Session may have expired, redirecting to login...');
+          authRedirectInProgress = true;
           window.location.href = '/login?returnTo=' + encodeURIComponent(window.location.pathname);
           return true;
         }
@@ -996,19 +1373,29 @@
       }
 
       async function api(url, opts = {}) {
-        const res = await fetch(url, opts);
-        if (handleAuthError(res)) return null;
-        if (!res.ok) throw new Error(await res.text());
-        return await res.json();
+        try {
+          const res = await fetch(url, opts);
+          if (handleAuthError(res)) return null;
+          if (!res.ok) throw new Error(await res.text());
+          return await res.json();
+        } catch (err) {
+          if (handleFetchError(err)) return null;
+          throw err;
+        }
       }
 
       async function apiJson(url, opts = {}) {
-        const res = await fetch(url, {
-          ...opts,
-          headers: { 'Content-Type': 'application/json', ...opts.headers }
-        });
-        if (handleAuthError(res)) return null;
-        return res;
+        try {
+          const res = await fetch(url, {
+            ...opts,
+            headers: { 'Content-Type': 'application/json', ...opts.headers }
+          });
+          if (handleAuthError(res)) return null;
+          return res;
+        } catch (err) {
+          if (handleFetchError(err)) return null;
+          throw err;
+        }
       }
       async function loadMinecraftUsername() {
         try {
@@ -1100,6 +1487,16 @@
           if (handleAuthError(res)) return;
           const data = await res.json();
 
+          // Check if migration is in progress (persists across page refresh)
+          const migrationState = checkMigrationInProgress();
+          if (migrationState) {
+            // Handle migration status - returns true if migration still in progress
+            if (handleMigrationStatus(data, migrationState)) {
+              // Migration in progress, skip normal UI update for state
+              // But still update resources display
+            }
+          }
+
           const badge = document.getElementById('container-state-badge');
           const notCreated = document.getElementById('container-not-created');
           const controls = document.getElementById('container-controls');
@@ -1119,10 +1516,12 @@
 
             // Show migration banner if approved for GPU node but not yet migrated
             const migrationBanner = document.getElementById('migration-banner');
-            if (data.resources.approved_target_node && data.resources.gpu_count > 0) {
+            if (data.resources.approved_target_node) {
               document.getElementById('migrate-target-node').textContent =
                 data.resources.approved_target_node.charAt(0).toUpperCase() + data.resources.approved_target_node.slice(1);
-              document.getElementById('migrate-gpu-count').textContent = data.resources.gpu_count;
+              // Show GPU count if set, otherwise show "GPU access"
+              const gpuCount = data.resources.gpu_count || 1;
+              document.getElementById('migrate-gpu-count').textContent = gpuCount;
               migrationBanner.classList.remove('hidden');
               // Store target node for migration function
               window.approvedTargetNode = data.resources.approved_target_node;
@@ -1165,6 +1564,7 @@
             }
           }
         } catch (err) {
+          if (handleFetchError(err)) return;
           console.error('Failed to load container status:', err);
         }
       }
@@ -1251,7 +1651,76 @@
         }
       }
 
-      // GPU Migration Function
+      // GPU Migration Functions
+      // Check if migration is in progress (persists across page refresh)
+      function checkMigrationInProgress() {
+        const migrationState = localStorage.getItem('hydra_migration_in_progress');
+        if (migrationState) {
+          try {
+            const state = JSON.parse(migrationState);
+            // Check if migration started within the last 10 minutes
+            if (state.startTime && (Date.now() - state.startTime) < 600000) {
+              return state;
+            } else {
+              // Migration timed out, clear state
+              localStorage.removeItem('hydra_migration_in_progress');
+            }
+          } catch (e) {
+            localStorage.removeItem('hydra_migration_in_progress');
+          }
+        }
+        return null;
+      }
+
+      // Show migration in progress UI
+      function showMigrationProgress(targetNode) {
+        const msg = document.getElementById('container-message');
+        const migrateBtn = document.getElementById('migrate-btn');
+        const migrationBanner = document.getElementById('migration-banner');
+
+        if (migrateBtn) {
+          migrateBtn.disabled = true;
+          migrateBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Migrating...';
+        }
+        if (migrationBanner) {
+          migrationBanner.classList.remove('hidden');
+        }
+        msg.innerHTML = `<p class="text-blue-600 bg-blue-50 border border-blue-200 rounded p-2"><i class="fas fa-sync fa-spin mr-2"></i>Migrating container to ${targetNode || 'GPU node'}... This may take a few minutes.</p>`;
+      }
+
+      // Clear migration progress state
+      function clearMigrationProgress() {
+        localStorage.removeItem('hydra_migration_in_progress');
+      }
+
+      // Check for migration completion based on container status
+      function handleMigrationStatus(data, migrationState) {
+        if (!migrationState) return false;
+
+        const msg = document.getElementById('container-message');
+        const migrateBtn = document.getElementById('migrate-btn');
+        const migrationBanner = document.getElementById('migration-banner');
+
+        // If container is now running on the target node, migration is complete
+        if (data.exists && data.running && data.resources &&
+            data.resources.node === migrationState.targetNode) {
+          clearMigrationProgress();
+          msg.innerHTML = `
+            <p class="text-green-700 bg-green-100 border border-green-200 rounded p-2">
+              <i class="fas fa-check-circle mr-2"></i>
+              Container successfully migrated to ${migrationState.targetNode}!
+            </p>
+          `;
+          if (migrationBanner) migrationBanner.classList.add('hidden');
+          setTimeout(() => { msg.innerHTML = ''; }, 5000);
+          return true;
+        }
+
+        // If still pending/not running, keep showing progress
+        showMigrationProgress(migrationState.targetNode);
+        return true;
+      }
+
       window.migrateContainer = async function() {
         const targetNode = window.approvedTargetNode;
         if (!targetNode) {
@@ -1271,12 +1740,14 @@
         const msg = document.getElementById('container-message');
         const migrateBtn = document.getElementById('migrate-btn');
 
+        // Save migration state to localStorage for persistence across page refresh
+        localStorage.setItem('hydra_migration_in_progress', JSON.stringify({
+          targetNode: targetNode,
+          startTime: Date.now()
+        }));
+
         // Disable button and show progress
-        if (migrateBtn) {
-          migrateBtn.disabled = true;
-          migrateBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Migrating...';
-        }
-        msg.innerHTML = '<p class="text-blue-600 bg-blue-50 border border-blue-200 rounded p-2"><i class="fas fa-sync fa-spin mr-2"></i>Migrating container to GPU node... This may take a few minutes.</p>';
+        showMigrationProgress(targetNode);
 
         try {
           const res = await fetch('/dashboard/api/containers/migrate', {
@@ -1291,6 +1762,9 @@
           if (!res.ok || !data.success) {
             throw new Error(data.message || 'Migration failed');
           }
+
+          // Clear migration state from localStorage on success
+          clearMigrationProgress();
 
           msg.innerHTML = `
             <p class="text-green-700 bg-green-100 border border-green-200 rounded p-2">
@@ -1313,6 +1787,9 @@
           }, 3000);
 
         } catch (err) {
+          // Clear migration state on error
+          clearMigrationProgress();
+
           msg.innerHTML = `<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2"><i class="fas fa-exclamation-triangle mr-2"></i>${err.message || 'Failed to migrate container'}</p>`;
 
           // Re-enable button on error
@@ -2637,6 +3114,538 @@
       if (eventSource) eventSource.close();
     });
     <% } %>
+  </script>
+
+  <!-- Interactive Tutorial System -->
+  <div id="tutorial-overlay" class="tutorial-overlay"></div>
+  <div id="tutorial-spotlight" class="tutorial-spotlight" style="display: none;"></div>
+  <div id="tutorial-tooltip" class="tutorial-tooltip" style="display: none;"></div>
+  <div id="tutorial-welcome" class="tutorial-welcome" style="display: none;"></div>
+
+  <script>
+  // ==================== Interactive Tutorial System ====================
+  (function() {
+    const TUTORIAL_VERSION = '1.0';
+    const STORAGE_KEY = 'hydra_tutorial_completed';
+
+    // Tutorial steps configuration
+    const tutorialSteps = [
+      {
+        type: 'welcome',
+        title: 'Welcome to Hydra!',
+        icon: '<img src="https://hydra.newpaltz.edu/SUNYCAT.png" alt="Hydra" style="width: 60px; height: 60px; border-radius: 12px;">',
+        content: `
+          <p style="color: #6b7280; margin-bottom: 16px;">Your personal development environment at SUNY New Paltz</p>
+          <ul class="tutorial-feature-list">
+            <li><i class="fas fa-cube"></i> Personal Linux container with full terminal access</li>
+            <li><i class="fas fa-code"></i> VS Code in browser (code-server)</li>
+            <li><i class="fas fa-bolt"></i> GPU access for ML/AI workloads</li>
+            <li><i class="fas fa-robot"></i> OpenWebUI for AI chat models</li>
+            <li><i class="fas fa-cogs"></i> n8n workflow automation</li>
+          </ul>
+        `,
+        showRoutes: false
+      },
+      {
+        type: 'highlight',
+        target: '#container-status-section',
+        title: 'Container Status',
+        content: `
+          <p>This shows your container's current state and allocated resources.</p>
+          <ul class="tutorial-feature-list" style="margin: 12px 0;">
+            <li><i class="fas fa-microchip"></i> <strong>CPU</strong> - Processing cores allocated</li>
+            <li><i class="fas fa-memory"></i> <strong>RAM</strong> - Memory for your applications</li>
+            <li><i class="fas fa-hdd"></i> <strong>Storage</strong> - Persistent disk space</li>
+            <li><i class="fas fa-server"></i> <strong>Node</strong> - Which server hosts your container</li>
+          </ul>
+        `,
+        route: {
+          method: 'GET',
+          path: '/dashboard/api/containers/status',
+          desc: 'Fetches container state and resource info'
+        },
+        position: 'bottom'
+      },
+      {
+        type: 'highlight',
+        target: '#container-controls',
+        title: 'Container Controls',
+        content: `
+          <p>Manage your container with these controls:</p>
+          <ul class="tutorial-feature-list" style="margin: 12px 0;">
+            <li><i class="fas fa-play" style="color: #22c55e;"></i> <strong>Start</strong> - Boot your container</li>
+            <li><i class="fas fa-stop" style="color: #ef4444;"></i> <strong>Stop</strong> - Shut down gracefully</li>
+            <li><i class="fas fa-terminal" style="color: #3b82f6;"></i> <strong>Terminal</strong> - Opens VS Code in browser</li>
+            <li><i class="fas fa-cog" style="color: #8b5cf6;"></i> <strong>Configure</strong> - Request more resources</li>
+          </ul>
+        `,
+        route: {
+          method: 'POST',
+          path: '/dashboard/api/containers/{start|stop}',
+          desc: 'Controls container lifecycle'
+        },
+        position: 'bottom'
+      },
+      {
+        type: 'highlight',
+        target: '#resource-config-btn',
+        title: 'Resource Configuration',
+        content: `
+          <p>Need more power? Click <strong>Configure</strong> to request:</p>
+          <ul class="tutorial-feature-list" style="margin: 12px 0;">
+            <li><i class="fas fa-arrow-up"></i> More CPU cores or RAM</li>
+            <li><i class="fas fa-bolt"></i> GPU access on Chimera/Cerberus</li>
+            <li><i class="fas fa-hdd"></i> Additional storage space</li>
+          </ul>
+          <p style="color: #6b7280; font-size: 13px; margin-top: 8px;">
+            <i class="fas fa-info-circle"></i> Some resources require admin approval
+          </p>
+        `,
+        route: {
+          method: 'POST',
+          path: '/dashboard/api/resource-requests',
+          desc: 'Submit resource upgrade request'
+        },
+        position: 'left'
+      },
+      {
+        type: 'highlight',
+        target: '#terminal-btn',
+        title: 'Terminal Access (VS Code)',
+        content: `
+          <p>Opens <strong>code-server</strong> - VS Code running in your browser!</p>
+          <ul class="tutorial-feature-list" style="margin: 12px 0;">
+            <li><i class="fas fa-folder"></i> Full file system access</li>
+            <li><i class="fas fa-terminal"></i> Integrated terminal</li>
+            <li><i class="fas fa-puzzle-piece"></i> Extension support</li>
+            <li><i class="fas fa-code-branch"></i> Git integration</li>
+          </ul>
+          <p style="color: #6b7280; font-size: 13px;">
+            Access at: <code style="background: #f3f4f6; padding: 2px 6px; border-radius: 4px;">https://hydra.newpaltz.edu/vscode/</code>
+          </p>
+        `,
+        route: {
+          method: 'GET',
+          path: '/vscode/',
+          desc: 'Proxied code-server instance'
+        },
+        position: 'left'
+      },
+      {
+        type: 'highlight',
+        target: '#tab-openwebui',
+        title: 'OpenWebUI - AI Chat',
+        content: `
+          <p>Access AI language models through a ChatGPT-like interface.</p>
+          <ul class="tutorial-feature-list" style="margin: 12px 0;">
+            <li><i class="fas fa-comments"></i> Chat with various AI models</li>
+            <li><i class="fas fa-user"></i> Create your account here</li>
+            <li><i class="fas fa-key"></i> Manage your credentials</li>
+          </ul>
+          <p style="color: #6b7280; font-size: 13px;">
+            Available at: <code style="background: #f3f4f6; padding: 2px 6px; border-radius: 4px;">https://gpt.hydra.newpaltz.edu</code>
+          </p>
+        `,
+        route: {
+          method: 'POST',
+          path: '/dashboard/api/webui/account',
+          desc: 'Create/manage OpenWebUI account'
+        },
+        position: 'bottom'
+      },
+      {
+        type: 'highlight',
+        target: '#tab-n8n',
+        title: 'n8n - Workflow Automation',
+        content: `
+          <p>Build automated workflows with a visual editor.</p>
+          <ul class="tutorial-feature-list" style="margin: 12px 0;">
+            <li><i class="fas fa-project-diagram"></i> Connect apps and services</li>
+            <li><i class="fas fa-clock"></i> Schedule automated tasks</li>
+            <li><i class="fas fa-webhook"></i> Trigger workflows via webhooks</li>
+          </ul>
+          <p style="color: #6b7280; font-size: 13px;">
+            Available at: <code style="background: #f3f4f6; padding: 2px 6px; border-radius: 4px;">https://n8n.hydra.newpaltz.edu</code>
+          </p>
+        `,
+        route: {
+          method: 'POST',
+          path: '/dashboard/api/n8n/account',
+          desc: 'Create/manage n8n account'
+        },
+        position: 'bottom'
+      },
+      {
+        type: 'info',
+        title: 'GPU Nodes: Chimera & Cerberus',
+        icon: '<i class="fas fa-microchip" style="color: white;"></i>',
+        content: `
+          <p style="color: #6b7280; margin-bottom: 16px;">For ML/AI workloads, request migration to a GPU node:</p>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+            <div style="background: #fef3c7; padding: 12px; border-radius: 8px;">
+              <strong style="color: #92400e;">Chimera</strong>
+              <p style="font-size: 12px; color: #92400e;">3× RTX 3090 (24GB each)</p>
+              <p style="font-size: 11px; color: #a16207;">Best for inference</p>
+            </div>
+            <div style="background: #dbeafe; padding: 12px; border-radius: 8px;">
+              <strong style="color: #1e40af;">Cerberus</strong>
+              <p style="font-size: 12px; color: #1e40af;">2× RTX 5090 (32GB each)</p>
+              <p style="font-size: 11px; color: #1d4ed8;">Best for training</p>
+            </div>
+          </div>
+        `,
+        route: {
+          method: 'POST',
+          path: '/dashboard/api/containers/migrate',
+          desc: 'Migrate container to GPU node'
+        }
+      },
+      <% if (typeof isAdmin !== 'undefined' && isAdmin) { %>
+      {
+        type: 'highlight',
+        target: '#admin-panel',
+        title: 'Admin Panel',
+        content: `
+          <p>As an admin, you can approve resource requests from users.</p>
+          <ul class="tutorial-feature-list" style="margin: 12px 0;">
+            <li><i class="fas fa-check"></i> Approve GPU/resource requests</li>
+            <li><i class="fas fa-times"></i> Deny with feedback</li>
+            <li><i class="fas fa-users"></i> Monitor all pending requests</li>
+          </ul>
+          <p style="color: #6b7280; font-size: 13px;">
+            Click the bell icon to view pending approvals
+          </p>
+        `,
+        route: {
+          method: 'GET',
+          path: '/dashboard/api/admin/requests',
+          desc: 'List all pending approval requests'
+        },
+        position: 'left'
+      },
+      <% } %>
+      {
+        type: 'info',
+        title: 'API Routes Overview',
+        icon: '<i class="fas fa-route" style="color: white;"></i>',
+        content: `
+          <p style="color: #6b7280; margin-bottom: 12px;">Hydra uses these main API endpoints:</p>
+          <div class="tutorial-route-box">
+            <div><span class="route-method">GET</span> <span class="route-path">/dashboard/api/containers/status</span></div>
+            <div style="margin-top: 4px;"><span class="route-method">POST</span> <span class="route-path">/dashboard/api/containers/{start|stop}</span></div>
+            <div style="margin-top: 4px;"><span class="route-method">POST</span> <span class="route-path">/dashboard/api/resource-requests</span></div>
+            <div style="margin-top: 4px;"><span class="route-method">GET</span> <span class="route-path">/dashboard/api/resource-requests/my</span></div>
+            <div style="margin-top: 4px;"><span class="route-method">POST</span> <span class="route-path">/dashboard/api/containers/migrate</span></div>
+          </div>
+          <p style="color: #9ca3af; font-size: 12px; margin-top: 8px;">
+            All routes require authentication via SAML SSO
+          </p>
+        `
+      },
+      {
+        type: 'complete',
+        title: "You're All Set!",
+        icon: '<i class="fas fa-check" style="color: white;"></i>',
+        content: `
+          <p style="color: #6b7280; margin-bottom: 16px;">You now know how to use the Hydra dashboard!</p>
+          <ul class="tutorial-feature-list">
+            <li><i class="fas fa-play"></i> Start your container to begin coding</li>
+            <li><i class="fas fa-terminal"></i> Use Terminal for VS Code access</li>
+            <li><i class="fas fa-cog"></i> Configure resources when needed</li>
+            <li><i class="fas fa-question-circle"></i> Click the cat logo to replay this tour</li>
+          </ul>
+        `
+      }
+    ];
+
+    let currentStep = 0;
+    let isActive = false;
+
+    // DOM elements
+    const overlay = document.getElementById('tutorial-overlay');
+    const spotlight = document.getElementById('tutorial-spotlight');
+    const tooltip = document.getElementById('tutorial-tooltip');
+    const welcome = document.getElementById('tutorial-welcome');
+
+    // Check if tutorial should show
+    function shouldShowTutorial() {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        try {
+          const data = JSON.parse(stored);
+          return data.version !== TUTORIAL_VERSION;
+        } catch (e) {
+          return true;
+        }
+      }
+      return true;
+    }
+
+    // Mark tutorial as completed
+    function completeTutorial() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        version: TUTORIAL_VERSION,
+        completedAt: new Date().toISOString()
+      }));
+    }
+
+    // Start tutorial
+    function startTutorial() {
+      currentStep = 0;
+      isActive = true;
+      overlay.classList.add('active');
+      showStep(currentStep);
+    }
+
+    // End tutorial
+    function endTutorial(completed = true) {
+      isActive = false;
+      overlay.classList.remove('active');
+      spotlight.style.display = 'none';
+      tooltip.style.display = 'none';
+      tooltip.classList.remove('visible');
+      welcome.style.display = 'none';
+      welcome.classList.remove('visible');
+      if (completed) {
+        completeTutorial();
+      }
+    }
+
+    // Show a specific step
+    function showStep(index) {
+      const step = tutorialSteps[index];
+      if (!step) {
+        endTutorial(true);
+        return;
+      }
+
+      // Hide previous elements
+      spotlight.style.display = 'none';
+      tooltip.style.display = 'none';
+      tooltip.classList.remove('visible');
+      welcome.style.display = 'none';
+      welcome.classList.remove('visible');
+
+      if (step.type === 'welcome' || step.type === 'info' || step.type === 'complete') {
+        showWelcomeStep(step, index);
+      } else if (step.type === 'highlight') {
+        showHighlightStep(step, index);
+      }
+    }
+
+    // Show welcome/info/complete step (centered modal)
+    function showWelcomeStep(step, index) {
+      const isLast = index === tutorialSteps.length - 1;
+      const routeHtml = step.route ? `
+        <div class="tutorial-route-box">
+          <span class="route-method">${step.route.method}</span>
+          <span class="route-path">${step.route.path}</span>
+          <div style="color: #9ca3af; font-size: 11px; margin-top: 4px;">${step.route.desc}</div>
+        </div>
+      ` : '';
+
+      welcome.innerHTML = `
+        <div class="tutorial-icon">${step.icon}</div>
+        <h2 style="font-size: 24px; font-weight: 600; color: #1f2937; margin-bottom: 12px;">${step.title}</h2>
+        ${step.content}
+        ${routeHtml}
+        <div class="tutorial-progress">
+          ${tutorialSteps.map((_, i) => `
+            <div class="tutorial-progress-dot ${i < index ? 'completed' : ''} ${i === index ? 'active' : ''}"></div>
+          `).join('')}
+        </div>
+        <div style="display: flex; gap: 12px; margin-top: 20px; justify-content: center;">
+          <button class="tutorial-btn tutorial-btn-skip" onclick="window.hydra_tutorial.skip()">
+            Skip All
+          </button>
+          ${index > 0 ? `
+            <button class="tutorial-btn tutorial-btn-secondary" onclick="window.hydra_tutorial.prev()">
+              <i class="fas fa-arrow-left"></i> Back
+            </button>
+          ` : ''}
+          <button class="tutorial-btn tutorial-btn-primary" onclick="window.hydra_tutorial.${isLast ? 'finish' : 'next'}()">
+            ${isLast ? 'Get Started' : (index === 0 ? 'Start Tour' : 'Next')} ${isLast ? '' : '<i class="fas fa-arrow-right"></i>'}
+          </button>
+        </div>
+      `;
+
+      welcome.style.display = 'block';
+      setTimeout(() => welcome.classList.add('visible'), 10);
+    }
+
+    // Show highlight step (spotlight + tooltip)
+    function showHighlightStep(step, index) {
+      const target = document.querySelector(step.target);
+      if (!target) {
+        // Skip if target not found
+        nextStep();
+        return;
+      }
+
+      // Scroll target into view
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+      setTimeout(() => {
+        // Position spotlight
+        const rect = target.getBoundingClientRect();
+        const padding = 8;
+        spotlight.style.display = 'block';
+        spotlight.style.left = (rect.left - padding + window.scrollX) + 'px';
+        spotlight.style.top = (rect.top - padding + window.scrollY) + 'px';
+        spotlight.style.width = (rect.width + padding * 2) + 'px';
+        spotlight.style.height = (rect.height + padding * 2) + 'px';
+
+        // Build tooltip content
+        const isLast = index === tutorialSteps.length - 1;
+        const routeHtml = step.route ? `
+          <div class="tutorial-route-box">
+            <span class="route-method">${step.route.method}</span>
+            <span class="route-path">${step.route.path}</span>
+            <div style="color: #9ca3af; font-size: 11px; margin-top: 4px;">${step.route.desc}</div>
+          </div>
+        ` : '';
+
+        tooltip.innerHTML = `
+          <h3 style="font-size: 18px; font-weight: 600; color: #1f2937; margin-bottom: 8px;">
+            ${step.title}
+          </h3>
+          ${step.content}
+          ${routeHtml}
+          <div class="tutorial-progress">
+            ${tutorialSteps.map((_, i) => `
+              <div class="tutorial-progress-dot ${i < index ? 'completed' : ''} ${i === index ? 'active' : ''}"></div>
+            `).join('')}
+          </div>
+          <div style="display: flex; gap: 8px; margin-top: 16px;">
+            <button class="tutorial-btn tutorial-btn-skip" onclick="window.hydra_tutorial.skip()">
+              Skip
+            </button>
+            <button class="tutorial-btn tutorial-btn-secondary" onclick="window.hydra_tutorial.prev()">
+              <i class="fas fa-arrow-left"></i>
+            </button>
+            <button class="tutorial-btn tutorial-btn-primary" onclick="window.hydra_tutorial.${isLast ? 'finish' : 'next'}()">
+              ${isLast ? 'Finish' : 'Next'} <i class="fas fa-arrow-right"></i>
+            </button>
+          </div>
+        `;
+
+        // Position tooltip
+        positionTooltip(rect, step.position || 'bottom');
+        tooltip.style.display = 'block';
+        setTimeout(() => tooltip.classList.add('visible'), 10);
+      }, 400);
+    }
+
+    // Position tooltip relative to target
+    function positionTooltip(targetRect, position) {
+      const tooltipRect = tooltip.getBoundingClientRect();
+      const margin = 20;
+      let left, top;
+
+      // Remove old arrow classes
+      tooltip.classList.remove('arrow-top', 'arrow-bottom', 'arrow-left', 'arrow-right');
+
+      switch (position) {
+        case 'bottom':
+          left = targetRect.left;
+          top = targetRect.bottom + margin;
+          tooltip.classList.add('arrow-top');
+          break;
+        case 'top':
+          left = targetRect.left;
+          top = targetRect.top - tooltipRect.height - margin;
+          tooltip.classList.add('arrow-bottom');
+          break;
+        case 'left':
+          left = targetRect.left - tooltipRect.width - margin;
+          top = targetRect.top;
+          tooltip.classList.add('arrow-right');
+          break;
+        case 'right':
+          left = targetRect.right + margin;
+          top = targetRect.top;
+          tooltip.classList.add('arrow-left');
+          break;
+      }
+
+      // Keep tooltip in viewport
+      const maxLeft = window.innerWidth - tooltipRect.width - 20;
+      const maxTop = window.innerHeight - tooltipRect.height - 20;
+      left = Math.max(20, Math.min(left, maxLeft));
+      top = Math.max(20, Math.min(top, maxTop));
+
+      tooltip.style.left = left + 'px';
+      tooltip.style.top = top + 'px';
+    }
+
+    // Navigation functions
+    function nextStep() {
+      if (currentStep < tutorialSteps.length - 1) {
+        currentStep++;
+        showStep(currentStep);
+      } else {
+        endTutorial(true);
+      }
+    }
+
+    function prevStep() {
+      if (currentStep > 0) {
+        currentStep--;
+        showStep(currentStep);
+      }
+    }
+
+    function skipTutorial() {
+      endTutorial(true);
+    }
+
+    function finishTutorial() {
+      endTutorial(true);
+    }
+
+    // Expose to global scope
+    window.hydra_tutorial = {
+      start: startTutorial,
+      next: nextStep,
+      prev: prevStep,
+      skip: skipTutorial,
+      finish: finishTutorial,
+      reset: function() {
+        localStorage.removeItem(STORAGE_KEY);
+        startTutorial();
+      }
+    };
+
+    // Add click handler to hydra cat logo to restart tutorial
+    document.addEventListener('DOMContentLoaded', function() {
+      const hydraCat = document.getElementById('hydra-cat');
+      if (hydraCat) {
+        hydraCat.title = 'Click to replay the tutorial';
+        hydraCat.addEventListener('click', function() {
+          window.hydra_tutorial.reset();
+        });
+      }
+
+      // Auto-start tutorial for first-time users
+      if (shouldShowTutorial()) {
+        setTimeout(startTutorial, 500);
+      }
+    });
+
+    // Handle escape key
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape' && isActive) {
+        skipTutorial();
+      }
+    });
+
+    // Handle window resize
+    window.addEventListener('resize', function() {
+      if (isActive && tutorialSteps[currentStep]?.type === 'highlight') {
+        showStep(currentStep);
+      }
+    });
+  })();
   </script>
 </body>
 
