@@ -109,6 +109,14 @@ function buildPodSpec(username, email, config) {
         // Container runs as root initially, then drops to user 1000 via entrypoint
         securityContext: {
           readOnlyRootFilesystem: false
+        },
+        // Disable password auth on startup for security
+        lifecycle: {
+          postStart: {
+            exec: {
+              command: ['/bin/sh', '-c', 'sed -i "s/^PasswordAuthentication yes/PasswordAuthentication no/" /etc/ssh/sshd_config && sed -i "s/^#*AllowUsers/#AllowUsers/" /etc/ssh/sshd_config || true']
+            }
+          }
         }
       }],
       volumes: [
