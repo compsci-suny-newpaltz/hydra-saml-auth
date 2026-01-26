@@ -530,19 +530,24 @@ const ensureAuthenticated = (req, res, next) =>
 
     // WebSocket terminal for containers (behind auth)
     app.ws('/dashboard/ws/containers/:name/exec', async (ws, req) => {
+      console.log('[ws] Terminal connection attempt for:', req.params.name);
       try {
         if (!req.isAuthenticated?.() || !req.user?.email) {
+          console.log('[ws] Not authenticated');
           ws.close();
           return;
         }
         const username = String(req.user.email).split('@')[0];
         const nameParam = String(req.params.name || '').trim();
+        console.log('[ws] User:', username, 'Container:', nameParam);
         if (!nameParam) {
+          console.log('[ws] No container name');
           ws.close();
           return;
         }
 
         const runtimeConfig = require('./config/runtime');
+        console.log('[ws] Runtime mode:', runtimeConfig.orchestrator);
 
         // ========== KUBERNETES MODE ==========
         if (runtimeConfig.isKubernetes()) {
@@ -558,12 +563,16 @@ const ensureAuthenticated = (req, res, next) =>
           // Verify pod belongs to user
           const coreApi = kc.makeApiClient(k8s.CoreV1Api);
           try {
+            console.log('[ws] Looking up pod:', nameParam, 'in namespace:', namespace);
             const pod = await coreApi.readNamespacedPod(nameParam, namespace);
             const labels = pod.body?.metadata?.labels || {};
+            console.log('[ws] Pod labels:', JSON.stringify(labels));
             if (labels['hydra.owner'] !== username) {
+              console.log('[ws] Owner mismatch:', labels['hydra.owner'], 'vs', username);
               ws.close();
               return;
             }
+            console.log('[ws] Pod ownership verified');
           } catch (e) {
             console.error('[ws] Pod not found:', e.message);
             ws.close();
@@ -604,6 +613,7 @@ const ensureAuthenticated = (req, res, next) =>
             try { stdinStream.end(); } catch { }
           });
 
+          console.log('[ws] Starting K8s exec...');
           exec.exec(
             namespace,
             nameParam,
@@ -614,11 +624,13 @@ const ensureAuthenticated = (req, res, next) =>
             stdinStream,
             true, // tty
             (status) => {
-              console.log('[ws] K8s exec ended:', status);
+              console.log('[ws] K8s exec ended:', JSON.stringify(status));
               try { ws.close(); } catch { }
             }
-          ).catch((e) => {
-            console.error('[ws] K8s exec error:', e);
+          ).then(() => {
+            console.log('[ws] K8s exec connected successfully');
+          }).catch((e) => {
+            console.error('[ws] K8s exec error:', e.message, e.stack);
             try { ws.close(); } catch { }
           });
 

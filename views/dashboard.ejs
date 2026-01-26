@@ -141,6 +141,31 @@
       color: #60a5fa !important;
     }
 
+    /* Dark mode for whitelist modal */
+    .dark #whitelist-modal > div > div {
+      background-color: #1f2937 !important;
+      border-color: #374151 !important;
+    }
+    .dark #whitelist-modal .bg-gray-50 {
+      background-color: #111827 !important;
+    }
+    .dark #whitelist-modal .bg-gray-100 {
+      background-color: #1f2937 !important;
+    }
+    .dark #whitelist-modal input,
+    .dark #whitelist-modal select {
+      background-color: #374151 !important;
+      border-color: #4b5563 !important;
+      color: #f3f4f6 !important;
+    }
+    .dark #whitelist-modal th,
+    .dark #whitelist-modal td {
+      color: #e5e7eb !important;
+    }
+    .dark #whitelist-modal .hover\:bg-gray-50:hover {
+      background-color: #374151 !important;
+    }
+
     /* Mobile-first responsive fixes */
     @media (max-width: 640px) {
       #admin-panel {
@@ -369,6 +394,15 @@
       <img id="hydra-cat" src="https://hydra.newpaltz.edu/SUNYCAT.png" alt="Hydra" class="h-8 w-8 rounded cursor-pointer select-none" />
       <h1 class="text-xl font-semibold">SUNY New Paltz - Hydra</h1>
       <div class="absolute top-4 right-4 flex items-center gap-2">
+        <% if (typeof isAdmin !== 'undefined' && isAdmin) { %>
+        <!-- Whitelist Management Button (Admin Only) -->
+        <button id="whitelist-btn" onclick="openWhitelistModal()"
+          class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-sm font-medium"
+          title="Manage admin whitelist">
+          <i class="fas fa-user-shield"></i>
+          <span class="hidden sm:inline">Whitelist</span>
+        </button>
+        <% } %>
         <!-- Demo/Tutorial Button -->
         <button id="demo-btn" onclick="window.hydra_tutorial && window.hydra_tutorial.reset()"
           class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-sm font-medium"
@@ -733,6 +767,72 @@
             </div>
           </div>
         </div>
+
+        <!-- Whitelist Management Modal -->
+        <% if (typeof isAdmin !== 'undefined' && isAdmin) { %>
+        <div id="whitelist-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+          <div class="relative top-4 sm:top-10 mx-auto p-3 sm:p-5 border w-[95%] sm:w-11/12 max-w-lg sm:max-w-2xl shadow-lg rounded-md bg-white">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-xl font-semibold text-gray-900"><i class="fas fa-user-shield text-blue-600"></i> Admin Whitelist</h3>
+              <button onclick="closeWhitelistModal()" class="text-gray-500 hover:text-gray-700">
+                <i class="fas fa-times text-xl"></i>
+              </button>
+            </div>
+
+            <!-- Add New User Form -->
+            <div class="mb-4 p-4 bg-gray-50 rounded-lg">
+              <h4 class="font-medium mb-3"><i class="fas fa-plus-circle text-green-600"></i> Add User to Whitelist</h4>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div class="relative">
+                  <label class="block text-xs font-medium text-gray-600 mb-1">Email</label>
+                  <input type="email" id="whitelist-email" placeholder="user@newpaltz.edu"
+                    class="w-full px-3 py-2 border rounded text-sm" list="whitelist-suggestions">
+                  <datalist id="whitelist-suggestions"></datalist>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">Role</label>
+                  <select id="whitelist-role" class="w-full px-3 py-2 border rounded text-sm">
+                    <option value="admin">Admin</option>
+                    <option value="faculty">Faculty</option>
+                    <option value="ta">TA</option>
+                  </select>
+                </div>
+              </div>
+              <div class="mt-3">
+                <label class="block text-xs font-medium text-gray-600 mb-1">Reason (optional)</label>
+                <input type="text" id="whitelist-reason" placeholder="e.g., Course instructor for CPS 101"
+                  class="w-full px-3 py-2 border rounded text-sm">
+              </div>
+              <div class="mt-3">
+                <button onclick="addToWhitelist()" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm">
+                  <i class="fas fa-plus mr-1"></i> Add to Whitelist
+                </button>
+              </div>
+              <div id="whitelist-add-message" class="mt-2"></div>
+            </div>
+
+            <!-- Current Whitelist -->
+            <div>
+              <h4 class="font-medium mb-3"><i class="fas fa-list text-blue-600"></i> Current Whitelist</h4>
+              <div id="whitelist-table" class="max-h-64 overflow-y-auto border rounded">
+                <table class="w-full text-sm">
+                  <thead class="bg-gray-100 sticky top-0">
+                    <tr>
+                      <th class="px-3 py-2 text-left">Email</th>
+                      <th class="px-3 py-2 text-left">Role</th>
+                      <th class="px-3 py-2 text-left">Source</th>
+                      <th class="px-3 py-2 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="whitelist-body">
+                    <tr><td colspan="4" class="px-3 py-4 text-center text-gray-500">Loading...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+        <% } %>
 
         <!-- Resource Configuration Modal -->
         <div id="resource-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
@@ -3299,6 +3399,121 @@
     // Load on page load and poll every 30s
     loadAdminRequests();
     setInterval(loadAdminRequests, 30000);
+
+    // ========== Whitelist Management ==========
+    window.openWhitelistModal = function() {
+      document.getElementById('whitelist-modal').classList.remove('hidden');
+      loadWhitelist();
+      loadWhitelistAutocomplete();
+    };
+
+    window.closeWhitelistModal = function() {
+      document.getElementById('whitelist-modal').classList.add('hidden');
+    };
+
+    async function loadWhitelist() {
+      try {
+        const res = await fetch('/dashboard/api/admin/whitelist');
+        const data = await res.json();
+        const tbody = document.getElementById('whitelist-body');
+
+        if (!data.whitelist || data.whitelist.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="4" class="px-3 py-4 text-center text-gray-500">No users in whitelist</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = data.whitelist.map(u => `
+          <tr class="border-t hover:bg-gray-50">
+            <td class="px-3 py-2">${u.email}</td>
+            <td class="px-3 py-2">
+              <span class="px-2 py-0.5 rounded text-xs ${
+                u.role === 'admin' ? 'bg-purple-100 text-purple-700' :
+                u.role === 'faculty' ? 'bg-blue-100 text-blue-700' :
+                'bg-green-100 text-green-700'
+              }">${u.role}</span>
+            </td>
+            <td class="px-3 py-2">
+              <span class="text-xs ${u.source === 'env' ? 'text-orange-600' : 'text-gray-500'}">${u.source}</span>
+            </td>
+            <td class="px-3 py-2 text-right">
+              ${u.source === 'database' ? `
+                <button onclick="removeFromWhitelist('${u.email}')" class="text-red-600 hover:text-red-800 text-sm" title="Remove">
+                  <i class="fas fa-trash"></i>
+                </button>
+              ` : '<span class="text-xs text-gray-400">env var</span>'}
+            </td>
+          </tr>
+        `).join('');
+      } catch (err) {
+        console.error('Error loading whitelist:', err);
+        document.getElementById('whitelist-body').innerHTML = '<tr><td colspan="4" class="px-3 py-4 text-center text-red-500">Error loading whitelist</td></tr>';
+      }
+    }
+
+    async function loadWhitelistAutocomplete() {
+      try {
+        const res = await fetch('/dashboard/api/admin/whitelist/autocomplete');
+        const data = await res.json();
+        const datalist = document.getElementById('whitelist-suggestions');
+        datalist.innerHTML = (data.suggestions || []).map(u => `<option value="${u.email}">${u.username}</option>`).join('');
+      } catch (err) {
+        console.error('Error loading autocomplete:', err);
+      }
+    }
+
+    window.addToWhitelist = async function() {
+      const email = document.getElementById('whitelist-email').value.trim();
+      const role = document.getElementById('whitelist-role').value;
+      const reason = document.getElementById('whitelist-reason').value.trim();
+      const msgEl = document.getElementById('whitelist-add-message');
+
+      if (!email) {
+        msgEl.innerHTML = '<p class="text-red-600 text-sm">Email is required</p>';
+        return;
+      }
+
+      try {
+        const res = await fetch('/dashboard/api/admin/whitelist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, role, reason })
+        });
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+          msgEl.innerHTML = '<p class="text-green-600 text-sm"><i class="fas fa-check mr-1"></i>Added successfully</p>';
+          document.getElementById('whitelist-email').value = '';
+          document.getElementById('whitelist-reason').value = '';
+          loadWhitelist();
+          setTimeout(() => { msgEl.innerHTML = ''; }, 3000);
+        } else {
+          msgEl.innerHTML = `<p class="text-red-600 text-sm">${data.error || 'Failed to add'}</p>`;
+        }
+      } catch (err) {
+        console.error('Error adding to whitelist:', err);
+        msgEl.innerHTML = '<p class="text-red-600 text-sm">Error adding to whitelist</p>';
+      }
+    };
+
+    window.removeFromWhitelist = async function(email) {
+      if (!confirm(`Remove ${email} from whitelist?`)) return;
+
+      try {
+        const res = await fetch(`/dashboard/api/admin/whitelist/${encodeURIComponent(email)}`, {
+          method: 'DELETE'
+        });
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+          loadWhitelist();
+        } else {
+          alert(data.error || 'Failed to remove');
+        }
+      } catch (err) {
+        console.error('Error removing from whitelist:', err);
+        alert('Error removing from whitelist');
+      }
+    };
 
     // ========== Container Events Toast Notifications ==========
     const toastContainer = document.createElement('div');

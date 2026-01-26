@@ -116,6 +116,17 @@ CREATE TABLE IF NOT EXISTS migration_progress (
     steps_log TEXT DEFAULT '[]'
 );
 
+-- User whitelist - dynamic admin access list (supplements ADMIN_USERS env var)
+CREATE TABLE IF NOT EXISTS user_whitelist (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT NOT NULL UNIQUE,
+    username TEXT NOT NULL,
+    role TEXT DEFAULT 'admin' CHECK(role IN ('admin', 'faculty', 'ta')),
+    added_by TEXT NOT NULL,
+    reason TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_requests_username ON resource_requests(username);
 CREATE INDEX IF NOT EXISTS idx_requests_status ON resource_requests(status);
@@ -128,6 +139,7 @@ CREATE INDEX IF NOT EXISTS idx_security_severity ON security_events(severity);
 CREATE INDEX IF NOT EXISTS idx_security_created ON security_events(created_at);
 CREATE INDEX IF NOT EXISTS idx_migration_username ON migration_progress(username);
 CREATE INDEX IF NOT EXISTS idx_migration_status ON migration_progress(status);
+CREATE INDEX IF NOT EXISTS idx_whitelist_email ON user_whitelist(email);
 `;
 
 // Initial node data from config
@@ -684,6 +696,78 @@ async function acknowledgeSecurityEvent(eventId, acknowledgedBy) {
     );
 }
 
+// ==================== User Whitelist ====================
+
+/**
+ * Get all whitelisted users
+ */
+async function getWhitelist() {
+    const db = await getDb();
+    return db.all('SELECT * FROM user_whitelist ORDER BY created_at DESC');
+}
+
+/**
+ * Check if email is whitelisted
+ */
+async function isWhitelisted(email) {
+    const db = await getDb();
+    const row = await db.get('SELECT * FROM user_whitelist WHERE email = ?', [email.toLowerCase()]);
+    return !!row;
+}
+
+/**
+ * Add user to whitelist
+ */
+async function addToWhitelist(email, addedBy, role = 'admin', reason = null) {
+    const db = await getDb();
+    const username = email.split('@')[0];
+    await db.run(
+        `INSERT OR REPLACE INTO user_whitelist (email, username, role, added_by, reason, created_at)
+         VALUES (?, ?, ?, ?, ?, datetime('now'))`,
+        [email.toLowerCase(), username, role, addedBy, reason]
+    );
+    console.log(`[whitelist] Added ${email} as ${role} by ${addedBy}`);
+}
+
+/**
+ * Remove user from whitelist
+ */
+async function removeFromWhitelist(email) {
+    const db = await getDb();
+    const result = await db.run('DELETE FROM user_whitelist WHERE email = ?', [email.toLowerCase()]);
+    if (result.changes > 0) {
+        console.log(`[whitelist] Removed ${email} from whitelist`);
+    }
+    return result.changes > 0;
+}
+
+/**
+ * Update whitelist entry
+ */
+async function updateWhitelistEntry(email, updates) {
+    const db = await getDb();
+    const fields = [];
+    const values = [];
+
+    if (updates.role !== undefined) {
+        fields.push('role = ?');
+        values.push(updates.role);
+    }
+    if (updates.reason !== undefined) {
+        fields.push('reason = ?');
+        values.push(updates.reason);
+    }
+
+    if (fields.length === 0) return false;
+
+    values.push(email.toLowerCase());
+    await db.run(
+        `UPDATE user_whitelist SET ${fields.join(', ')} WHERE email = ?`,
+        values
+    );
+    return true;
+}
+
 module.exports = {
     initializeSchema,
     getOrCreateUserQuota,
@@ -705,5 +789,11 @@ module.exports = {
     logSecurityEvent,
     getSecurityEvents,
     getSecuritySummary,
-    acknowledgeSecurityEvent
+    acknowledgeSecurityEvent,
+    // Whitelist management
+    getWhitelist,
+    isWhitelisted,
+    addToWhitelist,
+    removeFromWhitelist,
+    updateWhitelistEntry
 };
