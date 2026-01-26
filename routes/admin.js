@@ -15,25 +15,38 @@ const {
     updateNodeStatus,
     getSecurityEvents,
     getSecuritySummary,
-    acknowledgeSecurityEvent
+    acknowledgeSecurityEvent,
+    getWhitelist,
+    isWhitelisted,
+    addToWhitelist,
+    removeFromWhitelist,
+    updateWhitelistEntry
 } = require('../services/db-init');
 
-// Admin users list from environment
-const ADMIN_USERS = (process.env.ADMIN_USERS || '').split(',').map(u => u.trim().toLowerCase());
+// Admin users list from environment (supplemented by database whitelist)
+const ADMIN_USERS = (process.env.ADMIN_USERS || '').split(',').map(u => u.trim().toLowerCase()).filter(Boolean);
 
 /**
- * Middleware: Check if user is an admin (faculty OR whitelist)
+ * Middleware: Check if user is an admin (faculty OR env whitelist OR db whitelist)
  */
-function requireAdmin(req, res, next) {
+async function requireAdmin(req, res, next) {
     if (!req.isAuthenticated?.() || !req.user?.email) {
         return res.status(401).json({ error: 'Authentication required' });
     }
 
     const email = req.user.email.toLowerCase();
     const isFaculty = (req.user.affiliation || '').toLowerCase() === 'faculty';
-    const isWhitelisted = ADMIN_USERS.includes(email);
+    const isEnvWhitelisted = ADMIN_USERS.includes(email);
 
-    if (!isFaculty && !isWhitelisted) {
+    // Check database whitelist
+    let isDbWhitelisted = false;
+    try {
+        isDbWhitelisted = await isWhitelisted(email);
+    } catch (e) {
+        console.warn('[admin] Error checking whitelist:', e.message);
+    }
+
+    if (!isFaculty && !isEnvWhitelisted && !isDbWhitelisted) {
         console.warn(`[admin] Unauthorized access attempt by ${email}`);
         return res.status(403).json({ error: 'Admin access required' });
     }
@@ -660,6 +673,189 @@ router.get('/migrations/:username', async (req, res) => {
     } catch (error) {
         console.error('[admin] Failed to get migration status:', error);
         res.status(500).json({ error: 'Failed to retrieve migration status' });
+    }
+});
+
+// ==================== Whitelist Management Endpoints ====================
+
+/**
+ * GET /whitelist
+ * Get all whitelisted users
+ */
+router.get('/whitelist', async (req, res) => {
+    try {
+        const whitelist = await getWhitelist();
+
+        // Also include env whitelist for display (marked as source: 'env')
+        const envUsers = ADMIN_USERS.map(email => ({
+            email,
+            username: email.split('@')[0],
+            role: 'admin',
+            source: 'env',
+            added_by: 'environment',
+            created_at: null
+        }));
+
+        const dbUsers = whitelist.map(w => ({
+            id: w.id,
+            email: w.email,
+            username: w.username,
+            role: w.role,
+            source: 'database',
+            added_by: w.added_by,
+            reason: w.reason,
+            created_at: w.created_at
+        }));
+
+        res.json({
+            whitelist: [...envUsers, ...dbUsers],
+            count: envUsers.length + dbUsers.length
+        });
+    } catch (error) {
+        console.error('[admin] Failed to get whitelist:', error);
+        res.status(500).json({ error: 'Failed to retrieve whitelist' });
+    }
+});
+
+/**
+ * POST /whitelist
+ * Add a user to the whitelist
+ */
+router.post('/whitelist', async (req, res) => {
+    try {
+        const { email, role, reason } = req.body;
+        const adminEmail = req.user.email;
+
+        if (!email) {
+            return res.status(400).json({ error: 'Email is required' });
+        }
+
+        // Validate email format
+        if (!email.includes('@')) {
+            return res.status(400).json({ error: 'Invalid email format' });
+        }
+
+        const validRoles = ['admin', 'faculty', 'ta'];
+        const userRole = validRoles.includes(role) ? role : 'admin';
+
+        await addToWhitelist(email, adminEmail, userRole, reason);
+
+        console.log(`[admin] ${email} added to whitelist by ${adminEmail}`);
+
+        res.json({
+            success: true,
+            message: `${email} added to whitelist as ${userRole}`
+        });
+    } catch (error) {
+        console.error('[admin] Failed to add to whitelist:', error);
+        res.status(500).json({ error: 'Failed to add to whitelist' });
+    }
+});
+
+/**
+ * PUT /whitelist/:email
+ * Update a whitelist entry
+ */
+router.put('/whitelist/:email', async (req, res) => {
+    try {
+        const { email } = req.params;
+        const { role, reason } = req.body;
+
+        const updated = await updateWhitelistEntry(email, { role, reason });
+
+        if (!updated) {
+            return res.status(404).json({ error: 'Whitelist entry not found' });
+        }
+
+        console.log(`[admin] Whitelist entry updated for ${email} by ${req.user.email}`);
+
+        res.json({
+            success: true,
+            message: 'Whitelist entry updated'
+        });
+    } catch (error) {
+        console.error('[admin] Failed to update whitelist:', error);
+        res.status(500).json({ error: 'Failed to update whitelist' });
+    }
+});
+
+/**
+ * DELETE /whitelist/:email
+ * Remove a user from the whitelist
+ */
+router.delete('/whitelist/:email', async (req, res) => {
+    try {
+        const { email } = req.params;
+
+        const removed = await removeFromWhitelist(email);
+
+        if (!removed) {
+            return res.status(404).json({ error: 'Whitelist entry not found' });
+        }
+
+        console.log(`[admin] ${email} removed from whitelist by ${req.user.email}`);
+
+        res.json({
+            success: true,
+            message: `${email} removed from whitelist`
+        });
+    } catch (error) {
+        console.error('[admin] Failed to remove from whitelist:', error);
+        res.status(500).json({ error: 'Failed to remove from whitelist' });
+    }
+});
+
+/**
+ * GET /whitelist/autocomplete
+ * Get autocomplete suggestions from existing pods/users
+ */
+router.get('/whitelist/autocomplete', async (req, res) => {
+    try {
+        const runtimeConfig = require('../config/runtime');
+
+        let suggestions = [];
+
+        if (runtimeConfig.isKubernetes()) {
+            // Get all pods and extract user info
+            const K8sClient = require('../services/k8s-client');
+            const k8sClient = new K8sClient(runtimeConfig.k8s?.namespace || 'hydra-students');
+            const pods = await k8sClient.listPods();
+
+            suggestions = pods
+                .filter(p => p.metadata?.name?.startsWith('student-'))
+                .map(p => {
+                    const username = p.metadata.name.replace('student-', '');
+                    const email = p.metadata?.labels?.['hydra.email'] || `${username}@newpaltz.edu`;
+                    return { username, email };
+                });
+        } else {
+            // Docker mode - get containers
+            const Docker = require('dockerode');
+            const docker = new Docker({ socketPath: '/var/run/docker.sock' });
+            const containers = await docker.listContainers({ all: true });
+
+            suggestions = containers
+                .filter(c => c.Names?.some(n => n.includes('student-')))
+                .map(c => {
+                    const name = c.Names.find(n => n.includes('student-')) || '';
+                    const username = name.replace(/^\//, '').replace('student-', '');
+                    const email = c.Labels?.['hydra.email'] || `${username}@newpaltz.edu`;
+                    return { username, email };
+                });
+        }
+
+        // Also include users from quotas table
+        const quotas = await getAllUserQuotas();
+        const quotaUsers = quotas.map(q => ({ username: q.username, email: q.email }));
+
+        // Merge and dedupe
+        const all = [...suggestions, ...quotaUsers];
+        const unique = Array.from(new Map(all.map(u => [u.email.toLowerCase(), u])).values());
+
+        res.json({ suggestions: unique });
+    } catch (error) {
+        console.error('[admin] Failed to get autocomplete:', error);
+        res.status(500).json({ error: 'Failed to get suggestions', suggestions: [] });
     }
 });
 
