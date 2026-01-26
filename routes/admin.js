@@ -159,6 +159,60 @@ router.post('/requests/:id/approve', async (req, res) => {
             preset_tier: request.preset_id || 'conservative'
         });
 
+        // Check if migration is needed (request is for a different node than current)
+        let migrationResult = null;
+        if (request.request_type === 'migration' || request.request_type === 'new_container') {
+            // Get current container config to check if migration is needed
+            const { getOrCreateContainerConfig } = require('../services/db-init');
+            const currentConfig = await getOrCreateContainerConfig(request.username, `student-${request.username}`);
+
+            // Import migration service
+            try {
+                const migrationService = require('../services/container-migration');
+                const K8sClient = require('../services/k8s-client');
+                const runtimeConfig = require('../config/runtime');
+
+                // Check where the pod is actually running
+                const k8sClient = new K8sClient(runtimeConfig.k8s?.namespace || 'hydra-students');
+                const existingPod = await k8sClient.getPod(`student-${request.username}`);
+                const currentNode = existingPod?.spec?.nodeName || 'hydra';
+
+                console.log(`[admin] Current pod location: ${currentNode}, target: ${request.target_node}`);
+
+                if (currentNode.toLowerCase() !== request.target_node.toLowerCase()) {
+                    console.log(`[admin] Triggering migration from ${currentNode} to ${request.target_node}...`);
+
+                    migrationResult = await migrationService.migrateContainer(
+                        request.username,
+                        currentNode,
+                        request.target_node,
+                        {
+                            memory_gb: request.requested_memory_gb,
+                            cpus: request.requested_cpus,
+                            storage_gb: request.requested_storage_gb,
+                            gpu_count: request.requested_gpu_count
+                        }
+                    );
+
+                    if (migrationResult.success) {
+                        // Update container config with actual node after migration
+                        await updateContainerConfig(request.username, {
+                            current_node: request.target_node,
+                            last_migration_at: new Date().toISOString()
+                        });
+                        console.log(`[admin] Migration completed successfully`);
+                    } else {
+                        console.error(`[admin] Migration failed: ${migrationResult.error}`);
+                    }
+                } else {
+                    console.log(`[admin] Pod already on target node ${request.target_node}, no migration needed`);
+                }
+            } catch (migrationError) {
+                console.error(`[admin] Migration service error: ${migrationError.message}`);
+                migrationResult = { success: false, error: migrationError.message };
+            }
+        }
+
         // Send approval email to user
         try {
             const emailNotifications = require('../services/email-notifications');
@@ -171,7 +225,12 @@ router.post('/requests/:id/approve', async (req, res) => {
 
         res.json({
             success: true,
-            message: 'Request approved successfully'
+            message: migrationResult?.success
+                ? `Request approved and migration to ${request.target_node} completed`
+                : migrationResult?.error
+                    ? `Request approved but migration failed: ${migrationResult.error}`
+                    : 'Request approved successfully',
+            migration: migrationResult
         });
     } catch (error) {
         console.error('[admin] Failed to approve request:', error);

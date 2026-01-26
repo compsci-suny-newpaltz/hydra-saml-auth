@@ -1591,35 +1591,45 @@
 
       window.initContainer = async function () {
         const msg = document.getElementById('container-message');
-        msg.innerHTML = '<p class="text-gray-600">Initializing container...</p>';
+        msg.innerHTML = '<p class="text-gray-600"><i class="fas fa-spinner fa-spin mr-2"></i>Initializing container (this may take up to 60s)...</p>';
         try {
           const res = await fetch('/dashboard/api/containers/init', { method: 'POST' });
           if (handleAuthError(res)) return;
           const data = await res.json();
           if (!res.ok || !data.success) throw new Error(data.message || 'Failed');
 
-          msg.innerHTML = '<p class="text-green-700 bg-green-100 border border-green-200 rounded p-2">Container initialized successfully!</p>';
-          setTimeout(() => { msg.innerHTML = ''; }, 3000);
+          // Check if pod is actually ready
+          if (data.ready === false) {
+            msg.innerHTML = `<p class="text-yellow-700 bg-yellow-100 border border-yellow-200 rounded p-2"><i class="fas fa-exclamation-triangle mr-2"></i>Container created but not ready yet (${data.status || 'starting'}). Refresh in a moment.</p>`;
+          } else {
+            msg.innerHTML = '<p class="text-green-700 bg-green-100 border border-green-200 rounded p-2"><i class="fas fa-check-circle mr-2"></i>Container initialized and running!</p>';
+          }
+          setTimeout(() => { msg.innerHTML = ''; }, 5000);
           loadContainerStatus();
         } catch (err) {
-          msg.innerHTML = `<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2">${err.message || 'Failed to initialize'}</p>`;
+          msg.innerHTML = `<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2"><i class="fas fa-times-circle mr-2"></i>${err.message || 'Failed to initialize'}</p>`;
         }
       };
 
       window.startContainer = async function () {
         const msg = document.getElementById('container-message');
-        msg.innerHTML = '<p class="text-gray-600">Starting container...</p>';
+        msg.innerHTML = '<p class="text-gray-600"><i class="fas fa-spinner fa-spin mr-2"></i>Starting container (this may take up to 60s)...</p>';
         try {
           const res = await fetch('/dashboard/api/containers/start', { method: 'POST' });
           if (handleAuthError(res)) return;
           const data = await res.json();
           if (!res.ok || !data.success) throw new Error(data.message || 'Failed');
 
-          msg.innerHTML = '<p class="text-green-700 bg-green-100 border border-green-200 rounded p-2">Container started!</p>';
-          setTimeout(() => { msg.innerHTML = ''; }, 3000);
+          // Check if pod is actually ready
+          if (data.ready === false) {
+            msg.innerHTML = `<p class="text-yellow-700 bg-yellow-100 border border-yellow-200 rounded p-2"><i class="fas fa-exclamation-triangle mr-2"></i>Container starting but not ready yet (${data.status || 'starting'}). Refresh in a moment.</p>`;
+          } else {
+            msg.innerHTML = '<p class="text-green-700 bg-green-100 border border-green-200 rounded p-2"><i class="fas fa-check-circle mr-2"></i>Container started and running!</p>';
+          }
+          setTimeout(() => { msg.innerHTML = ''; }, 5000);
           loadContainerStatus();
         } catch (err) {
-          msg.innerHTML = `<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2">${err.message || 'Failed to start'}</p>`;
+          msg.innerHTML = `<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2"><i class="fas fa-times-circle mr-2"></i>${err.message || 'Failed to start'}</p>`;
         }
       };
 

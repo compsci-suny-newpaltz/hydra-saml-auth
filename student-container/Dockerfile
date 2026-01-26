@@ -78,9 +78,12 @@ RUN install -m 0755 -d /etc/apt/keyrings && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # Install Jenkins (uses Java 21 already installed above)
-RUN curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key | tee \
-    /usr/share/keyrings/jenkins-keyring.asc > /dev/null && \
-    echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/" | \
+# Use both old and new keys for compatibility
+RUN curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key | tee /usr/share/keyrings/jenkins-2023.asc > /dev/null && \
+    gpg --batch --yes --dearmor -o /usr/share/keyrings/jenkins-keyring.gpg /usr/share/keyrings/jenkins-2023.asc && \
+    gpg --batch --yes --keyserver keyserver.ubuntu.com --recv-keys 7198F4B714ABFC68 && \
+    gpg --batch --yes --export 7198F4B714ABFC68 >> /usr/share/keyrings/jenkins-keyring.gpg && \
+    echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.gpg] https://pkg.jenkins.io/debian-stable binary/" | \
     tee /etc/apt/sources.list.d/jenkins.list > /dev/null && \
     apt-get update && \
     apt-get install -y --no-install-recommends jenkins && \
@@ -167,6 +170,8 @@ RUN mkdir -p /etc/skel/.local/share/code-server/User && \
     cp -r /tmp/default-vscode/* /etc/skel/.vscode/ && \
     # Copy installed extensions to skel
     cp -r /home/student/.local/share/code-server/extensions /etc/skel/.local/share/code-server/ && \
+    # Backup nvm to skel so it persists on mounted volumes
+    cp -r /home/student/.nvm /etc/skel/.nvm && \
     rm -rf /tmp/*
 
 # Install CUH63 tools (lcc compiler, assembler, examples)
