@@ -6,6 +6,7 @@ const k8sClient = require('./k8s-client');
 const k8sContainers = require('./k8s-containers');
 const resourceConfig = require('../config/resources');
 const runtimeConfig = require('../config/runtime');
+const migrationProgress = require('./migration-progress');
 
 const MIGRATION_TIMEOUT_MS = resourceConfig.migration?.timeoutMs || 300000; // 5 minutes
 
@@ -135,6 +136,9 @@ async function migrateContainer(username, fromNode, toNode, newConfig = {}) {
     console.log(`[k8s-migration] Warning: Chimera is reserved for OpenWebUI. Consider using Cerberus for GPU work.`);
   }
 
+  // Start migration tracking
+  await migrationProgress.startMigration(username, fromNode, toNode);
+
   try {
     // Step 1: Get source PVC info
     const sourcePvc = await k8sClient.getPVC(sourcePvcName);
@@ -148,17 +152,20 @@ async function migrateContainer(username, fromNode, toNode, newConfig = {}) {
     const targetStorageClass = toNodeConfig.k8s?.storageClass || runtimeConfig.k8s.defaultStorageClass;
 
     // Step 2: Stop the pod (data preserved in PVC)
+    await migrationProgress.updateProgress(username, 'STOPPING_POD');
     console.log(`[k8s-migration] Stopping pod ${podName}...`);
     await k8sClient.deletePod(podName);
 
     // Wait for pod deletion
     await new Promise(resolve => setTimeout(resolve, 3000));
+    await migrationProgress.updateProgress(username, 'POD_STOPPED');
 
     // Step 3: Check if we need to migrate data (different storage classes)
     const needsDataMigration = sourceStorageClass !== targetStorageClass;
 
     if (needsDataMigration) {
       console.log(`[k8s-migration] Storage class change: ${sourceStorageClass} -> ${targetStorageClass}`);
+      await migrationProgress.updateProgress(username, 'CREATING_TARGET_STORAGE', `Creating ${targetStorageClass} storage on ${toNode}`);
       console.log(`[k8s-migration] Creating target PVC...`);
 
       // Create target PVC with new storage class
@@ -178,8 +185,10 @@ async function migrateContainer(username, fromNode, toNode, newConfig = {}) {
       if (!pvcReady) {
         throw new Error('Target PVC failed to bind');
       }
+      await migrationProgress.updateProgress(username, 'STORAGE_READY');
 
       // Step 4: Run migration job
+      await migrationProgress.updateProgress(username, 'COPYING_DATA', `Copying data from ${fromNode} to ${toNode}`);
       console.log(`[k8s-migration] Running data migration job...`);
       const migrationJob = buildMigrationJobSpec(username, sourcePvcName, targetPvcName);
       await k8sClient.createJob(migrationJob);
@@ -191,6 +200,7 @@ async function migrateContainer(username, fromNode, toNode, newConfig = {}) {
         throw new Error(`Migration job failed: ${jobResult.error}`);
       }
 
+      await migrationProgress.updateProgress(username, 'DATA_COPIED');
       console.log(`[k8s-migration] Data migration completed`);
 
       // Step 5: Delete old PVC and rename new one
@@ -206,6 +216,7 @@ async function migrateContainer(username, fromNode, toNode, newConfig = {}) {
     }
 
     // Step 6: Recreate pod with new node selector
+    await migrationProgress.updateProgress(username, 'CREATING_POD', `Starting container on ${toNode}`);
     console.log(`[k8s-migration] Creating pod on ${toNode}...`);
 
     const config = {
@@ -224,8 +235,12 @@ async function migrateContainer(username, fromNode, toNode, newConfig = {}) {
     // Update PVC annotations for new node
     // Note: We modify the pod spec to use the correct PVC
     const result = await k8sContainers.startContainer(username, email);
+    await migrationProgress.updateProgress(username, 'POD_READY');
 
-    // Step 7: Send notification
+    // Step 7: Update routing
+    await migrationProgress.updateProgress(username, 'UPDATING_ROUTES', 'Updating routing configuration');
+
+    // Step 8: Send notification
     try {
       const emailNotifications = require('./email-notifications');
       await emailNotifications.sendMigrationComplete(username, email, fromNode, toNode, true);
@@ -233,6 +248,8 @@ async function migrateContainer(username, fromNode, toNode, newConfig = {}) {
       console.warn(`[k8s-migration] Failed to send notification: ${emailError.message}`);
     }
 
+    // Mark migration as complete
+    await migrationProgress.completeMigration(username, true);
     console.log(`[k8s-migration] Migration complete for ${username}`);
 
     return {
@@ -244,6 +261,9 @@ async function migrateContainer(username, fromNode, toNode, newConfig = {}) {
 
   } catch (error) {
     console.error(`[k8s-migration] Migration failed for ${username}:`, error);
+
+    // Mark migration as failed with error message
+    await migrationProgress.completeMigration(username, false, error.message);
 
     // Try to send failure notification
     try {

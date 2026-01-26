@@ -621,4 +621,46 @@ router.post('/security/scan', async (req, res) => {
     }
 });
 
+// ==================== Migration Progress Endpoints ====================
+
+/**
+ * GET /migrations
+ * Get all active migrations
+ */
+router.get('/migrations', async (req, res) => {
+    try {
+        const migrationProgress = require('../services/migration-progress');
+        const migrations = await migrationProgress.getActiveMigrations();
+
+        res.json({
+            migrations,
+            count: migrations.length
+        });
+    } catch (error) {
+        console.error('[admin] Failed to get migrations:', error);
+        res.status(500).json({ error: 'Failed to retrieve migrations' });
+    }
+});
+
+/**
+ * GET /migrations/:username
+ * Get migration status for a specific user
+ */
+router.get('/migrations/:username', async (req, res) => {
+    try {
+        const { username } = req.params;
+        const migrationProgress = require('../services/migration-progress');
+        const status = await migrationProgress.getMigrationStatus(username);
+
+        if (!status) {
+            return res.json({ status: 'none', message: 'No migration found' });
+        }
+
+        res.json(status);
+    } catch (error) {
+        console.error('[admin] Failed to get migration status:', error);
+        res.status(500).json({ error: 'Failed to retrieve migration status' });
+    }
+});
+
 module.exports = router;

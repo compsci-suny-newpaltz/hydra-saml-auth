@@ -916,6 +916,26 @@ router.get('/status', async (req, res) => {
                 approvedTargetNode = 'chimera';
             }
 
+            // Check for active migration
+            let migrationStatus = null;
+            try {
+                const migrationProgress = require('../services/migration-progress');
+                const migration = await migrationProgress.getMigrationStatus(username);
+                if (migration && migration.status === 'in_progress') {
+                    migrationStatus = {
+                        inProgress: true,
+                        fromNode: migration.fromNode,
+                        toNode: migration.toNode,
+                        currentStep: migration.currentStep,
+                        stepLabel: migration.stepInfo?.label || migration.currentStep,
+                        stepIcon: migration.stepInfo?.icon || '🔄',
+                        progressPercent: migration.progressPercent
+                    };
+                }
+            } catch (err) {
+                // Migration progress module might not be loaded
+            }
+
             return res.json({
                 success: true,
                 exists: status.exists,
@@ -933,6 +953,7 @@ router.get('/status', async (req, res) => {
                     preset: containerConfig.preset_tier,
                     approved_target_node: approvedTargetNode
                 },
+                migration: migrationStatus,
                 k8sMode: true
             });
         }

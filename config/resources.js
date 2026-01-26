@@ -287,8 +287,26 @@ module.exports = {
   },
 
   // Helper function to check if a request requires approval
-  requiresApproval(targetNode, preset, memory_gb, cpus, storage_gb) {
-    // GPU nodes always require approval
+  // currentConfig can be passed to check if this is a decrease (auto-approved)
+  requiresApproval(targetNode, preset, memory_gb, cpus, storage_gb, currentConfig = null) {
+    // Moving back to hydra from GPU node is always auto-approved (resource decrease)
+    if (targetNode === 'hydra' && currentConfig && currentConfig.current_node !== 'hydra') {
+      console.log(`[resources] Auto-approving return to hydra from ${currentConfig.current_node}`);
+      return false;
+    }
+
+    // Resource decreases on same node are auto-approved
+    if (currentConfig && targetNode === currentConfig.current_node) {
+      const isDecrease = memory_gb <= currentConfig.memory_gb &&
+                         cpus <= currentConfig.cpus &&
+                         storage_gb <= currentConfig.storage_gb;
+      if (isDecrease) {
+        console.log(`[resources] Auto-approving resource decrease on ${targetNode}`);
+        return false;
+      }
+    }
+
+    // GPU nodes require approval for increases
     if (targetNode !== 'hydra') {
       return true;
     }
