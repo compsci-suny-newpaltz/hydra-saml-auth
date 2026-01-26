@@ -570,9 +570,10 @@ const ensureAuthenticated = (req, res, next) =>
             return;
           }
 
-          // Create streams for stdin/stdout
+          // Create streams for stdin/stdout/stderr
           const stdoutStream = new stream.PassThrough();
           const stderrStream = new stream.PassThrough();
+          const stdinStream = new stream.PassThrough();
 
           stdoutStream.on('data', (chunk) => {
             try {
@@ -586,8 +587,22 @@ const ensureAuthenticated = (req, res, next) =>
             } catch { }
           });
 
-          // Store stdin writer for later
-          let stdinStream = null;
+          // Handle WebSocket messages -> container stdin
+          ws.on('message', (msg) => {
+            try {
+              stdinStream.write(Buffer.from(msg));
+            } catch (e) {
+              console.error('[ws] stdin write error:', e);
+            }
+          });
+
+          ws.on('close', () => {
+            try { stdinStream.end(); } catch { }
+          });
+
+          ws.on('error', () => {
+            try { stdinStream.end(); } catch { }
+          });
 
           exec.exec(
             namespace,
@@ -596,36 +611,13 @@ const ensureAuthenticated = (req, res, next) =>
             ['/bin/bash', '-l'],
             stdoutStream,
             stderrStream,
-            process.stdin, // placeholder, we'll handle stdin via ws
+            stdinStream,
             true, // tty
             (status) => {
               console.log('[ws] K8s exec ended:', status);
               try { ws.close(); } catch { }
             }
-          ).then((wsConnection) => {
-            stdinStream = wsConnection;
-            ws.on('message', (msg) => {
-              try {
-                if (stdinStream && stdinStream.readyState === 1) {
-                  // K8s WebSocket expects channel prefix for stdin (channel 0)
-                  const buf = Buffer.alloc(msg.length + 1);
-                  buf[0] = 0; // stdin channel
-                  Buffer.from(msg).copy(buf, 1);
-                  stdinStream.send(buf);
-                }
-              } catch (e) {
-                console.error('[ws] stdin write error:', e);
-              }
-            });
-
-            ws.on('close', () => {
-              try { if (stdinStream) stdinStream.close(); } catch { }
-            });
-
-            ws.on('error', () => {
-              try { if (stdinStream) stdinStream.close(); } catch { }
-            });
-          }).catch((e) => {
+          ).catch((e) => {
             console.error('[ws] K8s exec error:', e);
             try { ws.close(); } catch { }
           });
