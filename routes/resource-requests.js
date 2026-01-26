@@ -10,7 +10,8 @@ const {
     getUserPendingRequests,
     getOrCreateContainerConfig,
     updateContainerConfig,
-    getNodeStatus
+    getNodeStatus,
+    updateRequestStatus
 } = require('../services/db-init');
 
 // Import metrics collector for real-time node status
@@ -483,13 +484,14 @@ router.post('/', async (req, res) => {
             requestType = 'resource_upgrade';
         }
 
-        // Check if auto-approval applies
+        // Check if auto-approval applies (pass current config to detect decreases)
         const requiresApproval = resourceConfig.requiresApproval(
             target_node,
             preset_id || 'conservative',
             requestedMemory,
             requestedCpus,
-            requestedStorage
+            requestedStorage,
+            containerConfig  // Pass current config to check if this is a decrease
         );
 
         // Validate and set duration (default to 1 day if not specified)
@@ -517,6 +519,9 @@ router.post('/', async (req, res) => {
 
         // If auto-approved, update container config immediately
         if (!requiresApproval) {
+            // Mark request as approved so it doesn't show as pending
+            await updateRequestStatus(requestId, 'approved', 'system', 'Auto-approved');
+
             // Calculate expiry date based on duration
             const expireDate = new Date();
             expireDate.setDate(expireDate.getDate() + requestedDuration);

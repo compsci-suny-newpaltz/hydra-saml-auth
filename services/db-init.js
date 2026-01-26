@@ -101,6 +101,21 @@ CREATE TABLE IF NOT EXISTS security_events (
     created_at TEXT DEFAULT (datetime('now'))
 );
 
+-- Migration progress tracking - real-time migration status updates
+CREATE TABLE IF NOT EXISTS migration_progress (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL,
+    from_node TEXT NOT NULL,
+    to_node TEXT NOT NULL,
+    current_step TEXT NOT NULL DEFAULT 'INITIATED',
+    progress_percent INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'in_progress' CHECK(status IN ('in_progress', 'completed', 'failed')),
+    error_message TEXT,
+    started_at TEXT DEFAULT (datetime('now')),
+    completed_at TEXT,
+    steps_log TEXT DEFAULT '[]'
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_requests_username ON resource_requests(username);
 CREATE INDEX IF NOT EXISTS idx_requests_status ON resource_requests(status);
@@ -111,6 +126,8 @@ CREATE INDEX IF NOT EXISTS idx_security_username ON security_events(username);
 CREATE INDEX IF NOT EXISTS idx_security_type ON security_events(event_type);
 CREATE INDEX IF NOT EXISTS idx_security_severity ON security_events(severity);
 CREATE INDEX IF NOT EXISTS idx_security_created ON security_events(created_at);
+CREATE INDEX IF NOT EXISTS idx_migration_username ON migration_progress(username);
+CREATE INDEX IF NOT EXISTS idx_migration_status ON migration_progress(status);
 `;
 
 // Initial node data from config

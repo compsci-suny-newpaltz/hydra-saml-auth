@@ -141,7 +141,7 @@
 
     /* Tutorial Overlay Styles */
     .tutorial-overlay {
-      position: fixed;
+      position: absolute;
       top: 0;
       left: 0;
       right: 0;
@@ -179,7 +179,7 @@
     }
 
     .tutorial-tooltip {
-      position: fixed;
+      position: absolute;
       background: white;
       border-radius: 16px;
       padding: 24px;
@@ -259,7 +259,7 @@
     }
 
     .tutorial-welcome {
-      position: fixed;
+      position: absolute;
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%) scale(0.9);
@@ -669,7 +669,8 @@
               <h4 class="text-lg font-semibold text-yellow-800"><i class="fas fa-clock"></i> Pending Resource Request</h4>
               <p class="text-sm text-yellow-700 mt-1">
                 <span class="font-medium">Target:</span> <span id="pending-target-node">-</span> |
-                <span class="font-medium">Resources:</span> <span id="pending-resources">-</span>
+                <span class="font-medium">Resources:</span> <span id="pending-resources">-</span> |
+                <span class="font-medium">Duration:</span> <span id="pending-duration">-</span>
               </p>
               <p class="text-xs text-yellow-600 mt-1">Submitted: <span id="pending-submitted">-</span></p>
             </div>
@@ -833,6 +834,25 @@
                   <option value="100">100 GB (Requires approval)</option>
                   <option value="200">200 GB - GPU Training (Requires approval)</option>
                 </select>
+              </div>
+
+              <!-- Duration (Days) -->
+              <div id="duration-section">
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                  Duration <span class="text-gray-500">(days until auto-return to Hydra)</span>
+                </label>
+                <select id="duration-days" class="w-full rounded border border-gray-300 px-3 py-2">
+                  <option value="1">1 Day - Quick testing</option>
+                  <option value="3">3 Days - Short assignment</option>
+                  <option value="7" selected>1 Week - Good for short projects</option>
+                  <option value="14">2 Weeks - Standard project length</option>
+                  <option value="30">1 Month - Semester project</option>
+                  <option value="60">2 Months - Extended project (Requires approval)</option>
+                  <option value="90">3 Months - Full semester (Requires approval)</option>
+                </select>
+                <p class="text-xs text-gray-500 mt-1">
+                  <i class="fas fa-info-circle"></i> After this time, your container will automatically move back to Hydra. Your files will be preserved.
+                </p>
               </div>
 
               <!-- Reason (for approval requests) -->
@@ -1507,14 +1527,12 @@
           if (handleAuthError(res)) return;
           const data = await res.json();
 
-          // Check if migration is in progress (persists across page refresh)
+          // Check if migration is in progress (from server or local state)
           const migrationState = checkMigrationInProgress();
-          if (migrationState) {
-            // Handle migration status - returns true if migration still in progress
-            if (handleMigrationStatus(data, migrationState)) {
-              // Migration in progress, skip normal UI update for state
-              // But still update resources display
-            }
+          // Always call handleMigrationStatus to check for server-side migration
+          if (handleMigrationStatus(data, migrationState)) {
+            // Migration in progress, skip normal UI update for state
+            // But still update resources display
           }
 
           const badge = document.getElementById('container-state-badge');
@@ -1820,11 +1838,18 @@
 
       // Check for migration completion based on container status
       function handleMigrationStatus(data, migrationState) {
-        if (!migrationState) return false;
-
         const msg = document.getElementById('container-message');
         const migrateBtn = document.getElementById('migrate-btn');
         const migrationBanner = document.getElementById('migration-banner');
+
+        // Check if server reports active migration
+        if (data.migration && data.migration.inProgress) {
+          // Use real progress from server
+          showRealMigrationProgress(data.migration);
+          return true;
+        }
+
+        if (!migrationState) return false;
 
         // If container is now running on the target node, migration is complete
         if (data.exists && data.running && data.resources &&
@@ -1846,6 +1871,71 @@
         // If still pending/not running, keep showing progress with the original start time
         showMigrationProgress(migrationState.targetNode, migrationState.startTime);
         return true;
+      }
+
+      // Show real-time migration progress from server
+      function showRealMigrationProgress(migration) {
+        const msg = document.getElementById('container-message');
+        const migrationBanner = document.getElementById('migration-banner');
+
+        // Hide the migrate banner if showing
+        if (migrationBanner) {
+          migrationBanner.classList.add('hidden');
+        }
+
+        // Stop any timer-based progress
+        stopMigrationTimer();
+
+        msg.innerHTML = `
+          <div class="text-blue-600 bg-blue-50 border border-blue-200 rounded p-4">
+            <div class="flex items-center mb-3">
+              <span class="text-xl mr-2">${migration.stepIcon}</span>
+              <span>Migrating container to <strong>${migration.toNode || 'GPU node'}</strong></span>
+            </div>
+            <div class="mb-2">
+              <div class="flex justify-between text-sm mb-1">
+                <span id="migration-status-text">${migration.stepLabel}</span>
+                <span id="migration-progress-percent">${migration.progressPercent}%</span>
+              </div>
+              <div class="w-full bg-blue-200 rounded-full h-2.5">
+                <div id="migration-progress-bar" class="bg-blue-600 h-2.5 rounded-full transition-all duration-500" style="width: ${migration.progressPercent}%"></div>
+              </div>
+            </div>
+            <p class="text-xs text-blue-500 mt-2">
+              <i class="fas fa-info-circle mr-1"></i>
+              Your files will be preserved. Page will refresh when complete.
+            </p>
+          </div>
+        `;
+
+        // Set up polling for migration status
+        if (!window.migrationPollInterval) {
+          window.migrationPollInterval = setInterval(async () => {
+            try {
+              const res = await fetch('/dashboard/api/containers/status');
+              if (res.ok) {
+                const data = await res.json();
+                if (data.migration && data.migration.inProgress) {
+                  // Update progress bar and status
+                  const statusText = document.getElementById('migration-status-text');
+                  const progressPercent = document.getElementById('migration-progress-percent');
+                  const progressBar = document.getElementById('migration-progress-bar');
+                  if (statusText) statusText.textContent = data.migration.stepLabel;
+                  if (progressPercent) progressPercent.textContent = data.migration.progressPercent + '%';
+                  if (progressBar) progressBar.style.width = data.migration.progressPercent + '%';
+                } else {
+                  // Migration complete - refresh the page
+                  clearInterval(window.migrationPollInterval);
+                  window.migrationPollInterval = null;
+                  clearMigrationProgress();
+                  location.reload();
+                }
+              }
+            } catch (err) {
+              console.error('Migration poll error:', err);
+            }
+          }, 2000); // Poll every 2 seconds
+        }
       }
 
       window.migrateContainer = async function() {
@@ -2289,12 +2379,15 @@
         const targetNode = document.getElementById('target-node').value;
         const preset = document.getElementById('resource-preset').value;
         const storage = parseInt(document.getElementById('storage-tier').value);
+        const durationDays = parseInt(document.getElementById('duration-days').value);
 
         // Check if this requires approval
+        // GPU nodes require approval, but returning to hydra is auto-approved
         const needsApproval = (
           targetNode !== 'hydra' ||
           preset !== 'conservative' ||
-          storage > 50
+          storage > 50 ||
+          durationDays > 30
         );
 
         const approvalWarning = document.getElementById('approval-warning');
@@ -2328,6 +2421,7 @@
         updateApprovalStatus();
         updateRecommendation();
       });
+      document.getElementById('duration-days').addEventListener('change', updateApprovalStatus);
 
       // Handle form submission
       document.getElementById('resource-config-form').addEventListener('submit', async function (e) {
@@ -2344,6 +2438,7 @@
               target_node: document.getElementById('target-node').value,
               preset_id: document.getElementById('resource-preset').value,
               storage_gb: parseInt(document.getElementById('storage-tier').value),
+              duration_days: parseInt(document.getElementById('duration-days').value),
               reason: document.getElementById('request-reason').value || null
             })
           });
@@ -2383,6 +2478,7 @@
 
             document.getElementById('pending-target-node').textContent = request.target_node.charAt(0).toUpperCase() + request.target_node.slice(1);
             document.getElementById('pending-resources').textContent = `${request.requested_memory_gb}GB RAM, ${request.requested_cpus} CPUs, ${request.requested_storage_gb}GB storage`;
+            document.getElementById('pending-duration').textContent = request.requested_duration_days ? `${request.requested_duration_days} days` : 'N/A';
             document.getElementById('pending-submitted').textContent = new Date(request.created_at).toLocaleString();
 
             section.classList.remove('hidden');
