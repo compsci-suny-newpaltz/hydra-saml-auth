@@ -535,14 +535,107 @@ const ensureAuthenticated = (req, res, next) =>
           ws.close();
           return;
         }
-        const Docker = require('dockerode');
-        const docker = new Docker({ socketPath: '/var/run/docker.sock' });
         const username = String(req.user.email).split('@')[0];
         const nameParam = String(req.params.name || '').trim();
         if (!nameParam) {
           ws.close();
           return;
         }
+
+        const runtimeConfig = require('./config/runtime');
+
+        // ========== KUBERNETES MODE ==========
+        if (runtimeConfig.isKubernetes()) {
+          const k8s = require('@kubernetes/client-node');
+          const stream = require('stream');
+
+          const kc = new k8s.KubeConfig();
+          kc.loadFromDefault();
+
+          const exec = new k8s.Exec(kc);
+          const namespace = runtimeConfig.k8s?.namespace || 'hydra-students';
+
+          // Verify pod belongs to user
+          const coreApi = kc.makeApiClient(k8s.CoreV1Api);
+          try {
+            const pod = await coreApi.readNamespacedPod(nameParam, namespace);
+            const labels = pod.body?.metadata?.labels || {};
+            if (labels['hydra.owner'] !== username) {
+              ws.close();
+              return;
+            }
+          } catch (e) {
+            console.error('[ws] Pod not found:', e.message);
+            ws.close();
+            return;
+          }
+
+          // Create streams for stdin/stdout
+          const stdoutStream = new stream.PassThrough();
+          const stderrStream = new stream.PassThrough();
+
+          stdoutStream.on('data', (chunk) => {
+            try {
+              if (ws.readyState === ws.OPEN) ws.send(chunk);
+            } catch { }
+          });
+
+          stderrStream.on('data', (chunk) => {
+            try {
+              if (ws.readyState === ws.OPEN) ws.send(chunk);
+            } catch { }
+          });
+
+          // Store stdin writer for later
+          let stdinStream = null;
+
+          exec.exec(
+            namespace,
+            nameParam,
+            'student',
+            ['/bin/bash', '-l'],
+            stdoutStream,
+            stderrStream,
+            process.stdin, // placeholder, we'll handle stdin via ws
+            true, // tty
+            (status) => {
+              console.log('[ws] K8s exec ended:', status);
+              try { ws.close(); } catch { }
+            }
+          ).then((wsConnection) => {
+            stdinStream = wsConnection;
+            ws.on('message', (msg) => {
+              try {
+                if (stdinStream && stdinStream.readyState === 1) {
+                  // K8s WebSocket expects channel prefix for stdin (channel 0)
+                  const buf = Buffer.alloc(msg.length + 1);
+                  buf[0] = 0; // stdin channel
+                  Buffer.from(msg).copy(buf, 1);
+                  stdinStream.send(buf);
+                }
+              } catch (e) {
+                console.error('[ws] stdin write error:', e);
+              }
+            });
+
+            ws.on('close', () => {
+              try { if (stdinStream) stdinStream.close(); } catch { }
+            });
+
+            ws.on('error', () => {
+              try { if (stdinStream) stdinStream.close(); } catch { }
+            });
+          }).catch((e) => {
+            console.error('[ws] K8s exec error:', e);
+            try { ws.close(); } catch { }
+          });
+
+          return;
+        }
+
+        // ========== DOCKER MODE ==========
+        const Docker = require('dockerode');
+        const docker = new Docker({ socketPath: '/var/run/docker.sock' });
 
         const container = docker.getContainer(nameParam);
         const info = await container.inspect();
@@ -561,10 +654,10 @@ const ensureAuthenticated = (req, res, next) =>
           Tty: true
         });
 
-        const stream = await exec.start({ hijack: true, Tty: true, stdin: true });
+        const dockerStream = await exec.start({ hijack: true, Tty: true, stdin: true });
 
         // Pipe data between WebSocket and Docker stream
-        stream.on('data', (chunk) => {
+        dockerStream.on('data', (chunk) => {
           try {
             if (ws.readyState === ws.OPEN) {
               ws.send(chunk);
@@ -572,22 +665,22 @@ const ensureAuthenticated = (req, res, next) =>
           } catch { }
         });
 
-        stream.on('end', () => {
+        dockerStream.on('end', () => {
           try { ws.close(); } catch { }
         });
 
         ws.on('message', (msg) => {
           try {
-            stream.write(msg);
+            dockerStream.write(msg);
           } catch { }
         });
 
         ws.on('close', () => {
-          try { stream.end(); } catch { }
+          try { dockerStream.end(); } catch { }
         });
 
         ws.on('error', () => {
-          try { stream.end(); } catch { }
+          try { dockerStream.end(); } catch { }
         });
       } catch (e) {
         console.error('[ws] exec error:', e);

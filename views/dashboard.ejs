@@ -641,6 +641,10 @@
                 class="px-3 py-2 rounded bg-red-600 text-white hover:bg-red-700 text-sm">
                 <i class="fas fa-stop"></i> Stop
               </button>
+              <button onclick="restartContainer()" id="restart-btn"
+                class="px-3 py-2 rounded bg-orange-500 text-white hover:bg-orange-600 text-sm">
+                <i class="fas fa-sync-alt"></i> Restart
+              </button>
               <button onclick="openLogs()" id="logs-btn"
                 class="px-3 py-2 rounded bg-gray-600 text-white hover:bg-gray-700 text-sm">
                 <i class="fas fa-file-alt"></i> Logs
@@ -1666,6 +1670,24 @@
           loadContainerStatus();
         } catch (err) {
           msg.innerHTML = `<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2">${err.message || 'Failed to stop'}</p>`;
+        }
+      };
+
+      window.restartContainer = async function () {
+        if (!confirm('Restart your container? This will briefly interrupt your services.')) return;
+        const msg = document.getElementById('container-message');
+        msg.innerHTML = '<p class="text-gray-600"><i class="fas fa-spinner fa-spin mr-2"></i>Restarting container...</p>';
+        try {
+          const res = await fetch('/dashboard/api/containers/restart', { method: 'POST' });
+          if (handleAuthError(res)) return;
+          const data = await res.json();
+          if (!res.ok || !data.success) throw new Error(data.message || 'Failed');
+
+          msg.innerHTML = '<p class="text-green-700 bg-green-100 border border-green-200 rounded p-2"><i class="fas fa-check-circle mr-2"></i>Container restarted!</p>';
+          setTimeout(() => { msg.innerHTML = ''; }, 3000);
+          loadContainerStatus();
+        } catch (err) {
+          msg.innerHTML = `<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2"><i class="fas fa-times-circle mr-2"></i>${err.message || 'Failed to restart'}</p>`;
         }
       };
 

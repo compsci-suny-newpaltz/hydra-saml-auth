@@ -889,6 +889,42 @@ router.post('/stop', async (req, res) => {
     }
 });
 
+// Restart student container
+// POST /dashboard/api/containers/restart
+router.post('/restart', async (req, res) => {
+    try {
+        if (!req.isAuthenticated?.() || !req.user?.email) {
+            return res.status(401).json({ success: false, message: 'Not authenticated' });
+        }
+
+        const username = String(req.user.email).split('@')[0];
+
+        // ========== KUBERNETES MODE ==========
+        if (runtimeConfig.isKubernetes()) {
+            // Stop then start the container
+            await k8sContainers.stopContainer(username);
+            // Wait a moment for pod to terminate
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            const result = await k8sContainers.startContainer(username);
+            return res.json(result);
+        }
+
+        // ========== DOCKER MODE ==========
+        const result = await getStudentContainer(username);
+
+        if (!result) {
+            return res.status(404).json({ success: false, message: 'Container not found' });
+        }
+
+        const { container } = result;
+        await container.restart({ t: 10 });
+        return res.json({ success: true, message: 'Container restarted' });
+    } catch (err) {
+        console.error('[containers] restart error:', err);
+        return res.status(500).json({ success: false, message: err.message || 'Failed to restart container' });
+    }
+});
+
 // Get container status
 // GET /dashboard/api/containers/status
 router.get('/status', async (req, res) => {
