@@ -1,4 +1,27 @@
 {
+  "extensions.ignoreRecommendations": true,
+
+  "latex-workshop.latex.autoBuild.run": "never",
+  "latex-workshop.latex.autoClean.run": "never",
+  "latex-workshop.intellisense.enabled": false,
+
+  "volar.autoCompleteRefs": false,
+  "volar.codeLens.references": false,
+
+  "intelephense.diagnostics.enable": false,
+  "intelephense.completion.triggerParameterHints": false,
+
+  "docker.showStartPage": false,
+  "docker.promptOnStartup": false,
+
+  "cmake.configureOnOpen": false,
+  "cmake.showOptionsMovedNotification": false,
+
+  "gradle.autoDetect": "off",
+
+  "liveServer.settings.donotShowInfoMsg": true,
+  "liveServer.settings.donotVerifyTags": true,
+
   "editor.fontSize": 14,
   "editor.tabSize": 2,
   "editor.formatOnSave": true,

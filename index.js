@@ -722,24 +722,39 @@ const ensureAuthenticated = (req, res, next) =>
           return res.status(403).json({ error: 'Admin access required' });
         }
 
-        // Set up SSE headers
+        // Set up SSE headers - X-Accel-Buffering disables proxy buffering
         res.setHeader('Content-Type', 'text/event-stream');
-        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Cache-Control', 'no-cache, no-transform');
         res.setHeader('Connection', 'keep-alive');
+        res.setHeader('X-Accel-Buffering', 'no');
         res.flushHeaders();
 
         // Send initial connection message
         res.write(`data: ${JSON.stringify({ type: 'connected', message: 'Container events stream connected' })}\n\n`);
 
+        // Keepalive ping every 20 seconds to prevent proxy/browser timeout
+        const keepalive = setInterval(() => {
+          try {
+            res.write(`: keepalive\n\n`);
+          } catch (e) {
+            clearInterval(keepalive);
+          }
+        }, 20000);
+
         // Listen for container events
         const onContainerEvent = (event) => {
-          res.write(`data: ${JSON.stringify(event)}\n\n`);
+          try {
+            res.write(`data: ${JSON.stringify(event)}\n\n`);
+          } catch (e) {
+            // Connection closed
+          }
         };
 
         securityMonitor.eventBus.on('container-event', onContainerEvent);
 
         // Clean up on disconnect
         req.on('close', () => {
+          clearInterval(keepalive);
           securityMonitor.eventBus.off('container-event', onContainerEvent);
         });
       });

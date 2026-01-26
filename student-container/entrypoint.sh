@@ -61,6 +61,14 @@ if [ ! -d "/home/student/cuh63" ] && [ -d "/etc/skel/cuh63" ]; then
     chown -R student:student /home/student/cuh63
 fi
 
+# Copy nvm to user's home directory if not present (for fresh or old volumes)
+if [ ! -d "/home/student/.nvm" ] && [ -d "/etc/skel/.nvm" ]; then
+    echo "Installing nvm and Node.js to home directory..."
+    cp -r /etc/skel/.nvm /home/student/.nvm
+    chown -R student:student /home/student/.nvm
+    echo "Node.js $(cat /home/student/.nvm/alias/default) installed"
+fi
+
 # Handle graceful shutdown
 trap 'supervisorctl shutdown && exit 0' SIGTERM SIGINT
 

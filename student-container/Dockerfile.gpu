@@ -168,6 +168,8 @@ RUN mkdir -p /etc/skel/.local/share/code-server/User && \
     cp /tmp/default-settings.json /etc/skel/.local/share/code-server/User/settings.json && \
     cp -r /tmp/default-vscode/* /etc/skel/.vscode/ && \
     cp -r /home/student/.local/share/code-server/extensions /etc/skel/.local/share/code-server/ && \
+    # Backup nvm to skel so it persists on mounted volumes
+    cp -r /home/student/.nvm /etc/skel/.nvm && \
     rm -rf /tmp/*
 
 # Install CUH63 tools

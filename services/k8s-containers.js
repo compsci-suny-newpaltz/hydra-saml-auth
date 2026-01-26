@@ -5,6 +5,12 @@ const k8sClient = require('./k8s-client');
 const runtimeConfig = require('../config/runtime');
 const resourceConfig = require('../config/resources');
 const crypto = require('crypto');
+const fs = require('fs').promises;
+const path = require('path');
+const yaml = require('js-yaml');
+
+// Docker Traefik dynamic config directory (for Apache -> Docker Traefik -> K8s routing)
+const TRAEFIK_DYNAMIC_DIR = runtimeConfig.docker?.traefikConfigPath || '/etc/traefik/dynamic';
 
 // Generate a random password for student container
 function generatePassword(length = 16) {
@@ -272,6 +278,167 @@ function buildMiddlewareSpec(username) {
   };
 }
 
+// ==================== DOCKER TRAEFIK CONFIG ====================
+
+/**
+ * Write Docker Traefik config file that routes to K8s Traefik
+ * This is needed because Apache proxies to Docker Traefik (8082),
+ * which then needs to forward K8s student routes to K8s Traefik (30080)
+ */
+async function writeDockerTraefikConfig(username) {
+  const filePath = path.join(TRAEFIK_DYNAMIC_DIR, `student-${username}.yaml`);
+
+  const config = {
+    http: {
+      routers: {
+        [`student-${username}-vscode`]: {
+          entryPoints: ['web'],
+          rule: `PathPrefix(\`/students/${username}/vscode\`)`,
+          service: `k8s-traefik-${username}`,
+          middlewares: [`student-${username}-auth`]
+        },
+        [`student-${username}-jupyter`]: {
+          entryPoints: ['web'],
+          rule: `PathPrefix(\`/students/${username}/jupyter\`)`,
+          service: `k8s-traefik-${username}`,
+          middlewares: [`student-${username}-auth`]
+        }
+      },
+      services: {
+        [`k8s-traefik-${username}`]: {
+          loadBalancer: {
+            servers: [
+              { url: 'http://host.docker.internal:30080' }
+            ]
+          }
+        }
+      },
+      middlewares: {
+        [`student-${username}-auth`]: {
+          forwardAuth: {
+            address: 'http://host.docker.internal:6969/auth/verify',
+            trustForwardHeader: true
+          }
+        }
+      }
+    }
+  };
+
+  await fs.writeFile(filePath, yaml.dump(config), 'utf8');
+  console.log(`[K8s] Created Docker Traefik config for ${username}: ${filePath}`);
+}
+
+/**
+ * Delete Docker Traefik config file
+ */
+async function deleteDockerTraefikConfig(username) {
+  const filePath = path.join(TRAEFIK_DYNAMIC_DIR, `student-${username}.yaml`);
+  try {
+    await fs.unlink(filePath);
+    console.log(`[K8s] Deleted Docker Traefik config for ${username}`);
+    return true;
+  } catch (err) {
+    if (err.code !== 'ENOENT') {
+      console.warn(`[K8s] Failed to delete Traefik config for ${username}:`, err.message);
+    }
+    return false;
+  }
+}
+
+// ==================== SSH PIPER CONFIG ====================
+
+const SSHPIPER_CONFIG_DIR = runtimeConfig.sshpiper?.configPath || '/app/sshpiper/config';
+
+/**
+ * Update SSH piper config to point to K8s pod IP
+ * This is needed because sshpiper runs in Docker and can't resolve K8s service names
+ */
+async function updateSshPiperConfig(username, podIP) {
+  const userDir = path.join(SSHPIPER_CONFIG_DIR, username);
+  const upstreamFile = path.join(userDir, 'sshpiper_upstream');
+
+  try {
+    // Ensure directory exists
+    await fs.mkdir(userDir, { recursive: true });
+
+    // Write upstream config pointing to pod IP
+    await fs.writeFile(upstreamFile, `${podIP}:22\n`, 'utf8');
+    console.log(`[K8s] Updated SSH piper config for ${username}: ${podIP}:22`);
+    return true;
+  } catch (err) {
+    console.warn(`[K8s] Failed to update SSH piper config for ${username}:`, err.message);
+    return false;
+  }
+}
+
+/**
+ * Delete SSH piper config for a user
+ */
+async function deleteSshPiperConfig(username) {
+  const userDir = path.join(SSHPIPER_CONFIG_DIR, username);
+  try {
+    await fs.rm(userDir, { recursive: true, force: true });
+    console.log(`[K8s] Deleted SSH piper config for ${username}`);
+    return true;
+  } catch (err) {
+    if (err.code !== 'ENOENT') {
+      console.warn(`[K8s] Failed to delete SSH piper config for ${username}:`, err.message);
+    }
+    return false;
+  }
+}
+
+// ==================== HELPER FUNCTIONS ====================
+
+/**
+ * Wait for a pod to be ready
+ * @param {string} username - The student username
+ * @param {number} timeoutMs - Maximum time to wait in milliseconds
+ * @returns {Promise<{ready: boolean, status: string}>}
+ */
+async function waitForPodReady(username, timeoutMs = 60000) {
+  const startTime = Date.now();
+  const podName = `student-${username}`;
+
+  while (Date.now() - startTime < timeoutMs) {
+    const pod = await k8sClient.getPod(podName);
+    if (!pod) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      continue;
+    }
+
+    const phase = pod.status?.phase;
+    const containerStatus = pod.status?.containerStatuses?.[0];
+
+    // Pod is running and container is ready
+    if (phase === 'Running' && containerStatus?.ready) {
+      return { ready: true, status: 'running' };
+    }
+
+    // Pod failed
+    if (phase === 'Failed') {
+      return { ready: false, status: 'failed' };
+    }
+
+    // Check for container errors
+    if (containerStatus?.state?.waiting?.reason) {
+      const reason = containerStatus.state.waiting.reason;
+      if (reason === 'ImagePullBackOff' || reason === 'ErrImagePull' || reason === 'CrashLoopBackOff') {
+        return { ready: false, status: reason.toLowerCase() };
+      }
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+
+  // Timeout - return current status
+  const pod = await k8sClient.getPod(podName);
+  return {
+    ready: false,
+    status: pod?.status?.phase?.toLowerCase() || 'timeout'
+  };
+}
+
 // ==================== PUBLIC API ====================
 
 /**
@@ -320,10 +487,28 @@ async function initContainer(username, email, config = {}) {
       await k8sClient.createIngressRoute(buildIngressRouteSpec(username));
     }
 
+    // 6. Create Docker Traefik config (for Apache -> Docker Traefik -> K8s routing)
+    await writeDockerTraefikConfig(username);
+
+    // 7. Wait for pod to be ready (up to 60 seconds)
+    console.log(`[K8s] Waiting for pod student-${username} to be ready...`);
+    const readyStatus = await waitForPodReady(username, 60000);
+    if (!readyStatus.ready) {
+      console.warn(`[K8s] Pod student-${username} not ready after timeout: ${readyStatus.status}`);
+    }
+
+    // 8. Update SSH piper config with pod IP (for SSH access through sshpiper)
+    const pod = await k8sClient.getPod(`student-${username}`);
+    if (pod?.status?.podIP) {
+      await updateSshPiperConfig(username, pod.status.podIP);
+    }
+
     return {
       success: true,
       name: `student-${username}`,
       password: existingSecret ? null : password, // Only return password on first creation
+      ready: readyStatus.ready,
+      status: readyStatus.status,
       urls: {
         vscode: `/students/${username}/vscode/`,
         jupyter: `/students/${username}/jupyter/`
@@ -455,7 +640,28 @@ async function startContainer(username, email = '', containerConfig = null) {
 
     await k8sClient.createPod(podSpec);
 
-    return { success: true, message: 'Container started (pod recreated)' };
+    // Ensure Docker Traefik config exists for routing
+    await writeDockerTraefikConfig(username);
+
+    // Wait for pod to be ready (up to 60 seconds)
+    console.log(`[K8s] Waiting for pod student-${username} to be ready...`);
+    const readyStatus = await waitForPodReady(username, 60000);
+    if (!readyStatus.ready) {
+      console.warn(`[K8s] Pod student-${username} not ready after timeout: ${readyStatus.status}`);
+    }
+
+    // Update SSH piper config with pod IP (for SSH access through sshpiper)
+    const pod = await k8sClient.getPod(`student-${username}`);
+    if (pod?.status?.podIP) {
+      await updateSshPiperConfig(username, pod.status.podIP);
+    }
+
+    return {
+      success: true,
+      message: 'Container started',
+      ready: readyStatus.ready,
+      status: readyStatus.status
+    };
   } catch (err) {
     console.error(`[K8s] Error starting container for ${username}:`, err.message);
     // Add more context to the error
@@ -498,7 +704,9 @@ async function destroyContainer(username) {
     pod: false,
     service: false,
     ingressRoute: false,
-    middleware: false
+    middleware: false,
+    traefikConfig: false,
+    sshPiperConfig: false
   };
 
   try {
@@ -506,6 +714,8 @@ async function destroyContainer(username) {
     results.middleware = await k8sClient.deleteMiddleware(`strip-prefix-${username}`);
     results.service = await k8sClient.deleteService(`student-${username}`);
     results.pod = await k8sClient.deletePod(`student-${username}`);
+    results.traefikConfig = await deleteDockerTraefikConfig(username);
+    results.sshPiperConfig = await deleteSshPiperConfig(username);
 
     console.log(`[K8s] Destroyed container resources for ${username}:`, results);
     return { success: true, results };
@@ -599,7 +809,6 @@ function getRoutes(username) {
 async function migrateContainer(username, email, targetNode, config = {}) {
   const podName = `student-${username}`;
   const pvcName = `hydra-vol-${username}`;
-  const namespace = runtimeConfig.k8s.namespace;
 
   console.log(`[k8s-containers] Migrating ${username} to ${targetNode}`);
 
@@ -701,6 +910,13 @@ async function migrateContainer(username, email, targetNode, config = {}) {
 
   if (!ready) {
     console.warn(`[k8s-containers] Pod not ready after migration, but continuing`);
+  }
+
+  // Step 7: Update Docker Traefik and SSH piper configs after migration
+  await writeDockerTraefikConfig(username);
+  const finalPod = await k8sClient.getPod(podName);
+  if (finalPod?.status?.podIP) {
+    await updateSshPiperConfig(username, finalPod.status.podIP);
   }
 
   return {

@@ -42,6 +42,15 @@ webfreak.debug
 # Path Intellisense - autocomplete paths
 christian-kohler.path-intellisense
 
+# PDF Viewer - lightweight (7MB)
+mathematic.vscode-pdf
+
+# SQLTools - database client (MySQL, PostgreSQL, SQLite)
+mtxr.sqltools
+mtxr.sqltools-driver-mysql
+mtxr.sqltools-driver-pg
+mtxr.sqltools-driver-sqlite
+
 # Jenkins/CI-CD & Groovy
 secanis.jenkinsfile-support
 janjoerke.jenkins-pipeline-linter-connector
@@ -53,18 +62,17 @@ NicolasVuillamy.vscode-groovy-lint
 # See Dockerfile for build step
 
 # ===========================================
-# OPTIONAL (available on-demand)
-# Students can install these from Extensions panel
-# They appear in "Recommended" section
+# OPTIONAL (installed but disabled by default)
+# Students can enable these from Extensions panel
 # ===========================================
-# James-Yu.latex-workshop       # LaTeX (~80MB) - install if needed
-# Vue.volar                     # Vue.js - install if needed
-# bmewburn.vscode-intelephense-client  # PHP - install if needed
-# ms-azuretools.vscode-docker   # Docker - install if needed
-# ms-vscode.hexeditor           # Hex editor - install if needed
-# ms-vscode.cmake-tools         # CMake Tools - install if needed
-# github.vscode-github-actions  # GitHub Actions - install if needed
-# vscjava.vscode-gradle         # Gradle - install if needed
-# ritwickdey.liveserver         # Live Server - install if needed
-# ecmel.vscode-html-css         # HTML/CSS - install if needed
-# dsznajder.es7-react-js-snippets # React - install if needed
+James-Yu.latex-workshop
+Vue.volar
+bmewburn.vscode-intelephense-client
+ms-azuretools.vscode-docker
+ms-vscode.hexeditor
+ms-vscode.cmake-tools
+github.vscode-github-actions
+vscjava.vscode-gradle
+ritwickdey.liveserver
+ecmel.vscode-html-css
+dsznajder.es7-react-js-snippets
