@@ -721,7 +721,7 @@ const ensureAuthenticated = (req, res, next) =>
     // // }
     // ============================================================================
 
-    app.get('/dashboard', (req, res) => {
+    app.get('/dashboard', async (req, res) => {
       if (!req.isAuthenticated()) return res.redirect('/login');
       const viewUser = {
         firstName: req.user.given_name || '',
@@ -730,10 +730,18 @@ const ensureAuthenticated = (req, res, next) =>
         displayName: req.user.display_name || req.user.name || req.user.email || '',
         oid: req.user.oid || req.user.id || ''
       };
-      // Admin = faculty affiliation OR in whitelist
+      // Admin = faculty affiliation OR in env whitelist OR in database whitelist
       const isFaculty = (req.user.affiliation || '').toLowerCase() === 'faculty';
-      const isWhitelisted = ADMIN_USERS.includes((req.user.email || '').toLowerCase());
-      const isAdmin = isFaculty || isWhitelisted;
+      const isEnvWhitelisted = ADMIN_USERS.includes((req.user.email || '').toLowerCase());
+      // Check database whitelist
+      let isDbWhitelisted = false;
+      try {
+        const { isWhitelisted } = require('./services/db-init');
+        isDbWhitelisted = await isWhitelisted(req.user.email || '');
+      } catch (e) {
+        console.warn('[dashboard] Error checking db whitelist:', e.message);
+      }
+      const isAdmin = isFaculty || isEnvWhitelisted || isDbWhitelisted;
       res.render('dashboard', { user: viewUser, baseUrl: BASE_URL, isAdmin });
     });
 
