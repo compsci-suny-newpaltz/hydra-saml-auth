@@ -10,6 +10,14 @@ try {
   console.warn('[servers-api] Metrics collector not available, using mock data');
 }
 
+// Import K8s client for pod status
+let k8sClient;
+try {
+  k8sClient = require('../services/k8s-client');
+} catch (e) {
+  console.warn('[servers-api] K8s client not available, using mock data for pods');
+}
+
 /**
  * GET /api/servers/status
  * Returns status and metrics for all cluster servers
@@ -23,13 +31,13 @@ router.get('/status', async (req, res) => {
     if (metricsCollector) {
       const metrics = metricsCollector.getMetrics();
       if (metrics && metrics.lastUpdated) {
-        serverData = formatCollectedMetrics(metrics);
+        serverData = await formatCollectedMetrics(metrics);
       }
     }
 
     // Fallback to mock data if no real metrics
     if (!serverData) {
-      serverData = generateMockServerData();
+      serverData = await generateMockServerData();
     }
 
     res.json({
@@ -121,7 +129,7 @@ router.get('/:name/metrics', async (req, res) => {
 /**
  * Format metrics from the collector into API response format
  */
-function formatCollectedMetrics(metrics) {
+async function formatCollectedMetrics(metrics) {
   const result = {};
 
   // Format Hydra (control plane - no GPUs)
@@ -137,7 +145,7 @@ function formatCollectedMetrics(metrics) {
       disk_total_gb: h.system?.disk_total_gb || 21000,
       containers_running: h.containers?.running || 0,
       zfs_status: h.zfs_status || 'ONLINE',
-      storage_cluster: h.storage_cluster || generateStorageClusterData(),
+      storage_cluster: h.storage_cluster || await generateStorageClusterData(),
       last_updated: h.timestamp || new Date().toISOString()
     };
   }
@@ -203,7 +211,7 @@ function formatCollectedMetrics(metrics) {
  * Generate realistic mock server data
  * This will be replaced by real metrics collection
  */
-function generateMockServerData() {
+async function generateMockServerData() {
   // Add some randomization to make it look realistic
   const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
   const randFloat = (min, max) => (Math.random() * (max - min) + min).toFixed(1);
@@ -219,7 +227,7 @@ function generateMockServerData() {
       disk_total_gb: 21000,
       containers_running: rand(35, 55),
       zfs_status: 'ONLINE',
-      storage_cluster: generateStorageClusterData(),
+      storage_cluster: await generateStorageClusterData(),
       last_updated: new Date().toISOString()
     },
     chimera: {
@@ -298,45 +306,126 @@ function generateMockServerData() {
 }
 
 /**
- * Generate storage cluster data from Docker volumes
- * Shows student storage usage across the cluster
+ * Generate storage cluster data from K8s pods
+ * Shows student pods with their status (running, stopped, etc.)
+ *
+ * Cluster-wide capacity calculation:
+ * - Hydra: 20 CPU cores, 251 GB RAM, 110 pod limit
+ * - Chimera: 48 CPU cores, 251 GB RAM, 110 pod limit
+ * - Cerberus: 48 CPU cores, 62 GB RAM, 110 pod limit
+ * - Total: 116 cores, 564 GB RAM, 330 pod limit
+ *
+ * With base pod (0.5 CPU, 1.5 GB RAM):
+ * - By CPU: 116 / 0.5 = 232 pods
+ * - By Memory: 564 / 1.5 = 376 pods
+ * - By Pod limit: 330 pods
+ * - Effective max: 232 pods (CPU bottleneck)
  */
 async function generateStorageClusterData() {
-  const Docker = require('dockerode');
-  const docker = new Docker({ socketPath: '/var/run/docker.sock' });
+  // Cluster-wide capacity (all 3 nodes combined)
+  const CLUSTER_NODES = {
+    hydra: { cpu: 20, memory_gb: 251, pod_limit: 110 },
+    chimera: { cpu: 48, memory_gb: 251, pod_limit: 110 },
+    cerberus: { cpu: 48, memory_gb: 62, pod_limit: 110 }
+  };
+
+  const TOTAL_CPU_CORES = 20 + 48 + 48;  // 116
+  const TOTAL_MEMORY_GB = 251 + 251 + 62; // 564
+  const TOTAL_POD_LIMIT = 110 + 110 + 110; // 330
+  const TOTAL_STORAGE_TB = 21;
+
+  // Base pod resource allocation (conservative preset)
+  const BASE_CPU_REQUEST = 0.5;  // cores
+  const BASE_MEMORY_GB = 1.5;    // GB
+  const BASE_STORAGE_GB = 10;    // GB
+
+  // Calculate max capacity by each resource (cluster-wide)
+  const maxByCpu = Math.floor(TOTAL_CPU_CORES / BASE_CPU_REQUEST);      // 232
+  const maxByMemory = Math.floor(TOTAL_MEMORY_GB / BASE_MEMORY_GB);     // 376
+  const maxByStorage = Math.floor((TOTAL_STORAGE_TB * 1024) / BASE_STORAGE_GB); // 2150
+
+  // Effective max is minimum of all constraints
+  const MAX_PODS = Math.min(maxByCpu, maxByMemory, TOTAL_POD_LIMIT); // 232
 
   try {
-    // Get all student volumes
-    const volumes = await docker.listVolumes();
-    const studentVolumes = (volumes.Volumes || []).filter(v =>
-      v.Name.startsWith('hydra-vol-')
-    );
+    if (!k8sClient) {
+      console.warn('[servers-api] K8s client not available, using mock data');
+      return generateMockStorageCluster();
+    }
 
-    // Get volume sizes (this requires inspecting each volume's usage)
+    // Get all student pods from K8s
+    const pods = await k8sClient.listPods('app.kubernetes.io/name=student-container', 'hydra-students');
+
     const students = [];
-    let totalUsedGb = 0;
+    let runningCount = 0;
 
-    for (const vol of studentVolumes) {
-      const username = vol.Name.replace('hydra-vol-', '');
-      // Estimate usage - in production, use du or zfs list
-      const usedGb = Math.random() * 8; // Mock for now
-      const quotaGb = 10;
+    for (const pod of pods) {
+      const podName = pod.metadata?.name || '';
+      const username = podName.replace('student-', '');
+      const phase = pod.status?.phase || 'Unknown';
+      const containerReady = pod.status?.containerStatuses?.[0]?.ready || false;
+      const node = pod.spec?.nodeName || '-';
+
+      // Determine pod status
+      let pod_status = 'stopped'; // red
+      if (phase === 'Running' && containerReady) {
+        pod_status = 'running'; // green
+        runningCount++;
+      } else if (phase === 'Pending') {
+        pod_status = 'pending'; // yellow
+      } else if (phase === 'Failed' || phase === 'Unknown') {
+        pod_status = 'error'; // red
+      }
+
+      // Get resource usage from pod spec
+      const resources = pod.spec?.containers?.[0]?.resources || {};
+      const memoryRequest = resources.requests?.memory || '512Mi';
+      const cpuRequest = resources.requests?.cpu || '500m';
+
+      // Parse memory to GB (rough estimate)
+      let memoryGb = 0.5;
+      if (memoryRequest.includes('Gi')) {
+        memoryGb = parseFloat(memoryRequest);
+      } else if (memoryRequest.includes('Mi')) {
+        memoryGb = parseFloat(memoryRequest) / 1024;
+      }
 
       students.push({
         username,
-        used_gb: usedGb,
-        quota_gb: quotaGb
+        pod_status,
+        node,
+        used_gb: memoryGb, // Use memory allocation as "used"
+        quota_gb: BASE_STORAGE_GB,
+        phase,
+        pod_ip: pod.status?.podIP || null
       });
-      totalUsedGb += usedGb;
     }
+
+    // Sort by status: running first, then pending, then stopped
+    students.sort((a, b) => {
+      const order = { running: 0, pending: 1, stopped: 2, error: 3 };
+      return (order[a.pod_status] || 4) - (order[b.pod_status] || 4);
+    });
 
     return {
       students,
-      total_used_gb: totalUsedGb,
-      available_tb: 21 - (totalUsedGb / 1000) // 21TB total
+      total_pods: students.length,
+      running_count: runningCount,
+      max_capacity: MAX_PODS,
+      empty_slots: MAX_PODS - students.length,
+      capacity_info: {
+        max_by_cpu: maxByCpu,
+        max_by_memory: maxByMemory,
+        max_by_storage: maxByStorage,
+        k8s_limit: TOTAL_POD_LIMIT,
+        bottleneck: 'cpu',
+        nodes: CLUSTER_NODES
+      },
+      total_used_gb: students.reduce((sum, s) => sum + s.used_gb, 0),
+      available_tb: TOTAL_STORAGE_TB - (students.length * BASE_STORAGE_GB / 1024)
     };
   } catch (err) {
-    console.error('[servers-api] Failed to get storage data:', err.message);
+    console.error('[servers-api] Failed to get K8s pod data:', err.message);
     // Return mock data on error
     return generateMockStorageCluster();
   }
@@ -344,31 +433,56 @@ async function generateStorageClusterData() {
 
 /**
  * Generate mock storage cluster data for testing
+ * Includes pod_status for UI compatibility
  */
 function generateMockStorageCluster() {
+  const MAX_PODS = 232; // Cluster-wide: 116 cores / 0.5 = 232
   const rand = (min, max) => Math.random() * (max - min) + min;
   const students = [];
   const usernames = [
     'gopeen1', 'patelv22', 'easwarac', 'currym6', 'manzim1', 'namc3',
     'defreitm1', 'fennerj1', 'polij1', 'shusterj1', 'dankwahd1', 'arenellc1',
-    'riordanj2', 'smithj3', 'jonesm4', 'brownk5', 'davisl6', 'wilsonp7',
-    'andersona8', 'thomasb9', 'jacksonc10', 'whited11', 'harrisg12', 'martinh13',
-    'garciai14', 'martinezj15', 'robinsonk16', 'clarkl17', 'lewism18', 'leen19'
+    'riordanj2', 'smithj3', 'jonesm4', 'brownk5', 'davisl6', 'wilsonp7'
   ];
 
   let totalUsedGb = 0;
-  usernames.forEach(username => {
+  let runningCount = 0;
+  usernames.forEach((username, i) => {
     const usedGb = rand(0.1, 9.5);
+    // First 3 are running, rest are stopped (mock)
+    const pod_status = i < 3 ? 'running' : 'stopped';
+    if (pod_status === 'running') runningCount++;
+
     students.push({
       username,
+      pod_status,
+      node: 'hydra',
       used_gb: usedGb,
-      quota_gb: 10
+      quota_gb: 10,
+      phase: pod_status === 'running' ? 'Running' : 'Stopped',
+      pod_ip: pod_status === 'running' ? `10.42.0.${100 + i}` : null
     });
     totalUsedGb += usedGb;
   });
 
   return {
     students,
+    total_pods: students.length,
+    running_count: runningCount,
+    max_capacity: MAX_PODS,
+    empty_slots: MAX_PODS - students.length,
+    capacity_info: {
+      max_by_cpu: 232,
+      max_by_memory: 376,
+      max_by_storage: 2150,
+      k8s_limit: 330,
+      bottleneck: 'cpu',
+      nodes: {
+        hydra: { cpu: 20, memory_gb: 251, pod_limit: 110 },
+        chimera: { cpu: 48, memory_gb: 251, pod_limit: 110 },
+        cerberus: { cpu: 48, memory_gb: 62, pod_limit: 110 }
+      }
+    },
     total_used_gb: totalUsedGb,
     available_tb: 21 - (totalUsedGb / 1000)
   };

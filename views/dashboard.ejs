@@ -122,23 +122,62 @@
     /* Dark mode for FAQ section */
     .dark .divide-y > details summary {
       color: #f3f4f6 !important;
+      background-color: #1f2937 !important;
     }
     .dark .divide-y > details summary:hover {
       background-color: #374151 !important;
     }
-    .dark .divide-y > details .text-gray-600,
-    .dark .divide-y > details .px-4.pb-4 {
-      color: #9ca3af !important;
+    .dark .divide-y > details > div {
+      color: #d1d5db !important;
+      background-color: #1f2937 !important;
     }
-    .dark .divide-y > details a.text-blue-600 {
+    .dark .divide-y > details a.text-blue-600,
+    .dark .divide-y > details a {
       color: #60a5fa !important;
     }
-    .dark .border.rounded-lg > h4.bg-gray-50 {
-      background-color: #1f2937 !important;
+    .dark .border.rounded-lg > h4.bg-gray-50,
+    .dark .mt-6.border.rounded-lg > h4 {
+      background-color: #374151 !important;
       color: #f3f4f6 !important;
     }
-    .dark .border.rounded-lg > h4.bg-gray-50 .text-blue-600 {
+    .dark .mt-6.border.rounded-lg {
+      background-color: #1f2937 !important;
+      border-color: #374151 !important;
+    }
+    .dark .mt-6.border.rounded-lg .text-blue-600 {
       color: #60a5fa !important;
+    }
+    /* Dark mode for FAQ expanded content - explicit targeting */
+    .dark details.group > div.px-4 {
+      background-color: #1f2937 !important;
+    }
+    .dark details.group .text-gray-600 {
+      color: #9ca3af !important;
+    }
+    .dark details.group summary.hover\:bg-gray-50:hover {
+      background-color: #374151 !important;
+    }
+
+    /* Dark mode for Server Status section */
+    .dark #server-status-section {
+      background-color: #1f2937 !important;
+      border-color: #374151 !important;
+    }
+    .dark #server-status-section summary {
+      color: #f3f4f6 !important;
+    }
+    .dark #server-status-section summary:hover {
+      background-color: #374151 !important;
+    }
+    .dark #server-status-section .bg-gray-50 {
+      background-color: #111827 !important;
+    }
+    .dark #server-status-section .text-gray-600,
+    .dark #server-status-section .text-gray-500 {
+      color: #9ca3af !important;
+    }
+    .dark #server-status-section .font-semibold {
+      color: #f3f4f6 !important;
     }
 
     /* Dark mode for whitelist modal */
@@ -848,10 +887,10 @@
             <div class="bg-gray-50 rounded p-3 mb-4">
               <p class="text-sm font-medium text-gray-700 mb-2">Current Configuration</p>
               <div class="grid grid-cols-2 gap-2 text-sm">
-                <div><span class="text-gray-500">Node:</span> <span id="current-node" class="font-medium">Hydra</span></div>
-                <div><span class="text-gray-500">Memory:</span> <span id="current-memory" class="font-medium">4 GB</span></div>
-                <div><span class="text-gray-500">CPUs:</span> <span id="current-cpus" class="font-medium">2</span></div>
-                <div><span class="text-gray-500">Storage:</span> <span id="current-storage" class="font-medium">40 GB</span></div>
+                <div><span class="text-gray-500">Node:</span> <span id="current-node" class="font-medium">-</span></div>
+                <div><span class="text-gray-500">Memory:</span> <span id="current-memory" class="font-medium">-</span></div>
+                <div><span class="text-gray-500">CPUs:</span> <span id="current-cpus" class="font-medium">-</span></div>
+                <div><span class="text-gray-500">Storage:</span> <span id="current-storage" class="font-medium">-</span></div>
               </div>
             </div>
 
@@ -1253,13 +1292,15 @@
           <div id="routing-message" class="mt-3"></div>
         </div>
 
-        <!-- Server Status Section -->
-        <div id="server-status-section" class="mb-6 border rounded p-4 hidden">
-          <h4 class="text-lg font-semibold mb-3">
-            <i class="fas fa-server text-purple-600"></i> Server Status
-          </h4>
-
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <!-- Server Status Section (Collapsible) -->
+        <details id="server-status-section" class="mb-6 border rounded hidden group">
+          <summary class="p-4 cursor-pointer hover:bg-gray-50 flex items-center justify-between">
+            <h4 class="text-lg font-semibold">
+              <i class="fas fa-server text-purple-600"></i> Server Status
+            </h4>
+            <i class="fas fa-chevron-down text-gray-400 group-open:rotate-180 transition-transform"></i>
+          </summary>
+          <div class="p-4 pt-0 grid grid-cols-1 md:grid-cols-3 gap-4">
             <!-- Hydra Status -->
             <div class="border rounded p-3 bg-gray-50">
               <div class="flex items-center justify-between mb-2">
@@ -1330,11 +1371,11 @@
             </div>
           </div>
 
-          <p class="text-xs text-gray-500 mt-3">
+          <p class="text-xs text-gray-500 mt-3 px-4 pb-2">
             <i class="fas fa-info-circle"></i>
             <a href="/servers" target="_blank" class="text-blue-600 underline">View full cluster status</a>
           </p>
-        </div>
+        </details>
 
         <!-- Backup Warning -->
         <div class="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
@@ -1647,6 +1688,8 @@
       });
 
       // Container Management Functions
+      let lastKnownResources = null; // Store actual K8s state for resource modal
+
       async function loadContainerStatus() {
         try {
           const res = await fetch('/dashboard/api/containers/status');
@@ -1671,11 +1714,12 @@
 
           // Update resource display
           if (data.resources) {
-            document.getElementById('res-cpu').textContent = data.resources.cpu;
-            document.getElementById('res-ram').textContent = data.resources.memory_gb + 'GB';
-            document.getElementById('res-storage').textContent = data.resources.storage_gb + 'GB';
+            lastKnownResources = data.resources; // Store for resource modal
+            document.getElementById('res-cpu').textContent = data.resources.cpu || '-';
+            document.getElementById('res-ram').textContent = data.resources.memory_gb ? data.resources.memory_gb + 'GB' : '-';
+            document.getElementById('res-storage').textContent = data.resources.storage_gb ? data.resources.storage_gb + 'GB' : '-';
             document.getElementById('res-gpu').textContent = data.resources.gpu_count || '0';
-            document.getElementById('res-node').textContent = data.resources.node || 'hydra';
+            document.getElementById('res-node').textContent = data.resources.node || '-';
             resourcesSection.classList.remove('hidden');
 
             // Show migration banner if approved for GPU node but not yet migrated
@@ -1729,7 +1773,13 @@
           }
         } catch (err) {
           if (handleFetchError(err)) return;
-          console.error('Failed to load container status:', err);
+          console.error('[Container Status] Failed to load:', err);
+          // Show error state in UI
+          const badge = document.getElementById('container-state-badge');
+          if (badge) {
+            badge.textContent = 'Error';
+            badge.className = 'px-3 py-1 rounded text-sm font-medium bg-red-100 text-red-700';
+          }
         }
       }
 
@@ -2328,14 +2378,20 @@
           if (handleAuthError(res)) return;
           resourceConfig = await res.json();
 
-          // Update current config display
-          if (resourceConfig.currentConfig) {
-            document.getElementById('current-node').textContent = resourceConfig.currentConfig.current_node || 'Hydra';
-            document.getElementById('current-memory').textContent = (resourceConfig.currentConfig.memory_gb || 4) + ' GB';
-            document.getElementById('current-cpus').textContent = resourceConfig.currentConfig.cpus || 2;
-            document.getElementById('current-storage').textContent = (resourceConfig.currentConfig.storage_gb || 40) + ' GB';
-            selectedNode = (resourceConfig.currentConfig.current_node || 'hydra').toLowerCase();
-          }
+          // Update current config display - use actual K8s state from lastKnownResources when available
+          const resources = lastKnownResources || {};
+          const dbConfig = resourceConfig.currentConfig || {};
+          document.getElementById('current-node').textContent = resources.node || dbConfig.current_node || '-';
+          document.getElementById('current-memory').textContent =
+            (resources.memory_gb || dbConfig.memory_gb)
+              ? (resources.memory_gb || dbConfig.memory_gb) + ' GB'
+              : '-';
+          document.getElementById('current-cpus').textContent = resources.cpu || dbConfig.cpus || '-';
+          document.getElementById('current-storage').textContent =
+            (resources.storage_gb || dbConfig.storage_gb)
+              ? (resources.storage_gb || dbConfig.storage_gb) + ' GB'
+              : '-';
+          selectedNode = (resources.node || dbConfig.current_node || 'hydra').toLowerCase();
 
           // Update node cards with live metrics from nodes object
           if (resourceConfig.nodes) {
@@ -2354,7 +2410,8 @@
           msg.innerHTML = '';
           updateApprovalStatus();
         } catch (err) {
-          msg.innerHTML = `<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2">${err.message || 'Failed to load configuration'}</p>`;
+          console.error('[Resource Modal] Failed to load configuration:', err);
+          msg.innerHTML = `<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2"><i class="fas fa-exclamation-circle"></i> ${err.message || 'Failed to load configuration'}</p>`;
         }
       };
 

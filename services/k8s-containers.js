@@ -936,9 +936,128 @@ async function migrateContainer(username, email, targetNode, config = {}) {
   };
 }
 
+/**
+ * Get actual service status from supervisor via HTTP
+ * Queries the supervisor XML-RPC API to get real process state
+ * @param {string} username - The student username
+ * @returns {Promise<{services: Array, containerRunning: boolean}>}
+ */
+async function getServiceStatus(username) {
+  const status = await getContainerStatus(username);
+
+  if (!status.exists || !status.running || !status.ip) {
+    return {
+      services: [],
+      containerRunning: status.running || false,
+      error: !status.exists ? 'Container not found' : (!status.running ? 'Container not running' : 'No pod IP')
+    };
+  }
+
+  const podIP = status.ip;
+  const http = require('http');
+
+  // Query supervisor XML-RPC API for process status
+  const supervisorRequest = (method) => {
+    return new Promise((resolve, reject) => {
+      const xmlBody = `<?xml version="1.0"?><methodCall><methodName>${method}</methodName></methodCall>`;
+
+      const req = http.request({
+        hostname: podIP,
+        port: 9001,
+        path: '/RPC2',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/xml',
+          'Content-Length': Buffer.byteLength(xmlBody)
+        },
+        timeout: 3000
+      }, (res) => {
+        let data = '';
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => resolve(data));
+      });
+
+      req.on('error', reject);
+      req.on('timeout', () => {
+        req.destroy();
+        reject(new Error('Request timeout'));
+      });
+
+      req.write(xmlBody);
+      req.end();
+    });
+  };
+
+  try {
+    const xmlResponse = await supervisorRequest('supervisor.getAllProcessInfo');
+
+    // Parse XML response to extract process status
+    // Response format: <array><data><value><struct>...name, state, statename...</struct></value>...</data></array>
+    const services = [];
+
+    // Simple regex parsing for the XML response
+    const processRegex = /<member><name>name<\/name><value><string>([^<]+)<\/string><\/value><\/member>.*?<member><name>statename<\/name><value><string>([^<]+)<\/string><\/value><\/member>/gs;
+    let match;
+
+    while ((match = processRegex.exec(xmlResponse)) !== null) {
+      const [, name, statename] = match;
+      if (name === 'code-server' || name === 'jupyter') {
+        services.push({
+          name,
+          running: statename === 'RUNNING',
+          state: statename
+        });
+      }
+    }
+
+    // If we didn't parse any services, try a simpler pattern
+    if (services.length === 0) {
+      // Fallback: check if code-server and jupyter are mentioned with RUNNING
+      const hasCodeServer = xmlResponse.includes('code-server') && xmlResponse.includes('RUNNING');
+      const hasJupyter = xmlResponse.includes('jupyter') && xmlResponse.includes('RUNNING');
+
+      // Check for STOPPED state
+      const codeServerStopped = xmlResponse.includes('code-server') && xmlResponse.includes('STOPPED');
+      const jupyterStopped = xmlResponse.includes('jupyter') && xmlResponse.includes('STOPPED');
+
+      if (xmlResponse.includes('code-server')) {
+        services.push({
+          name: 'code-server',
+          running: hasCodeServer && !codeServerStopped,
+          state: codeServerStopped ? 'STOPPED' : (hasCodeServer ? 'RUNNING' : 'UNKNOWN')
+        });
+      }
+      if (xmlResponse.includes('jupyter')) {
+        services.push({
+          name: 'jupyter',
+          running: hasJupyter && !jupyterStopped,
+          state: jupyterStopped ? 'STOPPED' : (hasJupyter ? 'RUNNING' : 'UNKNOWN')
+        });
+      }
+    }
+
+    return {
+      services,
+      containerRunning: true
+    };
+  } catch (err) {
+    console.error(`[K8s] Failed to query supervisor for ${username}:`, err.message);
+    // Return unknown status on error rather than assuming running
+    return {
+      services: [
+        { name: 'code-server', running: false, state: 'UNKNOWN' },
+        { name: 'jupyter', running: false, state: 'UNKNOWN' }
+      ],
+      containerRunning: true,
+      error: err.message
+    };
+  }
+}
+
 module.exports = {
   initContainer,
   getContainerStatus,
+  getServiceStatus,
   startContainer,
   stopContainer,
   destroyContainer,

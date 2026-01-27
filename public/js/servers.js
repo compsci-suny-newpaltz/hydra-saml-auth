@@ -267,7 +267,7 @@ function updateServerStatus(server, status) {
   }
 }
 
-// Render storage cluster visualization
+// Render storage cluster visualization - only show active pods
 function renderStorageCluster(data) {
   const grid = document.getElementById('hydra-storage-grid');
   const totalEl = document.getElementById('hydra-storage-total');
@@ -275,55 +275,42 @@ function renderStorageCluster(data) {
   const availEl = document.getElementById('hydra-storage-available');
 
   if (!data || !data.students) {
-    grid.innerHTML = '<div class="loading">No storage data</div>';
+    grid.innerHTML = '<div class="loading">No pod data</div>';
     return;
   }
 
   // Clear grid
   grid.innerHTML = '';
 
-  // Sort students by usage (highest first)
-  const students = data.students.sort((a, b) => b.used_gb - a.used_gb);
+  const maxCapacity = data.max_capacity || 232;
 
-  // Create cubes for each student
-  students.forEach(student => {
+  // Only show actual pods (no empty slots)
+  data.students.forEach(student => {
     const cube = document.createElement('div');
     cube.className = 'cube';
 
-    const usagePercent = student.quota_gb > 0
-      ? (student.used_gb / student.quota_gb) * 100
-      : 0;
-
-    // Color based on usage
-    if (usagePercent >= 80) {
-      cube.classList.add('used-high');
-    } else if (usagePercent >= 50) {
-      cube.classList.add('used-med');
-    } else if (usagePercent > 0) {
-      cube.classList.add('used-low');
+    // Simple colors based on pod status
+    if (student.pod_status === 'running') {
+      cube.style.backgroundColor = '#10b981'; // green
+    } else if (student.pod_status === 'pending') {
+      cube.style.backgroundColor = '#f59e0b'; // yellow
     } else {
-      cube.classList.add('empty');
+      cube.style.backgroundColor = '#ef4444'; // red
     }
 
     // Tooltip with student info
-    cube.title = student.username + ': ' + student.used_gb.toFixed(1) + 'GB / ' + student.quota_gb + 'GB (' + usagePercent.toFixed(0) + '%)';
-
+    cube.title = `${student.username} | ${student.pod_status} | ${student.node} | ${student.pod_ip || '-'}`;
     grid.appendChild(cube);
   });
 
-  // Add empty cubes for available capacity (up to 100 total)
-  const emptySlots = Math.min(100 - students.length, Math.floor(data.available_tb * 10));
-  for (let i = 0; i < emptySlots && students.length + i < 100; i++) {
-    const cube = document.createElement('div');
-    cube.className = 'cube empty';
-    cube.title = 'Available slot';
-    grid.appendChild(cube);
-  }
-
   // Update summary
-  totalEl.textContent = students.length + ' students';
-  usedEl.textContent = data.total_used_gb.toFixed(0) + ' GB used';
-  availEl.textContent = data.available_tb.toFixed(1) + ' TB available';
+  const runningCount = data.running_count || 0;
+  const totalPods = data.total_pods || data.students.length;
+  const emptySlots = maxCapacity - totalPods;
+
+  totalEl.textContent = `${totalPods} / ${maxCapacity} pods`;
+  usedEl.textContent = `${runningCount} running`;
+  availEl.textContent = `${emptySlots} available`;
 }
 
 // Clean up on page unload

@@ -1241,19 +1241,17 @@ router.get('/services', async (req, res) => {
 
         // ========== KUBERNETES MODE ==========
         if (runtimeConfig.isKubernetes()) {
-            const status = await k8sContainers.getContainerStatus(username);
-            if (!status.exists) {
+            // Use real supervisor status check via HTTP
+            const serviceStatus = await k8sContainers.getServiceStatus(username);
+            if (serviceStatus.error === 'Container not found') {
                 return res.status(404).json({ success: false, message: 'Container not found' });
             }
-            // In K8s mode, services are managed by the pod - return running state based on pod status
             return res.json({
                 success: true,
-                services: status.running ? [
-                    { name: 'code-server', running: true, state: 'RUNNING' },
-                    { name: 'jupyter', running: true, state: 'RUNNING' }
-                ] : [],
-                containerRunning: status.running,
-                k8sMode: true
+                services: serviceStatus.services,
+                containerRunning: serviceStatus.containerRunning,
+                k8sMode: true,
+                ...(serviceStatus.error && { warning: serviceStatus.error })
             });
         }
 
