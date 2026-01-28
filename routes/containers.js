@@ -1347,13 +1347,13 @@ router.post('/services/:service/start', async (req, res) => {
 
         // ========== KUBERNETES MODE ==========
         if (runtimeConfig.isKubernetes()) {
-            // In K8s mode, services are managed by the pod's supervisor
-            // Return success since services auto-start with the pod
-            return res.json({
-                success: true,
-                message: 'Services are managed automatically in Kubernetes mode',
-                k8sMode: true
-            });
+            try {
+                await k8sContainers.controlService(username, serviceName, 'start');
+                return res.json({ success: true, k8sMode: true });
+            } catch (err) {
+                console.error(`[containers] K8s service start failed for ${username}/${serviceName}:`, err.message);
+                return res.status(500).json({ success: false, message: err.message });
+            }
         }
 
         // ========== DOCKER MODE ==========
@@ -1425,13 +1425,13 @@ router.post('/services/:service/stop', async (req, res) => {
 
         // ========== KUBERNETES MODE ==========
         if (runtimeConfig.isKubernetes()) {
-            // In K8s mode, services are managed by the pod's supervisor
-            // Individual service control not available - use container stop/start
-            return res.json({
-                success: true,
-                message: 'Individual service control not available in Kubernetes mode. Use Stop Container to stop all services.',
-                k8sMode: true
-            });
+            try {
+                await k8sContainers.controlService(username, serviceName, 'stop');
+                return res.json({ success: true, k8sMode: true });
+            } catch (err) {
+                console.error(`[containers] K8s service stop failed for ${username}/${serviceName}:`, err.message);
+                return res.status(500).json({ success: false, message: err.message });
+            }
         }
 
         // ========== DOCKER MODE ==========

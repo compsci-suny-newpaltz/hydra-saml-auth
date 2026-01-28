@@ -817,8 +817,7 @@ router.get('/whitelist/autocomplete', async (req, res) => {
 
         if (runtimeConfig.isKubernetes()) {
             // Get all pods and extract user info
-            const K8sClient = require('../services/k8s-client');
-            const k8sClient = new K8sClient(runtimeConfig.k8s?.namespace || 'hydra-students');
+            const k8sClient = require('../services/k8s-client');
             const pods = await k8sClient.listPods();
 
             suggestions = pods
@@ -826,7 +825,9 @@ router.get('/whitelist/autocomplete', async (req, res) => {
                 .map(p => {
                     const username = p.metadata.name.replace('student-', '');
                     const email = p.metadata?.labels?.['hydra.email'] || `${username}@newpaltz.edu`;
-                    return { username, email };
+                    const phase = (p.status?.phase || '').toLowerCase();
+                    const ready = p.status?.containerStatuses?.[0]?.ready || false;
+                    return { username, email, status: phase, online: phase === 'running' && ready };
                 });
         } else {
             // Docker mode - get containers
@@ -846,11 +847,12 @@ router.get('/whitelist/autocomplete', async (req, res) => {
 
         // Also include users from quotas table
         const quotas = await getAllUserQuotas();
-        const quotaUsers = quotas.map(q => ({ username: q.username, email: q.email }));
+        const quotaUsers = quotas.map(q => ({ username: q.username, email: q.email, status: 'unknown', online: false }));
 
-        // Merge and dedupe
+        // Merge and dedupe - prefer pod entries (they have status info)
         const all = [...suggestions, ...quotaUsers];
-        const unique = Array.from(new Map(all.map(u => [u.email.toLowerCase(), u])).values());
+        const unique = Array.from(new Map(all.map(u => [u.email.toLowerCase(), u])).values())
+            .sort((a, b) => (b.online ? 1 : 0) - (a.online ? 1 : 0) || a.username.localeCompare(b.username));
 
         res.json({ suggestions: unique });
     } catch (error) {

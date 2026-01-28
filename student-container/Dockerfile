@@ -35,6 +35,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     sudo \
     supervisor \
+    nano \
+    vim \
     ca-certificates \
     gnupg \
     lsb-release \

@@ -818,9 +818,30 @@
               </button>
             </div>
 
+            <!-- Quick Select Existing Users -->
+            <div class="mb-4 p-4 bg-blue-50 rounded-lg">
+              <div class="flex items-center justify-between mb-2">
+                <h4 class="font-medium text-sm"><i class="fas fa-users text-blue-600"></i> Existing Users</h4>
+                <div class="flex gap-2">
+                  <button onclick="selectAllWhitelistUsers('all')" class="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700">
+                    <i class="fas fa-check-double mr-1"></i>Select All
+                  </button>
+                  <button onclick="selectAllWhitelistUsers('online')" class="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700">
+                    <i class="fas fa-circle mr-1"></i>Online Only
+                  </button>
+                  <button onclick="addSelectedToWhitelist()" id="whitelist-add-selected-btn" class="px-2 py-1 bg-purple-600 text-white rounded text-xs hover:bg-purple-700 hidden">
+                    <i class="fas fa-plus mr-1"></i>Add Selected (<span id="whitelist-selected-count">0</span>)
+                  </button>
+                </div>
+              </div>
+              <div id="whitelist-user-chips" class="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
+                <span class="text-xs text-gray-400">Loading users...</span>
+              </div>
+            </div>
+
             <!-- Add New User Form -->
             <div class="mb-4 p-4 bg-gray-50 rounded-lg">
-              <h4 class="font-medium mb-3"><i class="fas fa-plus-circle text-green-600"></i> Add User to Whitelist</h4>
+              <h4 class="font-medium mb-3"><i class="fas fa-plus-circle text-green-600"></i> Add User Manually</h4>
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div class="relative">
                   <label class="block text-xs font-medium text-gray-600 mb-1">Email</label>
@@ -1399,13 +1420,40 @@
             <i class="fas fa-question-circle text-blue-600"></i> Frequently Asked Questions
           </h4>
           <div class="divide-y">
+            <details class="group" open>
+              <summary class="flex justify-between items-center p-4 cursor-pointer hover:bg-gray-50">
+                <span class="font-medium">What is this site?</span>
+                <i class="fas fa-chevron-down text-gray-400 group-open:rotate-180 transition-transform"></i>
+              </summary>
+              <div class="px-4 pb-4 text-sm text-gray-600">
+                <p class="mb-3">Hydra Lab is the SUNY New Paltz Computer Science department's cloud computing platform. It provides students and faculty with personal development environments, AI tools, and computing resources for coursework and projects.</p>
+                <p class="font-semibold mb-2">Each container includes:</p>
+                <ul class="list-disc list-inside space-y-1 ml-2">
+                  <li><strong>VS Code</strong> - Full IDE in your browser with extensions for C/C++, Python, Java, Go, Assembly, and more</li>
+                  <li><strong>Jupyter Lab</strong> - Interactive notebooks for data science, machine learning, and Python development</li>
+                  <li><strong>SSH Access</strong> - Connect via terminal at <code class="bg-gray-100 px-1 rounded">hydra.newpaltz.edu</code> port 2222 with your NetID</li>
+                  <li><strong>10GB Persistent Storage</strong> - Your files are saved on high-speed RAID storage and persist between sessions</li>
+                  <li><strong>Port Routing</strong> - Expose web apps you build to the internet with secure URLs</li>
+                </ul>
+                <p class="mt-3 font-semibold mb-2">Pre-installed languages and tools:</p>
+                <ul class="list-disc list-inside space-y-1 ml-2">
+                  <li>Python 3, Node.js (with pnpm), Java JDK 21, GCC/G++, GDB, NASM (assembly)</li>
+                  <li>CMake, Make, Git, Docker CLI, nano, vim</li>
+                </ul>
+                <p class="mt-3 font-semibold mb-2">Additional platform services:</p>
+                <ul class="list-disc list-inside space-y-1 ml-2">
+                  <li><strong>Open WebUI</strong> - Chat with AI models and generate OpenAI-compatible API keys</li>
+                  <li><strong>n8n</strong> - Visual workflow automation for connecting APIs and services</li>
+                </ul>
+              </div>
+            </details>
             <details class="group">
               <summary class="flex justify-between items-center p-4 cursor-pointer hover:bg-gray-50">
                 <span class="font-medium">How do I access my development container?</span>
                 <i class="fas fa-chevron-down text-gray-400 group-open:rotate-180 transition-transform"></i>
               </summary>
               <div class="px-4 pb-4 text-sm text-gray-600">
-                Click "Initialize Container" to create your personal development environment. Once running, click "Open VS Code" to access a full IDE in your browser with your files, terminal, and extensions pre-configured.
+                Click "Initialize Container" to create your personal development environment. Once running, click "Open VS Code" to access a full IDE in your browser with your files, terminal, and extensions pre-configured. You can also use "Open Jupyter" for notebook-based development, or connect via SSH at <code class="bg-gray-100 px-1 rounded">ssh yournetid@hydra.newpaltz.edu -p 2222</code>.
               </div>
             </details>
             <details class="group">
@@ -1414,7 +1462,7 @@
                 <i class="fas fa-chevron-down text-gray-400 group-open:rotate-180 transition-transform"></i>
               </summary>
               <div class="px-4 pb-4 text-sm text-gray-600">
-                Your container includes Python, Node.js (with pnpm), Java (JDK 21), GCC/G++, GDB, CMake, Make, and Docker CLI. VS Code comes with extensions for C/C++, Python, Java, Go, and more.
+                Your container includes Python 3, Node.js (with pnpm), Java JDK 21, GCC/G++, GDB, NASM (for assembly), CMake, Make, Git, and Docker CLI. Text editors include nano and vim. VS Code comes pre-configured with extensions for C/C++, Python, Java, Go, x86 Assembly, and more.
               </div>
             </details>
             <details class="group">
@@ -3507,16 +3555,98 @@
       }
     }
 
+    let whitelistUserData = [];
+    let whitelistSelected = new Set();
+
     async function loadWhitelistAutocomplete() {
       try {
         const res = await fetch('/dashboard/api/admin/whitelist/autocomplete');
         const data = await res.json();
         const datalist = document.getElementById('whitelist-suggestions');
-        datalist.innerHTML = (data.suggestions || []).map(u => `<option value="${u.email}">${u.username}</option>`).join('');
+        whitelistUserData = data.suggestions || [];
+        datalist.innerHTML = whitelistUserData.map(u => `<option value="${u.email}">${u.username}</option>`).join('');
+        renderWhitelistChips();
       } catch (err) {
         console.error('Error loading autocomplete:', err);
       }
     }
+
+    function renderWhitelistChips() {
+      const container = document.getElementById('whitelist-user-chips');
+      if (!whitelistUserData.length) {
+        container.innerHTML = '<span class="text-xs text-gray-400">No existing users found</span>';
+        return;
+      }
+      container.innerHTML = whitelistUserData.map(u => {
+        const isOnline = u.status === 'running' || u.online;
+        const isSelected = whitelistSelected.has(u.email);
+        return `<button onclick="toggleWhitelistChip('${u.email}')"
+          class="px-2 py-1 rounded-full text-xs border transition-all ${
+            isSelected
+              ? 'bg-purple-600 text-white border-purple-600'
+              : 'bg-white text-gray-700 border-gray-300 hover:border-blue-400'
+          }" data-email="${u.email}" data-online="${isOnline}">
+          <i class="fas fa-circle text-[8px] mr-1 ${isOnline ? 'text-green-400' : 'text-gray-300'}"></i>${u.username}
+        </button>`;
+      }).join('');
+      updateSelectedCount();
+    }
+
+    window.toggleWhitelistChip = function(email) {
+      if (whitelistSelected.has(email)) {
+        whitelistSelected.delete(email);
+      } else {
+        whitelistSelected.add(email);
+      }
+      renderWhitelistChips();
+    };
+
+    window.selectAllWhitelistUsers = function(filter) {
+      whitelistSelected.clear();
+      whitelistUserData.forEach(u => {
+        if (filter === 'all' || (filter === 'online' && (u.status === 'running' || u.online))) {
+          whitelistSelected.add(u.email);
+        }
+      });
+      renderWhitelistChips();
+    };
+
+    function updateSelectedCount() {
+      const count = whitelistSelected.size;
+      const btn = document.getElementById('whitelist-add-selected-btn');
+      const countEl = document.getElementById('whitelist-selected-count');
+      countEl.textContent = count;
+      btn.classList.toggle('hidden', count === 0);
+    }
+
+    window.addSelectedToWhitelist = async function() {
+      const role = document.getElementById('whitelist-role').value;
+      const reason = document.getElementById('whitelist-reason').value.trim() || 'Bulk added';
+      const msgEl = document.getElementById('whitelist-add-message');
+      const emails = Array.from(whitelistSelected);
+
+      if (!emails.length) return;
+
+      let added = 0, failed = 0;
+      msgEl.innerHTML = `<p class="text-blue-600 text-sm"><i class="fas fa-spinner fa-spin mr-1"></i>Adding ${emails.length} users...</p>`;
+
+      for (const email of emails) {
+        try {
+          const res = await fetch('/dashboard/api/admin/whitelist', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, role, reason })
+          });
+          if (res.ok) added++; else failed++;
+        } catch { failed++; }
+      }
+
+      whitelistSelected.clear();
+      renderWhitelistChips();
+      loadWhitelist();
+      msgEl.innerHTML = `<p class="text-green-600 text-sm"><i class="fas fa-check mr-1"></i>${added} added${failed ? `, ${failed} failed` : ''}</p>`;
+      setTimeout(() => { msgEl.innerHTML = ''; }, 4000);
+    };
 
     window.addToWhitelist = async function() {
       const email = document.getElementById('whitelist-email').value.trim();
