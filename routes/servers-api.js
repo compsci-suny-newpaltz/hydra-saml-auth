@@ -18,6 +18,31 @@ try {
   console.warn('[servers-api] K8s client not available, using mock data for pods');
 }
 
+// For disk stats
+const { execSync } = require('child_process');
+
+/**
+ * Get RAID storage usage from /data mount
+ * Returns { used_gb, total_gb }
+ */
+async function getRaidUsage() {
+  try {
+    // df -BG outputs in GB, e.g.: "/dev/md0  21373G  43G  20254G  1% /data"
+    const output = execSync('df -BG /data 2>/dev/null | tail -1', { encoding: 'utf8', timeout: 5000 });
+    const parts = output.trim().split(/\s+/);
+    // parts: [device, total, used, avail, use%, mount]
+    if (parts.length >= 4) {
+      const total_gb = parseInt(parts[1]) || 21000;
+      const used_gb = parseInt(parts[2]) || 0;
+      return { used_gb, total_gb };
+    }
+  } catch (err) {
+    console.warn('[servers-api] Failed to get RAID usage:', err.message);
+  }
+  // Fallback
+  return { used_gb: 0, total_gb: 21000 };
+}
+
 /**
  * GET /api/servers/status
  * Returns status and metrics for all cluster servers
@@ -135,14 +160,18 @@ async function formatCollectedMetrics(metrics) {
   // Format Hydra (control plane - no GPUs)
   if (metrics.hydra) {
     const h = metrics.hydra;
+    // Get real RAID usage
+    const raidStats = await getRaidUsage();
     result.hydra = {
       status: h.status || 'online',
       role: 'control-plane',
       cpu_percent: h.system?.cpu_percent || 0,
       ram_used_gb: h.system?.ram_used_gb || 0,
       ram_total_gb: h.system?.ram_total_gb || 251,
-      disk_used_gb: h.system?.disk_used_gb || 0,
-      disk_total_gb: h.system?.disk_total_gb || 21000,
+      disk_used_gb: h.system?.disk_used_gb || 254,
+      disk_total_gb: h.system?.disk_total_gb || 1000,
+      raid_used_gb: raidStats.used_gb,
+      raid_total_gb: raidStats.total_gb,
       containers_running: h.containers?.running || 0,
       zfs_status: h.zfs_status || 'ONLINE',
       storage_cluster: h.storage_cluster || await generateStorageClusterData(),
@@ -216,6 +245,9 @@ async function generateMockServerData() {
   const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
   const randFloat = (min, max) => (Math.random() * (max - min) + min).toFixed(1);
 
+  // Get real RAID usage
+  const raidStats = await getRaidUsage();
+
   return {
     hydra: {
       status: 'online',
@@ -223,8 +255,10 @@ async function generateMockServerData() {
       cpu_percent: rand(15, 55),
       ram_used_gb: rand(60, 120),
       ram_total_gb: 251,
-      disk_used_gb: rand(8000, 12000),
-      disk_total_gb: 21000,
+      disk_used_gb: 254,
+      disk_total_gb: 1000,
+      raid_used_gb: raidStats.used_gb,
+      raid_total_gb: raidStats.total_gb,
       containers_running: rand(35, 55),
       zfs_status: 'ONLINE',
       storage_cluster: await generateStorageClusterData(),

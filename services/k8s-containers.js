@@ -58,6 +58,7 @@ function buildPodSpec(username, email, config) {
       // Use NVIDIA runtime for GPU pods - required for GPU device access
       ...(gpuCount > 0 && { runtimeClassName: 'nvidia' }),
       serviceAccountName: 'student-workload',
+      automountServiceAccountToken: false,
       // Security context - allow container to run entrypoint as root then drop to user 1000
       securityContext: {
         fsGroup: 1000,
@@ -253,8 +254,8 @@ function buildIngressRouteSpec(username) {
           kind: 'Rule',
           services: [{ name: `student-${username}`, port: 8888 }],
           middlewares: [
-            { name: 'hydra-forward-auth', namespace: runtimeConfig.k8s.systemNamespace },
-            { name: `strip-prefix-${username}` }
+            { name: 'hydra-forward-auth', namespace: runtimeConfig.k8s.systemNamespace }
+            // No strip-prefix: Jupyter is configured with base_url and handles the prefix itself
           ]
         }
       ]
@@ -1054,10 +1055,65 @@ async function getServiceStatus(username) {
   }
 }
 
+/**
+ * Control a supervisor process (start/stop) via XML-RPC
+ * @param {string} username - The student username
+ * @param {string} processName - e.g. 'code-server' or 'jupyter'
+ * @param {string} action - 'start' or 'stop'
+ */
+async function controlService(username, processName, action) {
+  const status = await getContainerStatus(username);
+
+  if (!status.exists || !status.running || !status.ip) {
+    throw new Error('Container not running');
+  }
+
+  const http = require('http');
+  const method = action === 'start' ? 'supervisor.startProcess' : 'supervisor.stopProcess';
+  const xmlBody = `<?xml version="1.0"?><methodCall><methodName>${method}</methodName><params><param><value><string>${processName}</string></value></param></params></methodCall>`;
+
+  return new Promise((resolve, reject) => {
+    const req = http.request({
+      hostname: status.ip,
+      port: 9001,
+      path: '/RPC2',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'text/xml',
+        'Content-Length': Buffer.byteLength(xmlBody)
+      },
+      timeout: 5000
+    }, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        if (data.includes('<fault>')) {
+          const faultMatch = data.match(/<string>([^<]+)<\/string>/);
+          const errMsg = faultMatch ? faultMatch[1] : 'Supervisor error';
+          // ALREADY_STARTED / NOT_RUNNING are not real errors
+          if (errMsg.includes('ALREADY_STARTED') || errMsg.includes('NOT_RUNNING')) {
+            resolve({ success: true, alreadyInState: true });
+          } else {
+            reject(new Error(errMsg));
+          }
+        } else {
+          resolve({ success: true });
+        }
+      });
+    });
+
+    req.on('error', reject);
+    req.on('timeout', () => { req.destroy(); reject(new Error('Request timeout')); });
+    req.write(xmlBody);
+    req.end();
+  });
+}
+
 module.exports = {
   initContainer,
   getContainerStatus,
   getServiceStatus,
+  controlService,
   startContainer,
   stopContainer,
   destroyContainer,

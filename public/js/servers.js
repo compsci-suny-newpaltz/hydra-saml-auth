@@ -94,12 +94,14 @@ function renderHydra(server) {
   setMetricBar('hydra-ram-bar', ramPercent);
   document.getElementById('hydra-ram').textContent = `${ramUsed.toFixed(0)}/${ramTotal} GB`;
 
-  // Disk
+  // Disk (boot SSD + RAID array)
   const diskUsed = server.disk_used_gb || 0;
-  const diskTotal = server.disk_total_gb || 21000;
+  const diskTotal = server.disk_total_gb || 1000;
+  const raidUsed = server.raid_used_gb || 0;
+  const raidTotal = server.raid_total_gb || 21000;
   const diskPercent = (diskUsed / diskTotal) * 100;
   setMetricBar('hydra-disk-bar', diskPercent);
-  document.getElementById('hydra-disk').textContent = `${(diskUsed/1000).toFixed(1)}/${(diskTotal/1000).toFixed(0)} TB`;
+  document.getElementById('hydra-disk').textContent = `SSD: ${diskUsed}/${diskTotal} GB | RAID: ${(raidUsed/1000).toFixed(1)}/${(raidTotal/1000).toFixed(0)} TB`;
 
   // Containers
   document.getElementById('hydra-containers').textContent = `${server.containers_running || 0} running`;

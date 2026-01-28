@@ -19,6 +19,7 @@ services:
       - ./jwt-public.pem:/app/jwt-public.pem:ro
       - ./data/ssh-keys:/app/data/ssh-keys
       - ./sshpiper/config:/app/sshpiper/config
+      - /data:/data:ro  # Mount RAID for storage stats
     labels:
       # Make the /auth/verify endpoint accessible to Traefik
       - "traefik.enable=true"
