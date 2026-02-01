@@ -20,6 +20,50 @@ try {
 
 // For disk stats
 const { execSync } = require('child_process');
+const fs = require('fs');
+
+// Polyfill global crypto for jose library (Node.js 18+)
+const { webcrypto } = require('crypto');
+if (!globalThis.crypto) {
+  globalThis.crypto = webcrypto;
+}
+
+// For JWT verification - jose is ESM, need dynamic import
+let joseModule = null;
+let publicKey = null;
+
+(async () => {
+  try {
+    joseModule = await import('jose');
+    const publicKeyPem = fs.readFileSync(process.env.JWT_PUBLIC_KEY_PATH || './jwt-public.pem', 'utf8');
+    publicKey = await joseModule.importSPKI(publicKeyPem, 'RS256');
+  } catch (e) {
+    console.warn('[servers-api] Could not load JWT public key for admin check:', e.message);
+  }
+})();
+
+/**
+ * Check if request is from admin/faculty user
+ */
+async function isAdminRequest(req) {
+  try {
+    const token = req.cookies?.np_access;
+    if (!token || !publicKey || !joseModule) return false;
+
+    const { payload } = await joseModule.jwtVerify(token, publicKey, { algorithms: ['RS256'] });
+    const affiliation = (payload.affiliation || '').toLowerCase();
+    const isFaculty = affiliation === 'faculty';
+
+    // Check admin whitelist
+    const adminWhitelist = (process.env.ADMIN_WHITELIST || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+    const email = (payload.email || '').toLowerCase();
+    const isWhitelisted = adminWhitelist.includes(email);
+
+    return isFaculty || isWhitelisted;
+  } catch (e) {
+    return false;
+  }
+}
 
 /**
  * Get RAID storage usage from /data mount
@@ -50,24 +94,28 @@ async function getRaidUsage() {
  */
 router.get('/status', async (req, res) => {
   try {
+    // Check if user is admin/faculty for sensitive pod info
+    const showPodDetails = await isAdminRequest(req);
+
     let serverData;
 
     // Try to get real metrics from collector
     if (metricsCollector) {
       const metrics = metricsCollector.getMetrics();
       if (metrics && metrics.lastUpdated) {
-        serverData = await formatCollectedMetrics(metrics);
+        serverData = await formatCollectedMetrics(metrics, showPodDetails);
       }
     }
 
     // Fallback to mock data if no real metrics
     if (!serverData) {
-      serverData = await generateMockServerData();
+      serverData = await generateMockServerData(showPodDetails);
     }
 
     res.json({
       servers: serverData,
-      generated_at: new Date().toISOString()
+      generated_at: new Date().toISOString(),
+      showPodDetails
     });
   } catch (error) {
     console.error('[servers-api] Failed to get server status:', error);
@@ -154,7 +202,7 @@ router.get('/:name/metrics', async (req, res) => {
 /**
  * Format metrics from the collector into API response format
  */
-async function formatCollectedMetrics(metrics) {
+async function formatCollectedMetrics(metrics, showPodDetails = false) {
   const result = {};
 
   // Format Hydra (control plane - no GPUs)
@@ -174,7 +222,7 @@ async function formatCollectedMetrics(metrics) {
       raid_total_gb: raidStats.total_gb,
       containers_running: h.containers?.running || 0,
       zfs_status: h.zfs_status || 'ONLINE',
-      storage_cluster: h.storage_cluster || await generateStorageClusterData(),
+      storage_cluster: h.storage_cluster || await generateStorageClusterData(showPodDetails),
       last_updated: h.timestamp || new Date().toISOString()
     };
   }
@@ -240,7 +288,7 @@ async function formatCollectedMetrics(metrics) {
  * Generate realistic mock server data
  * This will be replaced by real metrics collection
  */
-async function generateMockServerData() {
+async function generateMockServerData(showPodDetails = false) {
   // Add some randomization to make it look realistic
   const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
   const randFloat = (min, max) => (Math.random() * (max - min) + min).toFixed(1);
@@ -261,7 +309,7 @@ async function generateMockServerData() {
       raid_total_gb: raidStats.total_gb,
       containers_running: rand(35, 55),
       zfs_status: 'ONLINE',
-      storage_cluster: await generateStorageClusterData(),
+      storage_cluster: await generateStorageClusterData(showPodDetails),
       last_updated: new Date().toISOString()
     },
     chimera: {
@@ -355,7 +403,7 @@ async function generateMockServerData() {
  * - By Pod limit: 330 pods
  * - Effective max: 232 pods (CPU bottleneck)
  */
-async function generateStorageClusterData() {
+async function generateStorageClusterData(showPodDetails = false) {
   // Cluster-wide capacity (all 3 nodes combined)
   const CLUSTER_NODES = {
     hydra: { cpu: 20, memory_gb: 251, pod_limit: 110 },
@@ -424,15 +472,23 @@ async function generateStorageClusterData() {
         memoryGb = parseFloat(memoryRequest) / 1024;
       }
 
-      students.push({
-        username,
-        pod_status,
-        node,
-        used_gb: memoryGb, // Use memory allocation as "used"
-        quota_gb: BASE_STORAGE_GB,
-        phase,
-        pod_ip: pod.status?.podIP || null
-      });
+      // Only include sensitive info (username, IP, node) for admins
+      if (showPodDetails) {
+        students.push({
+          username,
+          pod_status,
+          node,
+          used_gb: memoryGb,
+          quota_gb: BASE_STORAGE_GB,
+          phase,
+          pod_ip: pod.status?.podIP || null
+        });
+      } else {
+        // Redacted info for non-admins - just show status
+        students.push({
+          pod_status
+        });
+      }
     }
 
     // Sort by status: running first, then pending, then stopped
@@ -461,7 +517,7 @@ async function generateStorageClusterData() {
   } catch (err) {
     console.error('[servers-api] Failed to get K8s pod data:', err.message);
     // Return mock data on error
-    return generateMockStorageCluster();
+    return generateMockStorageCluster(showPodDetails);
   }
 }
 
@@ -469,7 +525,7 @@ async function generateStorageClusterData() {
  * Generate mock storage cluster data for testing
  * Includes pod_status for UI compatibility
  */
-function generateMockStorageCluster() {
+function generateMockStorageCluster(showPodDetails = false) {
   const MAX_PODS = 232; // Cluster-wide: 116 cores / 0.5 = 232
   const rand = (min, max) => Math.random() * (max - min) + min;
   const students = [];
@@ -487,15 +543,19 @@ function generateMockStorageCluster() {
     const pod_status = i < 3 ? 'running' : 'stopped';
     if (pod_status === 'running') runningCount++;
 
-    students.push({
-      username,
-      pod_status,
-      node: 'hydra',
-      used_gb: usedGb,
-      quota_gb: 10,
-      phase: pod_status === 'running' ? 'Running' : 'Stopped',
-      pod_ip: pod_status === 'running' ? `10.42.0.${100 + i}` : null
-    });
+    if (showPodDetails) {
+      students.push({
+        username,
+        pod_status,
+        node: 'hydra',
+        used_gb: usedGb,
+        quota_gb: 10,
+        phase: pod_status === 'running' ? 'Running' : 'Stopped',
+        pod_ip: pod_status === 'running' ? `10.42.0.${100 + i}` : null
+      });
+    } else {
+      students.push({ pod_status });
+    }
     totalUsedGb += usedGb;
   });
 

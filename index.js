@@ -287,6 +287,7 @@ function setNpCookie(res, token) {
 }
 
 // ---------- App + middleware ----------
+app.set('trust proxy', 1); // Trust first proxy (Traefik) for secure cookies behind HTTPS
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -309,8 +310,34 @@ app.use(passport.session());
 passport.serializeUser((u, d) => d(null, u));
 passport.deserializeUser((u, d) => d(null, u));
 
-const ensureAuthenticated = (req, res, next) =>
-  req.isAuthenticated() ? next() : res.redirect('/login');
+// Enhanced ensureAuthenticated: check passport session OR valid JWT cookie
+const ensureAuthenticated = (req, res, next) => {
+  // First try passport session
+  if (req.isAuthenticated()) return next();
+
+  // Fallback: verify JWT cookie and restore user
+  const token = req.cookies?.np_access;
+  if (token) {
+    try {
+      const payload = jwt.verify(token, JWT_PUBLIC_KEY_PEM, { algorithms: ['RS256'] });
+      // Restore user from JWT payload
+      req.user = {
+        email: payload.email,
+        given_name: payload.given_name || payload.email?.split('@')[0],
+        family_name: payload.family_name || '',
+        display_name: payload.name || payload.email,
+        affiliation: payload.affiliation || '',
+        roles: payload.roles || []
+      };
+      return next();
+    } catch (e) {
+      // Invalid token, clear it and redirect to login
+      res.clearCookie('np_access', { domain: COOKIE_DOMAIN, path: '/' });
+    }
+  }
+
+  return res.redirect('/login');
+};
 
 // ---------- Boot ----------
 (async function start() {
@@ -865,6 +892,16 @@ const ensureAuthenticated = (req, res, next) =>
       });
     } catch (e) {
       console.warn('[Init] security-monitor service not started:', e?.message || e);
+      // Fallback SSE endpoint when security-monitor not available (K8s mode)
+      app.get('/api/events/containers', ensureAuthenticated, (req, res) => {
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        res.flushHeaders();
+        // Send service unavailable message and close - client should not retry
+        res.write(`data: ${JSON.stringify({ type: 'error', message: 'Container events not available in K8s mode', retry: false })}\n\n`);
+        res.end();
+      });
     }
 
     // Start

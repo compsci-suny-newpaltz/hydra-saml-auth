@@ -71,13 +71,13 @@ function setRefreshIndicator(state, text) {
 function renderAllServers(data) {
   if (!data.servers) return;
 
-  renderHydra(data.servers.hydra);
+  renderHydra(data.servers.hydra, data.showPodDetails);
   renderChimera(data.servers.chimera);
   renderCerberus(data.servers.cerberus);
 }
 
 // Hydra (Control Plane)
-function renderHydra(server) {
+function renderHydra(server, showPodDetails = false) {
   if (!server) return;
 
   updateServerStatus('hydra', server.status);
@@ -94,14 +94,19 @@ function renderHydra(server) {
   setMetricBar('hydra-ram-bar', ramPercent);
   document.getElementById('hydra-ram').textContent = `${ramUsed.toFixed(0)}/${ramTotal} GB`;
 
-  // Disk (boot SSD + RAID array)
-  const diskUsed = server.disk_used_gb || 0;
-  const diskTotal = server.disk_total_gb || 1000;
+  // RAID (pod storage) - primary storage bar
   const raidUsed = server.raid_used_gb || 0;
   const raidTotal = server.raid_total_gb || 21000;
+  const raidPercent = (raidUsed / raidTotal) * 100;
+  setMetricBar('hydra-raid-bar', raidPercent);
+  document.getElementById('hydra-raid').textContent = `${raidUsed} GB / ${(raidTotal/1000).toFixed(0)} TB`;
+
+  // OS drive (boot SSD)
+  const diskUsed = server.disk_used_gb || 0;
+  const diskTotal = server.disk_total_gb || 1000;
   const diskPercent = (diskUsed / diskTotal) * 100;
-  setMetricBar('hydra-disk-bar', diskPercent);
-  document.getElementById('hydra-disk').textContent = `SSD: ${diskUsed}/${diskTotal} GB | RAID: ${(raidUsed/1000).toFixed(1)}/${(raidTotal/1000).toFixed(0)} TB`;
+  setMetricBar('hydra-os-bar', diskPercent);
+  document.getElementById('hydra-os').textContent = `${diskUsed}/${diskTotal} GB`;
 
   // Containers
   document.getElementById('hydra-containers').textContent = `${server.containers_running || 0} running`;
@@ -110,7 +115,7 @@ function renderHydra(server) {
   document.getElementById('hydra-zfs').textContent = server.zfs_status || 'ONLINE';
 
   // Storage Cluster
-  renderStorageCluster(server.storage_cluster);
+  renderStorageCluster(server.storage_cluster, showPodDetails);
 }
 
 // Chimera (Inference Node)
@@ -270,7 +275,7 @@ function updateServerStatus(server, status) {
 }
 
 // Render storage cluster visualization - only show active pods
-function renderStorageCluster(data) {
+function renderStorageCluster(data, showPodDetails = false) {
   const grid = document.getElementById('hydra-storage-grid');
   const totalEl = document.getElementById('hydra-storage-total');
   const usedEl = document.getElementById('hydra-storage-used');
@@ -300,8 +305,12 @@ function renderStorageCluster(data) {
       cube.style.backgroundColor = '#ef4444'; // red
     }
 
-    // Tooltip with student info
-    cube.title = `${student.username} | ${student.pod_status} | ${student.node} | ${student.pod_ip || '-'}`;
+    // Tooltip with student info - only show details for admin/faculty
+    if (showPodDetails && student.username) {
+      cube.title = `${student.username} | ${student.pod_status} | ${student.node} | ${student.pod_ip || '-'}`;
+    } else {
+      cube.title = student.pod_status; // Just show status for non-admins
+    }
     grid.appendChild(cube);
   });
 
