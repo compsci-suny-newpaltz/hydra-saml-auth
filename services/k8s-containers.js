@@ -243,6 +243,7 @@ function buildIngressRouteSpec(username) {
         {
           match: `Host(\`hydra.newpaltz.edu\`) && PathPrefix(\`/students/${username}/vscode\`)`,
           kind: 'Rule',
+          priority: 100,
           services: [{ name: `student-${username}`, port: 8443 }],
           middlewares: [
             { name: 'hydra-forward-auth', namespace: runtimeConfig.k8s.systemNamespace },
@@ -252,13 +253,17 @@ function buildIngressRouteSpec(username) {
         {
           match: `Host(\`hydra.newpaltz.edu\`) && PathPrefix(\`/students/${username}/jupyter\`)`,
           kind: 'Rule',
+          priority: 100,
           services: [{ name: `student-${username}`, port: 8888 }],
           middlewares: [
             { name: 'hydra-forward-auth', namespace: runtimeConfig.k8s.systemNamespace }
             // No strip-prefix: Jupyter is configured with base_url and handles the prefix itself
           ]
         }
-      ]
+      ],
+      tls: {
+        secretName: 'hydra-tls'
+      }
     }
   };
 }

@@ -1,0 +1,14 @@
+[Unit]
+Description=Fix Hydra K8s Routes after restart
+After=docker.service k3s.service rke2-server.service
+Wants=docker.service
+
+[Service]
+Type=oneshot
+ExecStartPre=/bin/sleep 30
+ExecStart=/home/infra/hydra-saml-auth/scripts/fix-k8s-routes.sh
+User=root
+Environment=KUBECONFIG=/etc/rancher/rke2/rke2.yaml
+
+[Install]
+WantedBy=multi-user.target
