@@ -241,7 +241,7 @@ function buildIngressRouteSpec(username) {
       entryPoints: ['web', 'websecure'],
       routes: [
         {
-          match: `PathPrefix(\`/students/${username}/vscode\`)`,
+          match: `Host(\`hydra.newpaltz.edu\`) && PathPrefix(\`/students/${username}/vscode\`)`,
           kind: 'Rule',
           services: [{ name: `student-${username}`, port: 8443 }],
           middlewares: [
@@ -250,7 +250,7 @@ function buildIngressRouteSpec(username) {
           ]
         },
         {
-          match: `PathPrefix(\`/students/${username}/jupyter\`)`,
+          match: `Host(\`hydra.newpaltz.edu\`) && PathPrefix(\`/students/${username}/jupyter\`)`,
           kind: 'Rule',
           services: [{ name: `student-${username}`, port: 8888 }],
           middlewares: [
@@ -293,8 +293,17 @@ function buildMiddlewareSpec(username) {
  * Write Docker Traefik config file that routes to K8s Traefik
  * This is needed because Apache proxies to Docker Traefik (8082),
  * which then needs to forward K8s student routes to K8s Traefik (30080)
+ * Note: This is only needed in hybrid Docker+K8s setups; skipped in pure K8s
  */
 async function writeDockerTraefikConfig(username) {
+  // Skip if Traefik dynamic dir doesn't exist (pure K8s mode without Docker Traefik)
+  try {
+    await fs.access(TRAEFIK_DYNAMIC_DIR);
+  } catch {
+    // Directory doesn't exist - we're in pure K8s mode, skip Docker Traefik config
+    return;
+  }
+
   const filePath = path.join(TRAEFIK_DYNAMIC_DIR, `student-${username}.yaml`);
 
   const config = {
