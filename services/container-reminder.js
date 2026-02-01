@@ -29,7 +29,11 @@ const docker = new Docker({ socketPath: '/var/run/docker.sock' });
 const MAIL_METHOD = process.env.MAIL_METHOD || 'graph'; // 'graph' or 'smtp'
 const FROM_EMAIL = process.env.MAIL_FROM || 'cslab@newpaltz.edu';
 const FROM_NAME = process.env.MAIL_FROM_NAME || 'Hydra CS Lab';
-const REMINDER_INTERVAL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+// Check interval: run the check every 24 hours
+// The actual reminder logic will track when last sent to avoid sending too often
+const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours (safe - under 32-bit int max)
+const REMINDER_DAYS = 30; // Days between reminders
 
 // Microsoft Graph config
 const MS_TENANT_ID = process.env.MS_TENANT_ID;
@@ -51,6 +55,7 @@ let reminderTimer = null;
 let isRunning = false;
 let graphAccessToken = null;
 let graphTokenExpiry = 0;
+let lastReminderRun = 0; // Track when reminders were last sent
 
 /**
  * Get Microsoft Graph access token (client credentials flow)
@@ -304,8 +309,18 @@ This is an automated message from the Hydra CS Lab at SUNY New Paltz.
 
 /**
  * Run the monthly reminder process
+ * @param {boolean} force - If true, skip the time check and run immediately
  */
-async function runReminders() {
+async function runReminders(force = false) {
+  // Check if enough time has passed since last run (unless forced)
+  const now = Date.now();
+  const daysSinceLastRun = (now - lastReminderRun) / (24 * 60 * 60 * 1000);
+
+  if (!force && daysSinceLastRun < REMINDER_DAYS) {
+    // Not time yet - silently skip
+    return { sent: 0, failed: 0, skipped: 0, reason: 'not_due' };
+  }
+
   console.log('[container-reminder] Running monthly container reminders...');
   console.log(`[container-reminder] Using ${MAIL_METHOD} method, from: ${FROM_EMAIL}`);
 
@@ -344,11 +359,15 @@ async function runReminders() {
   }
 
   console.log(`[container-reminder] Complete: ${sent} sent, ${failed} failed, ${skipped} skipped`);
+
+  // Update last run time only if we actually processed containers
+  lastReminderRun = Date.now();
+
   return { sent, failed, skipped };
 }
 
 /**
- * Start the reminder service (runs monthly)
+ * Start the reminder service (checks daily, sends monthly)
  */
 function start() {
   if (isRunning) {
@@ -359,12 +378,19 @@ function start() {
   console.log('[container-reminder] Starting monthly reminder service');
   isRunning = true;
 
-  // Schedule to run monthly
-  reminderTimer = setInterval(runReminders, REMINDER_INTERVAL_MS);
+  // Check daily if it's time to send reminders (avoids 32-bit int overflow)
+  reminderTimer = setInterval(runReminders, CHECK_INTERVAL_MS);
 
-  // Also check if we should run on startup (e.g., if server was down during scheduled time)
-  // For now, we'll just wait for the interval
-  console.log(`[container-reminder] Next reminder in ${REMINDER_INTERVAL_MS / (24 * 60 * 60 * 1000)} days`);
+  // Run once on startup to check if reminders are due
+  runReminders().then(result => {
+    if (result.reason !== 'not_due') {
+      console.log(`[container-reminder] Startup check: ${result.sent} sent`);
+    }
+  }).catch(err => {
+    console.error('[container-reminder] Startup check failed:', err.message);
+  });
+
+  console.log(`[container-reminder] Will check every 24h, send reminders every ${REMINDER_DAYS} days`);
 }
 
 /**
@@ -381,9 +407,10 @@ function stop() {
 
 /**
  * Manually trigger reminders (for admin use)
+ * Forces immediate execution regardless of schedule
  */
 async function triggerReminders() {
-  return await runReminders();
+  return await runReminders(true); // Force run
 }
 
 module.exports = {
