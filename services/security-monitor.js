@@ -30,6 +30,33 @@ const THRESHOLDS = {
   }
 };
 
+// Mining process detection - blocklist of known mining software
+// These process names will trigger automatic container pause and alert
+const MINING_PROCESS_BLOCKLIST = [
+  'xmrig',
+  'xmr-stak',
+  'ethminer',
+  'minerd',
+  'cgminer',
+  'bfgminer',
+  'cpuminer',
+  'ccminer',
+  'phoenixminer',
+  'nbminer',
+  't-rex',
+  'gminer',
+  'lolminer',
+  'teamredminer',
+  'nanominer',
+  'srbminer',
+  'claymore',
+  'nicehash',
+  'minergate'
+];
+
+// Environment variable to enable/disable mining enforcement (default: enabled)
+const MINING_ENFORCEMENT_ENABLED = process.env.MINING_ENFORCEMENT_ENABLED !== 'false';
+
 // Track container stats for trend detection (only used if periodic checks enabled)
 const containerHistory = new Map();
 const HISTORY_SIZE = 5;
@@ -246,6 +273,61 @@ function calculateMemoryPercent(stats) {
 }
 
 /**
+ * Check for mining processes inside a container
+ * Executes 'ps aux' and checks for blocklisted process names
+ * Returns array of detected mining process names
+ */
+async function checkForMiningProcesses(container) {
+  try {
+    const exec = await container.exec({
+      Cmd: ['ps', 'aux'],
+      AttachStdout: true,
+      AttachStderr: true
+    });
+
+    const stream = await exec.start({ hijack: true, stdin: false });
+    
+    return new Promise((resolve, reject) => {
+      let output = '';
+      stream.on('data', (chunk) => {
+        output += chunk.toString();
+      });
+      stream.on('end', () => {
+        const detectedMining = [];
+        const lowerOutput = output.toLowerCase();
+        for (const miner of MINING_PROCESS_BLOCKLIST) {
+          if (lowerOutput.includes(miner)) {
+            detectedMining.push(miner);
+          }
+        }
+        resolve(detectedMining);
+      });
+      stream.on('error', reject);
+      
+      // Timeout after 5 seconds
+      setTimeout(() => resolve([]), 5000);
+    });
+  } catch (err) {
+    console.warn(`[security-monitor] Failed to check processes: ${err.message}`);
+    return [];
+  }
+}
+
+/**
+ * Pause a container (for mining enforcement)
+ */
+async function pauseContainer(container, containerName, reason) {
+  try {
+    await container.pause();
+    console.log(`[security-monitor] PAUSED container ${containerName}: ${reason}`);
+    return true;
+  } catch (err) {
+    console.error(`[security-monitor] Failed to pause ${containerName}:`, err.message);
+    return false;
+  }
+}
+
+/**
  * Periodic stats check for sustained high usage / mining detection
  * This runs less frequently (every 5 min) and is optional
  */
@@ -277,6 +359,49 @@ async function runPeriodicStatsCheck() {
         }
         containerHistory.set(containerName, history);
 
+        // Check for blocklisted mining processes
+        const detectedMining = await checkForMiningProcesses(container);
+        if (detectedMining.length > 0) {
+          let actionTaken = 'alerted';
+          
+          // If enforcement is enabled, pause the container
+          if (MINING_ENFORCEMENT_ENABLED) {
+            const paused = await pauseContainer(
+              container, 
+              containerName, 
+              `Mining software detected: ${detectedMining.join(', ')}`
+            );
+            actionTaken = paused ? 'container_paused' : 'pause_failed';
+          }
+
+          await logSecurityEvent({
+            username,
+            container_name: containerName,
+            event_type: 'mining_detected',
+            severity: 'critical',
+            description: `Mining software detected: ${detectedMining.join(', ')}`,
+            metrics: { 
+              detectedProcesses: detectedMining,
+              cpuPercent: Math.round(cpuPercent)
+            },
+            process_info: JSON.stringify({ detected: detectedMining }),
+            action_taken: actionTaken
+          });
+
+          // Emit event for dashboard notification
+          eventBus.emit('container-event', {
+            timestamp: Date.now(),
+            username,
+            containerName,
+            action: 'mining_detected',
+            type: 'error',
+            message: `MINING DETECTED: ${detectedMining.join(', ')} - Container ${actionTaken === 'container_paused' ? 'PAUSED' : 'ALERTED'}`
+          });
+
+          // Skip further checks for this container if mining was detected
+          continue;
+        }
+
         // Check for sustained high CPU (potential mining)
         if (history.length >= 3) {
           const avgCpu = history.reduce((a, h) => a + h.cpu, 0) / history.length;
@@ -284,9 +409,9 @@ async function runPeriodicStatsCheck() {
             await logSecurityEvent({
               username,
               container_name: containerName,
-              event_type: 'mining_detected',
+              event_type: 'sustained_high_cpu',
               severity: 'critical',
-              description: `Sustained high CPU: ${avgCpu.toFixed(1)}% average over ${history.length} checks`,
+              description: `Sustained high CPU: ${avgCpu.toFixed(1)}% average over ${history.length} checks - possible mining`,
               metrics: { avgCpu: Math.round(avgCpu), currentCpu: Math.round(cpuPercent) },
               action_taken: 'alerted'
             });
@@ -410,7 +535,9 @@ function getStatus() {
     periodicStatsEnabled: STATS_CHECK_INTERVAL > 0,
     periodicStatsInterval: STATS_CHECK_INTERVAL,
     containersTracked: containerHistory.size,
-    thresholds: THRESHOLDS
+    thresholds: THRESHOLDS,
+    miningEnforcementEnabled: MINING_ENFORCEMENT_ENABLED,
+    miningBlocklist: MINING_PROCESS_BLOCKLIST
   };
 }
 
@@ -420,5 +547,7 @@ module.exports = {
   forceScan,
   getStatus,
   THRESHOLDS,
+  MINING_PROCESS_BLOCKLIST,
+  MINING_ENFORCEMENT_ENABLED,
   eventBus // For SSE dashboard notifications
 };

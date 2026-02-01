@@ -523,7 +523,13 @@ router.post('/init', async (req, res) => {
                 Mounts: mounts,
                 Memory: resourceConfig.memoryToBytes(resourceConfig.defaults.memory_gb),
                 NanoCpus: resourceConfig.cpusToNanoCpus(resourceConfig.defaults.cpus),
-                Privileged: true, // For Docker-in-Docker
+                // SECURITY WARNING: Privileged mode allows container escape!
+                // This is a CRITICAL SECURITY VULNERABILITY - see docs/SECURITY_VULNERABILITIES.md
+                // TODO: Replace with Sysbox, gVisor, or rootless Docker for safe nested containers
+                // For now, only enable if DOCKER_IN_DOCKER_ENABLED=true
+                Privileged: process.env.DOCKER_IN_DOCKER_ENABLED === 'true',
+                // Add PID limit to prevent fork bombs
+                PidsLimit: 512,
                 PortBindings: {
                     '22/tcp': [{ HostPort: String(sshPort) }]
                 }
@@ -2122,7 +2128,11 @@ router.post('/wipe', async (req, res) => {
                 Mounts: mounts,
                 Memory: resourceConfig.memoryToBytes(resourceConfig.defaults.memory_gb),
                 NanoCpus: resourceConfig.cpusToNanoCpus(resourceConfig.defaults.cpus),
-                Privileged: true // For Docker-in-Docker
+                // SECURITY WARNING: Privileged mode allows container escape!
+                // See docs/SECURITY_VULNERABILITIES.md for details
+                Privileged: process.env.DOCKER_IN_DOCKER_ENABLED === 'true',
+                // Add PID limit to prevent fork bombs
+                PidsLimit: 512
             }
         });
 

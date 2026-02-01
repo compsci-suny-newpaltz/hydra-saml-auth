@@ -287,7 +287,13 @@ async function initContainer(username, email, config = {}) {
       Mounts: mounts,
       Memory: memoryBytes,
       NanoCpus: nanoCpus,
-      Privileged: true // For Docker-in-Docker - SECURITY NOTE: This is a known risk
+      // SECURITY WARNING: Privileged mode allows container escape!
+      // This is a CRITICAL SECURITY VULNERABILITY - see docs/SECURITY_VULNERABILITIES.md
+      // TODO: Replace with Sysbox, gVisor, or rootless Docker for safe nested containers
+      // For now, only enable if DOCKER_IN_DOCKER_ENABLED=true
+      Privileged: process.env.DOCKER_IN_DOCKER_ENABLED === 'true',
+      // Add PID limit to prevent fork bombs
+      PidsLimit: 512
     }
   });
 
