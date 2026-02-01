@@ -118,8 +118,12 @@ function buildPodSpec(username, email, config) {
           readOnlyRootFilesystem: false,
           capabilities: {
             drop: ['ALL'],
-            // Add back only necessary capabilities for container operation
-            add: ['CHOWN', 'SETUID', 'SETGID', 'DAC_OVERRIDE', 'NET_BIND_SERVICE']
+            // Add back only minimal capabilities needed for container operation
+            // CHOWN: Required for volume permission setup
+            // DAC_OVERRIDE: Required for entrypoint to modify system files
+            // NET_BIND_SERVICE: Allow binding to ports < 1024 (SSH on 22)
+            // Note: SETUID/SETGID not needed since container runs as root (UID 0)
+            add: ['CHOWN', 'DAC_OVERRIDE', 'NET_BIND_SERVICE']
           }
         },
         // Disable password auth on startup for security

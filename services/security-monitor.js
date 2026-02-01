@@ -289,6 +289,16 @@ async function checkForMiningProcesses(container) {
     
     return new Promise((resolve, reject) => {
       let output = '';
+      let timeoutId = null;
+      let completed = false;
+      
+      const finish = (result) => {
+        if (completed) return;
+        completed = true;
+        if (timeoutId) clearTimeout(timeoutId);
+        resolve(result);
+      };
+      
       stream.on('data', (chunk) => {
         output += chunk.toString();
       });
@@ -300,12 +310,18 @@ async function checkForMiningProcesses(container) {
             detectedMining.push(miner);
           }
         }
-        resolve(detectedMining);
+        finish(detectedMining);
       });
-      stream.on('error', reject);
+      stream.on('error', (err) => {
+        console.warn(`[security-monitor] Stream error checking processes: ${err.message}`);
+        finish([]);
+      });
       
-      // Timeout after 5 seconds
-      setTimeout(() => resolve([]), 5000);
+      // Timeout after 5 seconds - return empty array but log the timeout
+      timeoutId = setTimeout(() => {
+        console.warn(`[security-monitor] Timeout checking processes in container`);
+        finish([]);
+      }, 5000);
     });
   } catch (err) {
     console.warn(`[security-monitor] Failed to check processes: ${err.message}`);
@@ -389,13 +405,16 @@ async function runPeriodicStatsCheck() {
           });
 
           // Emit event for dashboard notification
+          const actionMessage = actionTaken === 'container_paused' 
+            ? 'PAUSED' 
+            : (actionTaken === 'pause_failed' ? 'PAUSE FAILED' : 'ALERTED');
           eventBus.emit('container-event', {
             timestamp: Date.now(),
             username,
             containerName,
             action: 'mining_detected',
             type: 'error',
-            message: `MINING DETECTED: ${detectedMining.join(', ')} - Container ${actionTaken === 'container_paused' ? 'PAUSED' : 'ALERTED'}`
+            message: `MINING DETECTED: ${detectedMining.join(', ')} - Container ${actionMessage}`
           });
 
           // Skip further checks for this container if mining was detected
