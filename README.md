@@ -129,35 +129,41 @@ The platform runs on RKE2 (Rancher Kubernetes Engine 2) with orchestration mode 
 | `hydra-nfs` | NFS (192.168.1.160:/data/containers) | Cross-node storage for GPU migrations |
 | `hydra-hot/warm/cold` | OpenEBS ZFS | Tiered ZFS storage on Hydra |
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         Internet                                 │
-└─────────────────────────┬───────────────────────────────────────┘
-                          │
-                          ▼
-┌─────────────────────────────────────────────────────────────────┐
-│            Traefik Ingress Controller (K8s, Hydra)              │
-│                      (Ports 80, 443)                            │
-│  • TLS (ACME)   • IngressRoutes   • ForwardAuth                │
-└────────┬──────────────────┬──────────────────┬──────────────────┘
-         │                  │                  │
-         ▼                  ▼                  ▼
-┌─────────────────┐ ┌─────────────────┐ ┌─────────────────────────┐
-│ hydra-saml-auth │ │ OpenWebUI+Ollama│ │   Student Containers    │
-│ (Hydra :6969)   │ │ (Chimera :3000) │ │  student-{user}         │
-│                 │ │                 │ │  • VS Code :8443        │
-│ • SAML Auth     │ │ • AI Chat UI    │ │  • Jupyter :8888        │
-│ • Dashboard     │ │ • 3× RTX 3090   │ │  • Custom ports         │
-│ • Container Mgmt│ │ • 72GB VRAM     │ │                         │
-│ • n8n Proxy     │ │                 │ │                         │
-└────────┬────────┘ └─────────────────┘ └─────────────────────────┘
-         │
-         ▼
-┌─────────────────┐     ┌─────────────────┐
-│     SQLite      │     │   Cerberus      │
-│   Database      │     │ • 2× RTX 5090   │
-└─────────────────┘     │ • GPU Training  │
-                        └─────────────────┘
+```mermaid
+graph TD
+    Internet((Internet))
+
+    Internet --> Traefik
+
+    subgraph Hydra["Hydra (192.168.1.160) — Control Plane"]
+        Traefik["Traefik Ingress\n:80 / :443\nTLS · ACME · ForwardAuth"]
+        Auth["hydra-saml-auth\n:6969\nSAML · JWT · Dashboard"]
+        CSLab["CS Lab Website\n:5001"]
+        DB[(SQLite)]
+        Students["Student Pods\nstudent-{user}\nVS Code · Jupyter"]
+        n8n["n8n Automation\n:5678"]
+        Hackathons["Hackathons\n:45821"]
+
+        Traefik --> Auth
+        Traefik --> CSLab
+        Traefik --> Students
+        Traefik --> n8n
+        Traefik --> Hackathons
+        Auth --> DB
+    end
+
+    subgraph Chimera["Chimera (192.168.1.150) — Inference"]
+        OpenWebUI["OpenWebUI + Middleman\n:3000 / :7070"]
+        Ollama["Ollama\n:11434\n3x RTX 3090 · 72GB VRAM"]
+        OpenWebUI --> Ollama
+    end
+
+    subgraph Cerberus["Cerberus (192.168.1.233) — Training"]
+        Ray["Ray Worker\n2x RTX 5090 · 64GB VRAM"]
+    end
+
+    Traefik -->|"gpt.hydra.newpaltz.edu"| OpenWebUI
+    Traefik -->|"n8n.hydra.newpaltz.edu"| n8n
 ```
 
 ### Network
