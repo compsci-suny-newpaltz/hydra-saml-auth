@@ -25,4 +25,4 @@ metadata:
   labels:
     app.kubernetes.io/name: hydra
     app.kubernetes.io/component: infrastructure-services
-    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/enforce: privileged

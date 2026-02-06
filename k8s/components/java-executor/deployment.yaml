@@ -19,7 +19,6 @@ spec:
     spec:
       nodeSelector:
         kubernetes.io/hostname: hydra
-      serviceAccountName: hydra-auth
       containers:
         - name: java-executor
           image: docker-java-executor-java-executor:latest
