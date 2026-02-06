@@ -59,8 +59,12 @@ function buildPodSpec(username, email, config) {
       ...(gpuCount > 0 && { runtimeClassName: 'nvidia' }),
       serviceAccountName: 'student-workload',
       automountServiceAccountToken: false,
-      // Security context - allow container to run entrypoint as root then drop to user 1000
+      // Security context - hardened for student containers
+      // NOTE: runAsNonRoot is false because entrypoint needs root for SSH key setup,
+      // but drops to user 1000 (student) via supervisor after initialization
       securityContext: {
+        runAsUser: 0,  // Start as root for entrypoint (drops to 1000 after init)
+        runAsGroup: 0,
         fsGroup: 1000,
         seccompProfile: {
           type: 'RuntimeDefault'
@@ -108,8 +112,19 @@ function buildPodSpec(username, email, config) {
           { name: 'home', mountPath: '/home/student' }
         ],
         // Container runs as root initially, then drops to user 1000 via entrypoint
+        // Security hardening: prevent privilege escalation and drop all capabilities
         securityContext: {
-          readOnlyRootFilesystem: false
+          allowPrivilegeEscalation: false,
+          readOnlyRootFilesystem: false,
+          capabilities: {
+            drop: ['ALL'],
+            // Add back only minimal capabilities needed for container operation
+            // CHOWN: Required for volume permission setup
+            // DAC_OVERRIDE: Required for entrypoint to modify system files
+            // NET_BIND_SERVICE: Allow binding to ports < 1024 (SSH on 22)
+            // Note: SETUID/SETGID not needed since container runs as root (UID 0)
+            add: ['CHOWN', 'DAC_OVERRIDE', 'NET_BIND_SERVICE']
+          }
         },
         // Disable password auth on startup for security
         lifecycle: {
