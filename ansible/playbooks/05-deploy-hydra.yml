@@ -71,7 +71,7 @@
         kubectl apply -f /tmp/hydra-manifests/components/hydra-auth/
       register: hydra_result
 
-    # Wait for deployments
+    # Wait for core deployments
     - name: Wait for Traefik deployment
       shell: |
         export KUBECONFIG={{ kubeconfig }}
@@ -89,6 +89,150 @@
       retries: 3
       delay: 20
       until: hydra_ready.rc == 0
+
+    # Deploy infra components to hydra-infra namespace
+    - name: Ensure hydra-infra namespace exists
+      shell: |
+        export KUBECONFIG={{ kubeconfig }}
+        kubectl get namespace hydra-infra || kubectl create namespace hydra-infra
+      register: infra_ns_result
+      changed_when: "'created' in infra_ns_result.stdout"
+
+    - name: Apply infra RBAC
+      shell: |
+        export KUBECONFIG={{ kubeconfig }}
+        kubectl apply -f /tmp/hydra-manifests/base/rbac/infra-rbac.yaml
+      register: infra_rbac_result
+
+    - name: Deploy hackathons
+      shell: |
+        export KUBECONFIG={{ kubeconfig }}
+        kubectl apply -f /tmp/hydra-manifests/components/hackathons/
+      register: hackathons_result
+
+    - name: Deploy java-executor
+      shell: |
+        export KUBECONFIG={{ kubeconfig }}
+        kubectl apply -f /tmp/hydra-manifests/components/java-executor/
+      register: java_executor_result
+
+    - name: Deploy sshpiper
+      shell: |
+        export KUBECONFIG={{ kubeconfig }}
+        kubectl apply -f /tmp/hydra-manifests/components/sshpiper/
+      register: sshpiper_result
+
+    - name: Deploy git-learning
+      shell: |
+        export KUBECONFIG={{ kubeconfig }}
+        kubectl apply -f /tmp/hydra-manifests/components/git-learning/
+      register: git_learning_result
+
+    - name: Deploy n8n
+      shell: |
+        export KUBECONFIG={{ kubeconfig }}
+        kubectl apply -f /tmp/hydra-manifests/components/n8n/
+      register: n8n_result
+
+    - name: Deploy ollama
+      shell: |
+        export KUBECONFIG={{ kubeconfig }}
+        kubectl apply -f /tmp/hydra-manifests/components/ollama/
+      register: ollama_result
+
+    - name: Deploy openwebui
+      shell: |
+        export KUBECONFIG={{ kubeconfig }}
+        kubectl apply -f /tmp/hydra-manifests/components/openwebui/
+      register: openwebui_result
+
+    - name: Deploy ray
+      shell: |
+        export KUBECONFIG={{ kubeconfig }}
+        kubectl apply -f /tmp/hydra-manifests/components/ray/
+      register: ray_result
+
+    # Wait for infra deployments
+    - name: Wait for hackathons deployment
+      shell: |
+        export KUBECONFIG={{ kubeconfig }}
+        kubectl -n hydra-infra wait --for=condition=Available deployment/hackathons --timeout=180s
+      register: hackathons_ready
+      retries: 3
+      delay: 20
+      until: hackathons_ready.rc == 0
+
+    - name: Wait for java-executor deployment
+      shell: |
+        export KUBECONFIG={{ kubeconfig }}
+        kubectl -n hydra-infra wait --for=condition=Available deployment/java-executor --timeout=180s
+      register: java_executor_ready
+      retries: 3
+      delay: 20
+      until: java_executor_ready.rc == 0
+
+    - name: Wait for sshpiper deployment
+      shell: |
+        export KUBECONFIG={{ kubeconfig }}
+        kubectl -n hydra-infra wait --for=condition=Available deployment/sshpiper --timeout=180s
+      register: sshpiper_ready
+      retries: 3
+      delay: 20
+      until: sshpiper_ready.rc == 0
+
+    - name: Wait for git-learning deployment
+      shell: |
+        export KUBECONFIG={{ kubeconfig }}
+        kubectl -n hydra-infra wait --for=condition=Available deployment/git-learning --timeout=180s
+      register: git_learning_ready
+      retries: 3
+      delay: 20
+      until: git_learning_ready.rc == 0
+
+    - name: Wait for n8n deployment
+      shell: |
+        export KUBECONFIG={{ kubeconfig }}
+        kubectl -n hydra-infra wait --for=condition=Available deployment/n8n --timeout=180s
+      register: n8n_ready
+      retries: 3
+      delay: 20
+      until: n8n_ready.rc == 0
+
+    - name: Wait for ollama deployment
+      shell: |
+        export KUBECONFIG={{ kubeconfig }}
+        kubectl -n hydra-infra wait --for=condition=Available deployment/ollama --timeout=180s
+      register: ollama_ready
+      retries: 3
+      delay: 20
+      until: ollama_ready.rc == 0
+
+    - name: Wait for open-webui deployment
+      shell: |
+        export KUBECONFIG={{ kubeconfig }}
+        kubectl -n hydra-infra wait --for=condition=Available deployment/open-webui --timeout=180s
+      register: openwebui_ready
+      retries: 3
+      delay: 20
+      until: openwebui_ready.rc == 0
+
+    - name: Wait for ray-head deployment
+      shell: |
+        export KUBECONFIG={{ kubeconfig }}
+        kubectl -n hydra-infra wait --for=condition=Available deployment/ray-head --timeout=180s
+      register: ray_head_ready
+      retries: 3
+      delay: 20
+      until: ray_head_ready.rc == 0
+
+    - name: Wait for ray-worker deployment
+      shell: |
+        export KUBECONFIG={{ kubeconfig }}
+        kubectl -n hydra-infra wait --for=condition=Available deployment/ray-worker --timeout=180s
+      register: ray_worker_ready
+      retries: 3
+      delay: 20
+      until: ray_worker_ready.rc == 0
 
     # Verify deployment
     - name: Get all pods

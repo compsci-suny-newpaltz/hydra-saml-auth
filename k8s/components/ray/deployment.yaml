@@ -1,0 +1,132 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ray-head
+  namespace: hydra-infra
+  labels:
+    app: ray-head
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: ray-head
+  template:
+    metadata:
+      labels:
+        app: ray-head
+        ray.io/node-type: head
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: chimera
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      hostNetwork: true
+      hostIPC: true
+      containers:
+        - name: ray-head
+          image: rayproject/ray:2.35.0-py311-gpu
+          imagePullPolicy: IfNotPresent
+          command: ["ray", "start", "--head", "--port=6379", "--dashboard-host=0.0.0.0", "--dashboard-port=8265", "--block"]
+          ports:
+            - containerPort: 6379
+              name: gcs
+            - containerPort: 8265
+              name: dashboard
+          env:
+            - name: RAY_HEAD_NODE
+              value: "1"
+          resources:
+            requests:
+              memory: "8Gi"
+              cpu: "4000m"
+              nvidia.com/gpu: "3"
+            limits:
+              memory: "32Gi"
+              cpu: "16000m"
+              nvidia.com/gpu: "3"
+          volumeMounts:
+            - name: infiniband
+              mountPath: /dev/infiniband
+              readOnly: true
+      volumes:
+        - name: infiniband
+          hostPath:
+            path: /dev/infiniband
+            type: DirectoryOrCreate
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ray-worker
+  namespace: hydra-infra
+  labels:
+    app: ray-worker
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: ray-worker
+  template:
+    metadata:
+      labels:
+        app: ray-worker
+        ray.io/node-type: worker
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: cerberus
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      hostNetwork: true
+      hostIPC: true
+      containers:
+        - name: ray-worker
+          image: rayproject/ray:2.35.0-py311-gpu
+          imagePullPolicy: IfNotPresent
+          command: ["ray", "start", "--address=192.168.1.150:6379", "--block"]
+          env:
+            - name: RAY_HEAD_ADDRESS
+              value: "192.168.1.150:6379"
+          resources:
+            requests:
+              memory: "8Gi"
+              cpu: "4000m"
+              nvidia.com/gpu: "2"
+            limits:
+              memory: "32Gi"
+              cpu: "16000m"
+              nvidia.com/gpu: "2"
+          volumeMounts:
+            - name: infiniband
+              mountPath: /dev/infiniband
+              readOnly: true
+      volumes:
+        - name: infiniband
+          hostPath:
+            path: /dev/infiniband
+            type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ray-head
+  namespace: hydra-infra
+  labels:
+    app: ray-head
+spec:
+  selector:
+    app: ray-head
+  ports:
+    - port: 6379
+      targetPort: 6379
+      name: gcs
+    - port: 8265
+      targetPort: 8265
+      name: dashboard

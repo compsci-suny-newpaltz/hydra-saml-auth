@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hackathons
+  namespace: hydra-infra
+  labels:
+    app: hackathons
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: hackathons
+  template:
+    metadata:
+      labels:
+        app: hackathons
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: hydra
+      containers:
+        - name: hackathons
+          image: hackaton-voting-app:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 45821
+              name: http
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: PORT
+              value: "45821"
+            - name: APP_BASE_PATH
+              value: "/hackathons"
+            - name: BASE_URL
+              value: "https://hydra.newpaltz.edu"
+            - name: RETURN_TO
+              value: "https://hydra.newpaltz.edu/hackathons/"
+            - name: HYDRA_BASE_URL
+              value: "https://hydra.newpaltz.edu"
+            - name: DATABASE_URL
+              value: "/app/data/hackathon.db"
+            - name: UPLOAD_DIR
+              value: "/app/uploads"
+            - name: MAX_FILE_SIZE
+              value: "1073741824"
+            - name: JUDGE_CODE_EXPIRY_HOURS
+              value: "168"
+            - name: DEFAULT_VOTE_EXPIRATION_DAYS
+              value: "7"
+            - name: SESSION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: hackathons-secret
+                  key: session-secret
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+            - name: uploads
+              mountPath: /app/uploads
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /hackathons/
+              port: 45821
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /hackathons/
+              port: 45821
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: hackathons-data
+        - name: uploads
+          persistentVolumeClaim:
+            claimName: hackathons-uploads

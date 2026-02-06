@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: git-learning
+  namespace: hydra-infra
+  labels:
+    app: git-learning
+spec:
+  selector:
+    app: git-learning
+  ports:
+    - port: 38765
+      targetPort: 38765
+      name: http

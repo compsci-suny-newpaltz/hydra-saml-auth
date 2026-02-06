@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: git-learning
+  namespace: hydra-infra
+  labels:
+    app: git-learning
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: git-learning
+  template:
+    metadata:
+      labels:
+        app: git-learning
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: hydra
+      containers:
+        - name: git-learning
+          image: gg-git-learning-app:latest
+          imagePullPolicy: Never
+          command: ["pm2-runtime", "backend/server.js"]
+          ports:
+            - containerPort: 38765
+              name: http
+          env:
+            - name: PORT
+              value: "38765"
+            - name: NODE_ENV
+              value: "production"
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "300m"
+          livenessProbe:
+            httpGet:
+              path: /git
+              port: 38765
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /git
+              port: 38765
+            initialDelaySeconds: 5
+            periodSeconds: 10

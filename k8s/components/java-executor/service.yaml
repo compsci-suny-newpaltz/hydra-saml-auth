@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: java-executor
+  namespace: hydra-infra
+  labels:
+    app: java-executor
+spec:
+  selector:
+    app: java-executor
+  ports:
+    - port: 3000
+      targetPort: 3000
+      name: http
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: java-executor-data
+  namespace: hydra-infra
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: hydra-local
+  resources:
+    requests:
+      storage: 1Gi

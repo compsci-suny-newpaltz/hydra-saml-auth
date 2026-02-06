@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: java-executor
+  namespace: hydra-infra
+  labels:
+    app: java-executor
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: java-executor
+  template:
+    metadata:
+      labels:
+        app: java-executor
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: hydra
+      serviceAccountName: hydra-auth
+      containers:
+        - name: java-executor
+          image: docker-java-executor-java-executor:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 3000
+              name: http
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: PORT
+              value: "3000"
+            - name: DATABASE_PATH
+              value: "/app/data/java_executor.db"
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+            - name: docker-sock
+              mountPath: /var/run/docker.sock
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: java-executor-data
+        - name: docker-sock
+          hostPath:
+            path: /var/run/docker.sock
+            type: Socket

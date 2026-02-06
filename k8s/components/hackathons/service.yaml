@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: hackathons
+  namespace: hydra-infra
+  labels:
+    app: hackathons
+spec:
+  selector:
+    app: hackathons
+  ports:
+    - port: 45821
+      targetPort: 45821
+      name: http
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hackathons-data
+  namespace: hydra-infra
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: hydra-local
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hackathons-uploads
+  namespace: hydra-infra
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: hydra-local
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: hackathons-secret
+  namespace: hydra-infra
+type: Opaque
+stringData:
+  session-secret: "change-this-in-prod"
