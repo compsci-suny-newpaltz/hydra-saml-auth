@@ -18,6 +18,8 @@ module.exports = {
     namespace: process.env.K8S_NAMESPACE || 'hydra-students',
     // Namespace for system components (hydra-auth, traefik)
     systemNamespace: process.env.K8S_SYSTEM_NAMESPACE || 'hydra-system',
+    // Namespace for infrastructure services (faculty-managed)
+    infraNamespace: process.env.K8S_INFRA_NAMESPACE || 'hydra-infra',
     // Whether running inside a K8s cluster (uses in-cluster config)
     inCluster: process.env.K8S_IN_CLUSTER === 'true',
     // Path to kubeconfig file (only used if not in-cluster)

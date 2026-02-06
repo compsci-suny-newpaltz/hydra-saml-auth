@@ -547,6 +547,25 @@ const ensureAuthenticated = (req, res, next) => {
       console.warn('[Init] admin routes not mounted:', e?.message || e);
     }
 
+    // Mount infra services API routes (behind auth, admin check in router)
+    try {
+      const infraApiRouter = require('./routes/infra-api');
+      app.use('/dashboard/api/infra', ensureAuthenticated, infraApiRouter);
+    } catch (e) {
+      console.warn('[Init] infra-api routes not mounted:', e?.message || e);
+    }
+
+    // Minecraft dashboard stub routes (feature not fully implemented)
+    app.get('/minecraftdashboard/api/my-username', ensureAuthenticated, (req, res) => {
+      res.json({ minecraft_username: null, message: 'Minecraft integration not available' });
+    });
+    app.post('/minecraftdashboard/api/my-username', ensureAuthenticated, (req, res) => {
+      res.status(503).json({ success: false, message: 'Minecraft integration not available' });
+    });
+    app.get('/minecraftdashboard/', (req, res) => {
+      res.redirect('/dashboard');
+    });
+
     // Mount API routes for server status and metrics (public)
     try {
       const serversApiRouter = require('./routes/servers-api');
@@ -715,6 +734,100 @@ const ensureAuthenticated = (req, res, next) => {
         });
       } catch (e) {
         console.error('[ws] exec error:', e);
+        try { ws.close(); } catch { }
+      }
+    });
+
+    // WebSocket terminal for infra services (admin only)
+    app.ws('/dashboard/ws/infra/:name/exec', async (ws, req) => {
+      console.log('[ws-infra] Terminal connection for:', req.params.name);
+      try {
+        if (!req.isAuthenticated?.() || !req.user?.email) {
+          ws.close();
+          return;
+        }
+
+        // Admin check
+        const email = req.user.email.toLowerCase();
+        const isFaculty = (req.user.affiliation || '').toLowerCase() === 'faculty';
+        const isEnvWhitelisted = ADMIN_USERS.includes(email);
+        let isDbWhitelisted = false;
+        try {
+          const { isWhitelisted } = require('./services/db-init');
+          isDbWhitelisted = await isWhitelisted(email);
+        } catch (e) { /* ignore */ }
+
+        if (!isFaculty && !isEnvWhitelisted && !isDbWhitelisted) {
+          console.warn('[ws-infra] Non-admin access attempt:', email);
+          ws.close();
+          return;
+        }
+
+        const nameParam = String(req.params.name || '').trim();
+        if (!nameParam) { ws.close(); return; }
+
+        const runtimeConfig = require('./config/runtime');
+        const k8s = require('@kubernetes/client-node');
+        const stream = require('stream');
+
+        const kc = new k8s.KubeConfig();
+        kc.loadFromDefault();
+
+        const exec = new k8s.Exec(kc);
+        const namespace = runtimeConfig.k8s?.infraNamespace || 'hydra-infra';
+
+        // Verify pod exists in hydra-infra namespace
+        const coreApi = kc.makeApiClient(k8s.CoreV1Api);
+        let containerName;
+        try {
+          const pod = await coreApi.readNamespacedPod(nameParam, namespace);
+          containerName = pod.body?.spec?.containers?.[0]?.name || nameParam;
+        } catch (e) {
+          console.error('[ws-infra] Pod not found:', nameParam, e.message);
+          ws.close();
+          return;
+        }
+
+        const stdoutStream = new stream.PassThrough();
+        const stderrStream = new stream.PassThrough();
+        const stdinStream = new stream.PassThrough();
+
+        stdoutStream.on('data', (chunk) => {
+          try { if (ws.readyState === ws.OPEN) ws.send(chunk); } catch { }
+        });
+
+        stderrStream.on('data', (chunk) => {
+          try { if (ws.readyState === ws.OPEN) ws.send(chunk); } catch { }
+        });
+
+        ws.on('message', (msg) => {
+          try { stdinStream.write(Buffer.from(msg)); } catch { }
+        });
+
+        ws.on('close', () => { try { stdinStream.end(); } catch { } });
+        ws.on('error', () => { try { stdinStream.end(); } catch { } });
+
+        exec.exec(
+          namespace,
+          nameParam,
+          containerName,
+          ['/bin/sh'],
+          stdoutStream,
+          stderrStream,
+          stdinStream,
+          true,
+          (status) => {
+            console.log('[ws-infra] Exec ended:', nameParam, JSON.stringify(status));
+            try { ws.close(); } catch { }
+          }
+        ).then(() => {
+          console.log('[ws-infra] Exec connected:', nameParam);
+        }).catch((e) => {
+          console.error('[ws-infra] Exec error:', e.message);
+          try { ws.close(); } catch { }
+        });
+      } catch (e) {
+        console.error('[ws-infra] Error:', e);
         try { ws.close(); } catch { }
       }
     });

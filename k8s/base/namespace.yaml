@@ -17,3 +17,12 @@ metadata:
     app.kubernetes.io/name: hydra
     app.kubernetes.io/component: student-workloads
     pod-security.kubernetes.io/enforce: restricted
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hydra-infra
+  labels:
+    app.kubernetes.io/name: hydra
+    app.kubernetes.io/component: infrastructure-services
+    pod-security.kubernetes.io/enforce: baseline
