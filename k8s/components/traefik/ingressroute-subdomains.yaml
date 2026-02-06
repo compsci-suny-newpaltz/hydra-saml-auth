@@ -1,0 +1,39 @@
+# Subdomain IngressRoutes
+# gpt.hydra.newpaltz.edu -> OpenWebUI on Chimera
+# n8n.hydra.newpaltz.edu -> n8n
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: openwebui
+  namespace: hydra-system
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - match: Host(`gpt.hydra.newpaltz.edu`)
+      kind: Rule
+      services:
+        - name: openwebui-chimera
+          port: 3000
+  tls:
+    certResolver: letsencrypt
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: n8n
+  namespace: hydra-system
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - match: Host(`n8n.hydra.newpaltz.edu`)
+      kind: Rule
+      services:
+        - name: n8n-external
+          port: 5678
+  tls:
+    certResolver: letsencrypt

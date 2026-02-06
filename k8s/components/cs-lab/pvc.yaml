@@ -1,0 +1,16 @@
+# CS Lab MariaDB Data PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cs-lab-db-data
+  namespace: hydra-system
+  labels:
+    app.kubernetes.io/name: cs-lab
+    app.kubernetes.io/component: database
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: hydra-local
+  resources:
+    requests:
+      storage: 5Gi

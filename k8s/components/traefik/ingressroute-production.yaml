@@ -1,0 +1,364 @@
+# Production IngressRoutes for hydra.newpaltz.edu
+# Replaces Apache ProxyPass and Docker Traefik file-provider routing
+---
+# Main Hydra Auth routes (dashboard, login, API, etc.)
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: hydra-main
+  namespace: hydra-system
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    # Dashboard
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/dashboard`)
+      kind: Rule
+      priority: 10
+      services:
+        - name: hydra-auth
+          port: 6969
+    # Login / Auth
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/login`)
+      kind: Rule
+      priority: 10
+      services:
+        - name: hydra-auth
+          port: 6969
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/logout`)
+      kind: Rule
+      priority: 10
+      services:
+        - name: hydra-auth
+          port: 6969
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/auth`)
+      kind: Rule
+      priority: 10
+      services:
+        - name: hydra-auth
+          port: 6969
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/callback`)
+      kind: Rule
+      priority: 10
+      services:
+        - name: hydra-auth
+          port: 6969
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/token`)
+      kind: Rule
+      priority: 10
+      services:
+        - name: hydra-auth
+          port: 6969
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/check`)
+      kind: Rule
+      priority: 10
+      services:
+        - name: hydra-auth
+          port: 6969
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/.well-known/jwks.json`)
+      kind: Rule
+      priority: 10
+      services:
+        - name: hydra-auth
+          port: 6969
+    # Servers status page + static assets
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/servers`)
+      kind: Rule
+      priority: 10
+      services:
+        - name: hydra-auth
+          port: 6969
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/css`)
+      kind: Rule
+      priority: 5
+      services:
+        - name: hydra-auth
+          port: 6969
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/js`)
+      kind: Rule
+      priority: 5
+      services:
+        - name: hydra-auth
+          port: 6969
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/static`)
+      kind: Rule
+      priority: 5
+      services:
+        - name: hydra-auth
+          port: 6969
+    # Health check
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/health`)
+      kind: Rule
+      priority: 10
+      services:
+        - name: hydra-auth
+          port: 6969
+    # API endpoints (hydra-auth internal)
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/api/servers`)
+      kind: Rule
+      priority: 15
+      services:
+        - name: hydra-auth
+          port: 6969
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/api/events`)
+      kind: Rule
+      priority: 15
+      services:
+        - name: hydra-auth
+          port: 6969
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/api/webui`)
+      kind: Rule
+      priority: 15
+      services:
+        - name: hydra-auth
+          port: 6969
+    # Admin API (hydra-backend on :5002)
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/admin-api`)
+      kind: Rule
+      priority: 15
+      services:
+        - name: hydra-backend
+          port: 5002
+  tls:
+    certResolver: letsencrypt
+---
+# CS Lab Website routes
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: cs-lab-website
+  namespace: hydra-system
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    # CS Lab API routes (higher priority)
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/api/courses`)
+      kind: Rule
+      priority: 20
+      services:
+        - name: cs-lab-backend
+          port: 5001
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/api/events`)
+      kind: Rule
+      priority: 20
+      services:
+        - name: cs-lab-backend
+          port: 5001
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/api/comp-exam`)
+      kind: Rule
+      priority: 20
+      services:
+        - name: cs-lab-backend
+          port: 5001
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/api/faq`)
+      kind: Rule
+      priority: 20
+      services:
+        - name: cs-lab-backend
+          port: 5001
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/api/faculty`)
+      kind: Rule
+      priority: 20
+      services:
+        - name: cs-lab-backend
+          port: 5001
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/api/student-resources`)
+      kind: Rule
+      priority: 20
+      services:
+        - name: cs-lab-backend
+          port: 5001
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/api/admins`)
+      kind: Rule
+      priority: 20
+      services:
+        - name: cs-lab-backend
+          port: 5001
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/api/auth`)
+      kind: Rule
+      priority: 20
+      services:
+        - name: cs-lab-backend
+          port: 5001
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/api/tech-blog`)
+      kind: Rule
+      priority: 20
+      services:
+        - name: cs-lab-backend
+          port: 5001
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/api/student-highlights`)
+      kind: Rule
+      priority: 20
+      services:
+        - name: cs-lab-backend
+          port: 5001
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/api/sd-forms`)
+      kind: Rule
+      priority: 20
+      services:
+        - name: cs-lab-backend
+          port: 5001
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/api/student`)
+      kind: Rule
+      priority: 20
+      services:
+        - name: cs-lab-backend
+          port: 5001
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/api/school-calendar`)
+      kind: Rule
+      priority: 20
+      services:
+        - name: cs-lab-backend
+          port: 5001
+    # CS Lab frontend routes (lower priority)
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/courses`)
+      kind: Rule
+      priority: 10
+      services:
+        - name: cs-lab-backend
+          port: 5001
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/events`)
+      kind: Rule
+      priority: 10
+      services:
+        - name: cs-lab-backend
+          port: 5001
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/calendar`)
+      kind: Rule
+      priority: 10
+      services:
+        - name: cs-lab-backend
+          port: 5001
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/faculty`)
+      kind: Rule
+      priority: 10
+      services:
+        - name: cs-lab-backend
+          port: 5001
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/faq`)
+      kind: Rule
+      priority: 10
+      services:
+        - name: cs-lab-backend
+          port: 5001
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/student`)
+      kind: Rule
+      priority: 10
+      services:
+        - name: cs-lab-backend
+          port: 5001
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/tech-blog`)
+      kind: Rule
+      priority: 10
+      services:
+        - name: cs-lab-backend
+          port: 5001
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/admin`)
+      kind: Rule
+      priority: 10
+      services:
+        - name: cs-lab-backend
+          port: 5001
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/comp-exam`)
+      kind: Rule
+      priority: 10
+      services:
+        - name: cs-lab-backend
+          port: 5001
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/course-progression`)
+      kind: Rule
+      priority: 10
+      services:
+        - name: cs-lab-backend
+          port: 5001
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/uploads`)
+      kind: Rule
+      priority: 10
+      services:
+        - name: cs-lab-backend
+          port: 5001
+  tls:
+    certResolver: letsencrypt
+---
+# Hackathons route (already exists, keeping for reference)
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: hackathons
+  namespace: hydra-system
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/hackathons`)
+      kind: Rule
+      priority: 100
+      services:
+        - name: hackathons-external
+          port: 45821
+  tls:
+    certResolver: letsencrypt
+---
+# Java executor route
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: java-executor
+  namespace: hydra-system
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/java`)
+      kind: Rule
+      priority: 15
+      services:
+        - name: java-executor-external
+          port: 55392
+  tls:
+    certResolver: letsencrypt
+---
+# Git learning app route
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: git-learning
+  namespace: hydra-system
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/git`)
+      kind: Rule
+      priority: 15
+      services:
+        - name: git-learning-external
+          port: 8080
+  tls:
+    certResolver: letsencrypt
+---
+# Default catch-all: CS Lab frontend (lowest priority)
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: hydra-default
+  namespace: hydra-system
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - match: Host(`hydra.newpaltz.edu`)
+      kind: Rule
+      priority: 1
+      services:
+        - name: cs-lab-backend
+          port: 5001
+  tls:
+    certResolver: letsencrypt
