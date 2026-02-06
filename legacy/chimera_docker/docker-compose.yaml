@@ -29,7 +29,9 @@ services:
                 - gpu
 
   open-webui:
-    image: ghcr.io/open-webui/open-webui:v0.6.37
+    image: ghcr.io/open-webui/open-webui:v0.7.2
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"  # Prevent Watchtower from overriding pinned version
     container_name: open-webui
     volumes:
       - open-webui:/app/backend/data
