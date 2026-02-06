@@ -383,6 +383,77 @@ class K8sClient {
     return response.body.items;
   }
 
+  // ==================== DEPLOYMENT OPERATIONS ====================
+
+  // Create a deployment
+  async createDeployment(deploySpec) {
+    this.init();
+    const namespace = deploySpec.metadata?.namespace || this.namespace;
+    return await this.appsApi.createNamespacedDeployment(namespace, deploySpec);
+  }
+
+  // Get a deployment by name
+  async getDeployment(name, namespace = this.namespace) {
+    this.init();
+    try {
+      const response = await this.appsApi.readNamespacedDeployment(name, namespace);
+      return response.body;
+    } catch (err) {
+      if (err.statusCode === 404) return null;
+      throw err;
+    }
+  }
+
+  // List deployments by label selector
+  async listDeployments(labelSelector, namespace = this.namespace) {
+    this.init();
+    const response = await this.appsApi.listNamespacedDeployment(
+      namespace,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      labelSelector
+    );
+    return response.body.items;
+  }
+
+  // Patch a deployment (for scale, restart, etc.)
+  async patchDeployment(name, namespace, patch) {
+    this.init();
+    const options = { headers: { 'Content-Type': 'application/strategic-merge-patch+json' } };
+    const response = await this.appsApi.patchNamespacedDeployment(
+      name, namespace, patch, undefined, undefined, undefined, undefined, undefined, options
+    );
+    return response.body;
+  }
+
+  // Delete a deployment
+  async deleteDeployment(name, namespace = this.namespace) {
+    this.init();
+    try {
+      await this.appsApi.deleteNamespacedDeployment(name, namespace);
+      return true;
+    } catch (err) {
+      if (err.statusCode === 404) return false;
+      throw err;
+    }
+  }
+
+  // List services by label selector
+  async listServices(labelSelector, namespace = this.namespace) {
+    this.init();
+    const response = await this.coreApi.listNamespacedService(
+      namespace,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      labelSelector
+    );
+    return response.body.items;
+  }
+
   // ==================== NODE OPERATIONS ====================
 
   // List nodes
