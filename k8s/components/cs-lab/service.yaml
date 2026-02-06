@@ -1,0 +1,39 @@
+# CS Lab Website Services
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cs-lab-db
+  namespace: hydra-system
+  labels:
+    app.kubernetes.io/name: cs-lab
+    app.kubernetes.io/component: database
+spec:
+  type: ClusterIP
+  ports:
+    - name: mysql
+      port: 3306
+      targetPort: mysql
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: cs-lab
+    app.kubernetes.io/component: database
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cs-lab-backend
+  namespace: hydra-system
+  labels:
+    app.kubernetes.io/name: cs-lab
+    app.kubernetes.io/component: backend
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 5001
+      targetPort: http
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: cs-lab
+    app.kubernetes.io/component: backend

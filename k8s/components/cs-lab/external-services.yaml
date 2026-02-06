@@ -1,0 +1,41 @@
+# ExternalName services for Docker containers not yet migrated to K8s
+# These allow K8s IngressRoutes to reach Docker containers on the host
+---
+# Java Executor (Docker container on host port 55392)
+apiVersion: v1
+kind: Service
+metadata:
+  name: java-executor-external
+  namespace: hydra-system
+spec:
+  type: ExternalName
+  externalName: "192.168.1.160"
+  ports:
+    - port: 55392
+      targetPort: 55392
+---
+# Git Learning App (Docker container, proxied via n8n-traefik on host port 8080)
+apiVersion: v1
+kind: Service
+metadata:
+  name: git-learning-external
+  namespace: hydra-system
+spec:
+  type: ExternalName
+  externalName: "192.168.1.160"
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+# Hydra Backend (host Node.js process on port 5002)
+apiVersion: v1
+kind: Service
+metadata:
+  name: hydra-backend
+  namespace: hydra-system
+spec:
+  type: ExternalName
+  externalName: "192.168.1.160"
+  ports:
+    - port: 5002
+      targetPort: 5002

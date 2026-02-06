@@ -1,0 +1,27 @@
+services:
+  app:
+    build: .
+    container_name: hackathons-app
+    environment:
+      - NODE_ENV=production
+      - PORT=45821
+      - APP_BASE_PATH=/hackathons
+      - BASE_URL=https://hydra.newpaltz.edu
+      - RETURN_TO=https://hydra.newpaltz.edu/hackathons/
+      - HYDRA_BASE_URL=https://hydra.newpaltz.edu
+      - DATABASE_URL=/app/data/hackathon.db
+      - UPLOAD_DIR=/app/uploads
+      - MAX_FILE_SIZE=1073741824
+      - JUDGE_CODE_EXPIRY_HOURS=168
+      - DEFAULT_VOTE_EXPIRATION_DAYS=7
+      - SESSION_SECRET=${SESSION_SECRET:-change-this-in-prod}
+    ports:
+      - "45821:45821"
+    volumes:
+      - app_data:/app/data
+      - app_uploads:/app/uploads
+    restart: unless-stopped
+
+volumes:
+  app_data:
+  app_uploads:
