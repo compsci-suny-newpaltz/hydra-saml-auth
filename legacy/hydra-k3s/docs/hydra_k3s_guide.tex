@@ -1,0 +1,314 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{fancyhdr}
+\usepackage{enumitem}
+\usepackage{float}
+\usepackage{mdframed}
+\usepackage{longtable}
+
+\geometry{margin=1in}
+
+\definecolor{hydra-blue}{RGB}{5,32,73}
+\definecolor{code-bg}{RGB}{248,248,248}
+\definecolor{warning-bg}{RGB}{255,243,205}
+\definecolor{success-bg}{RGB}{212,237,218}
+\definecolor{info-bg}{RGB}{217,237,247}
+
+\hypersetup{colorlinks=true,linkcolor=hydra-blue,urlcolor=blue}
+
+\lstdefinestyle{bash}{backgroundcolor=\color{code-bg},basicstyle=\ttfamily\small,breaklines=true,frame=single,numbers=none}
+\lstdefinestyle{yaml}{backgroundcolor=\color{code-bg},basicstyle=\ttfamily\small,breaklines=true,frame=single,numbers=left}
+
+\newmdenv[backgroundcolor=warning-bg,linewidth=0pt,innerleftmargin=10pt,innerrightmargin=10pt,innertopmargin=10pt,innerbottommargin=10pt]{warningbox}
+\newmdenv[backgroundcolor=success-bg,linewidth=0pt,innerleftmargin=10pt,innerrightmargin=10pt,innertopmargin=10pt,innerbottommargin=10pt]{successbox}
+\newmdenv[backgroundcolor=info-bg,linewidth=0pt,innerleftmargin=10pt,innerrightmargin=10pt,innertopmargin=10pt,innerbottommargin=10pt]{infobox}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\textbf{Hydra K3s/RKE2}}
+\fancyhead[R]{\textbf{Cluster Guide}}
+\fancyfoot[C]{\thepage}
+\setlength{\headheight}{14pt}
+
+\title{\textbf{Hydra RKE2 Cluster Guide}\\[0.5em]\large Storage Architecture \& GPU Resource Management}
+\author{Computer Science Department\\SUNY New Paltz}
+\date{February 2026}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+%% ============================================================
+\section{Overview}
+%% ============================================================
+
+The Hydra cluster is a 3-node RKE2 Kubernetes deployment serving the SUNY New Paltz Computer Science department. It provides containerized development environments for students and GPU resources for machine learning workloads.
+
+\begin{infobox}
+\textbf{Repository:} \url{https://github.com/compsci-suny-newpaltz/hydra-k3s}\\
+\textbf{Orchestration:} Rancher RKE2 v1.28\\
+\textbf{Container Runtime:} containerd 1.7.7
+\end{infobox}
+
+%% ============================================================
+\section{Cluster Topology}
+%% ============================================================
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}lllll@{}}
+\toprule
+\textbf{Node} & \textbf{IP} & \textbf{Role} & \textbf{RAM} & \textbf{Storage} \\
+\midrule
+Hydra & 192.168.1.160 & Control plane, student containers & 256 GB & 21 TB ZFS RAID-10 \\
+Chimera & 192.168.1.150 & GPU inference (OpenWebUI + Ollama) & 251 GB & 3.5 TB NVMe \\
+Cerberus & 192.168.1.233 & GPU training & 64 GB & 3.6 TB NVMe \\
+\bottomrule
+\end{tabular}
+\caption{Node hardware specifications}
+\end{table}
+
+\subsection{GPU Resources}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}llrrl@{}}
+\toprule
+\textbf{Node} & \textbf{GPU Model} & \textbf{Count} & \textbf{VRAM} & \textbf{Use Case} \\
+\midrule
+Chimera & RTX 3090 & 3 & 72 GB & Ollama inference, concurrent users \\
+Cerberus & RTX 5090 & 2 & 64 GB & Student training, research \\
+\bottomrule
+\end{tabular}
+\caption{GPU allocation across the cluster (136 GB total VRAM)}
+\end{table}
+
+\begin{warningbox}
+\textbf{GPU Scheduling:} Chimera GPUs are shared with OpenWebUI/Ollama. For dedicated GPU access, student workloads should target Cerberus via the \texttt{gpu\_training} resource preset.
+\end{warningbox}
+
+%% ============================================================
+\section{Kubernetes Namespaces}
+%% ============================================================
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Namespace} & \textbf{Purpose} \\
+\midrule
+\texttt{hydra-system} & Core services: Traefik, hydra-auth, cs-lab-backend, cs-lab-db \\
+\texttt{hydra-students} & Student workload pods (one per student) \\
+\texttt{gpu-operator} & NVIDIA GPU operator and device plugin \\
+\texttt{kube-system} & RKE2 system components \\
+\bottomrule
+\end{tabular}
+\caption{Namespace organization}
+\end{table}
+
+%% ============================================================
+\section{Storage Architecture}
+%% ============================================================
+
+\subsection{Tiered Storage Design}
+
+The cluster uses a 3-tier storage model:
+
+\begin{enumerate}
+    \item \textbf{Tier 1 --- Fast NVMe Cache (8.8 TB):} Chimera and Cerberus NVMe drives for hot data, active models, and training workspaces.
+    \item \textbf{Tier 2 --- Primary Storage (21 TB):} Hydra ZFS RAID-10 array for student containers, model repositories, and system backups.
+    \item \textbf{Tier 3 --- Archive:} Long-term storage for graduated student data and completed research projects.
+\end{enumerate}
+
+\subsection{ZFS Configuration (Hydra)}
+
+\begin{lstlisting}[style=bash]
+# RAID-10 array: 6 drives, 21TB usable
+/dev/md0: active raid10 sdc sdd sdf sde sdb sda
+  22500996096 blocks [6/6] [UUUUUU]
+
+# Mount point
+/dev/md0  21T  54G  20T  1% /data
+\end{lstlisting}
+
+\subsection{Storage Classes}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{StorageClass} & \textbf{Backend} & \textbf{Use Case} \\
+\midrule
+\texttt{hydra-local} & Local ZFS on Hydra & Student PVCs, system data \\
+\texttt{hydra-nfs} & NFS export from Hydra & Cross-node access (GPU nodes) \\
+\texttt{hydra-hot} & NVMe on GPU nodes & Active training data \\
+\bottomrule
+\end{tabular}
+\caption{Kubernetes StorageClass definitions}
+\end{table}
+
+%% ============================================================
+\section{Node Labeling \& Scheduling}
+%% ============================================================
+
+Pods are scheduled to appropriate nodes using labels and tolerations.
+
+\subsection{Node Labels}
+
+\begin{lstlisting}[style=bash]
+# Hydra (control plane)
+hydra.node-role=control-plane
+
+# Chimera (inference)
+hydra.node-role=inference
+hydra.gpu-enabled=true
+
+# Cerberus (training)
+hydra.node-role=training
+hydra.gpu-enabled=true
+\end{lstlisting}
+
+\subsection{GPU Tolerations}
+
+GPU workloads must include the NVIDIA toleration:
+
+\begin{lstlisting}[style=yaml]
+tolerations:
+  - key: nvidia.com/gpu
+    operator: Exists
+    effect: NoSchedule
+\end{lstlisting}
+
+%% ============================================================
+\section{Resource Presets}
+%% ============================================================
+
+Students select resource presets when requesting containers. These map to Kubernetes resource requests and limits.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}lrrrll@{}}
+\toprule
+\textbf{Preset} & \textbf{Memory} & \textbf{CPUs} & \textbf{Storage} & \textbf{GPU} & \textbf{Auto-Approve} \\
+\midrule
+Minimal & 1 GB & 0.5 & 5 GB & --- & Yes \\
+Conservative & 1.5 GB & 1 & 10 GB & --- & Yes \\
+Standard & 2 GB & 1 & 20 GB & --- & Yes \\
+Enhanced & 4 GB & 2 & 40 GB & --- & Yes \\
+GPU Inference & 32 GB & 8 & 100 GB & 1 & No \\
+GPU Training & 48 GB & 16 & 200 GB & 2 & No \\
+\bottomrule
+\end{tabular}
+\caption{Resource presets defined in \texttt{config/resources.js}}
+\end{table}
+
+\begin{warningbox}
+\textbf{GPU presets require admin approval.} GPU Inference targets Chimera; GPU Training targets Cerberus. Capacity is limited --- approve based on current utilization.
+\end{warningbox}
+
+%% ============================================================
+\section{Manifest Structure}
+%% ============================================================
+
+\begin{lstlisting}[style=bash]
+hydra-k3s/
+  manifests/
+    cache-config/      # NVMe cache tier configuration
+    model-cache/       # Model caching policies
+    monitoring/        # Prometheus, alerting
+    storage-controller/ # Tiered storage controller
+  scripts/
+    setup-hydra-storage.sh
+    setup-chimera-cache.sh
+    setup-cerberus-workspace.sh
+    deploy-controllers.sh
+    migrate-data.sh
+  docs/
+    phase1-storage.md
+    phase2-fast-tier.md
+    phase3-controllers.md
+    phase4-migration.md
+\end{lstlisting}
+
+%% ============================================================
+\section{Deployment Procedures}
+%% ============================================================
+
+\subsection{Initial Setup}
+
+\begin{lstlisting}[style=bash]
+# Phase 1: Setup storage (Day 1)
+./scripts/setup-hydra-storage.sh
+
+# Phase 2: Configure fast tier (Day 2)
+kubectl apply -f manifests/cache-config/
+
+# Phase 3: Deploy controllers (Day 3)
+kubectl apply -f manifests/storage-controller/
+kubectl apply -f manifests/monitoring/
+
+# Phase 4: Migrate data (Days 4-5)
+./scripts/migrate-data.sh
+\end{lstlisting}
+
+\subsection{Health Check}
+
+\begin{lstlisting}[style=bash]
+export KUBECONFIG=/etc/rancher/rke2/rke2.yaml
+
+# Node status
+kubectl get nodes -o wide
+
+# Problem pods
+kubectl get pods -A | grep -v Running | grep -v Completed
+
+# GPU availability
+kubectl get nodes -o custom-columns=\
+  "NAME:.metadata.name,GPU:.status.capacity.nvidia\.com/gpu"
+
+# Student pods
+kubectl get pods -n hydra-students --sort-by=.metadata.name
+
+# RAID health
+cat /proc/mdstat | head -5
+\end{lstlisting}
+
+%% ============================================================
+\section{Backup Strategy}
+%% ============================================================
+
+\begin{itemize}
+    \item \textbf{Weekly OS backups:} \texttt{backup-cluster.sh} via cron (rsync to \texttt{/mnt/sdh4/backups})
+    \item \textbf{ZFS snapshots:} Hourly for active datasets, daily for archives
+    \item \textbf{etcd snapshots:} Automatic via RKE2 (stored on Hydra sdb)
+    \item \textbf{Database dumps:} MariaDB and PostgreSQL included in weekly backup
+\end{itemize}
+
+%% ============================================================
+\section{Migration Status}
+%% ============================================================
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Phase} & \textbf{Task} & \textbf{Status} \\
+\midrule
+Phase 1 & Storage pool created & Complete \\
+Phase 2 & Fast tier configured & Pending \\
+Phase 3 & Controllers deployed & Pending \\
+Phase 4 & Data migration & Pending \\
+\bottomrule
+\end{tabular}
+\caption{Docker-to-Kubernetes migration progress}
+\end{table}
+
+\end{document}
