@@ -459,15 +459,91 @@ hydra-saml-auth/
 ├── docker-compose.yaml      # Production stack
 ├── docs/
 │   ├── containers.md        # Container system documentation
-│   └── hydra_infrastructure_guide.tex  # Cluster setup guide
+│   ├── hydra_infrastructure_guide.tex  # Cluster setup guide
+│   ├── hydra_cluster_audit_20260204.tex # Cluster audit report
+│   └── compose-backups/     # Backed up Docker Compose files
+├── scripts/
+│   └── test-routes.sh       # Route health check script
 └── README.md
 ```
 
-## Operations
+## Cluster Operations
+
+### Shell Aliases
+
+Source `~/.hydra-aliases` (auto-loaded in `.bashrc`) for quick management:
+
+```bash
+# Quick health check
+hydra-test          # Full route health check (all IngressRoutes, K8s, GPUs, RAID)
+hydra-health        # Quick cluster status
+
+# Kubernetes shortcuts
+k                   # kubectl
+kgp                 # kubectl get pods -A
+kgs                 # kubectl get svc -A
+kgn                 # kubectl get nodes -o wide
+kgi                 # kubectl get ingressroute -A
+
+# Namespace shortcuts
+ksys                # kubectl -n hydra-system
+kstu                # kubectl -n hydra-students
+kgpu                # kubectl -n gpu-operator
+
+# Service logs
+cslab-logs          # CS Lab backend logs
+cslab-db-logs       # CS Lab MariaDB logs
+traefik-logs        # Traefik ingress logs
+traefik-routes      # List all IngressRoutes
+
+# Student management
+students            # List all student pods
+student-logs <pod>  # View student container logs
+
+# n8n management
+n8n-logs            # n8n container logs
+n8n-users           # List all n8n users from PostgreSQL
+n8n-restart         # Restart n8n container
+n8n-usermgr-logs    # n8n user manager API logs
+
+# Database shells
+cslab-db-shell      # MariaDB shell (K8s)
+n8n-db-shell        # PostgreSQL shell (Docker)
+
+# GPU
+gpu-check           # Show GPU count per node
+
+# Docker (for services not yet migrated)
+dps                 # Docker container list
+```
+
+### Route Health Check
+
+Run `hydra-test` to verify all services. Expected results:
+
+| Route | Expected | Service |
+|-------|----------|---------|
+| `/` | 200 | CS Lab Frontend |
+| `/dashboard` | 302 | Hydra Auth (redirects to login) |
+| `/login` | 302 | SAML SSO redirect |
+| `/servers` | 200 | Server status page |
+| `/api/courses` | 200 | CS Lab API |
+| `/.well-known/jwks.json` | 200 | JWT public keys |
+| `/hackathons/` | 200 | Hackathon voting app |
+| `/token` | routed | Auth token endpoint |
+| `/java/` | routed | Java executor |
+| `/git/` | routed | Git learning app |
+| `/admin-api/` | routed | Hydra backend (user creation) |
+| `gpt.hydra.newpaltz.edu` | 200 | OpenWebUI (Chimera) |
+| `n8n.hydra.newpaltz.edu` | 200 | n8n workflow automation |
 
 ### Rebuild Main Service
 
 ```bash
+# K8s deployment (preferred)
+kubectl rollout restart deployment/hydra-auth -n hydra-system
+
+# Docker compose (legacy)
 docker compose build hydra-saml-auth
 docker compose up -d hydra-saml-auth
 ```
