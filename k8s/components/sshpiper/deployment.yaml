@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sshpiper
+  namespace: hydra-infra
+  labels:
+    app: sshpiper
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: sshpiper
+  template:
+    metadata:
+      labels:
+        app: sshpiper
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: hydra
+      containers:
+        - name: sshpiper
+          image: farmer1992/sshpiperd:latest
+          args:
+            - /sshpiperd/plugins/workingdir
+            - --root
+            - /var/sshpiper
+            - --no-check-perm
+          ports:
+            - containerPort: 2222
+              hostPort: 2222
+              name: ssh
+          volumeMounts:
+            - name: config
+              mountPath: /var/sshpiper
+            - name: ssh-keys
+              mountPath: /ssh-keys
+              readOnly: true
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+          livenessProbe:
+            tcpSocket:
+              port: 2222
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            tcpSocket:
+              port: 2222
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: config
+          hostPath:
+            path: /home/infra/hydra-saml-auth/sshpiper/config
+            type: Directory
+        - name: ssh-keys
+          hostPath:
+            path: /home/infra/hydra-saml-auth/data/ssh-keys
+            type: Directory

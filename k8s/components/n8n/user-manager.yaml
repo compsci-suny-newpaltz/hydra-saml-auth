@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: n8n-user-manager
+  namespace: hydra-infra
+  labels:
+    app: n8n-user-manager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: n8n-user-manager
+  template:
+    metadata:
+      labels:
+        app: n8n-user-manager
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: hydra
+      containers:
+        - name: n8n-user-manager
+          image: traefik-n8n-n8n-user-manager:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 3000
+              name: http
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: n8n-secret
+                  key: postgres-user
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: n8n-secret
+                  key: postgres-password
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: n8n-secret
+                  key: postgres-db
+            - name: DB_POSTGRESDB_HOST
+              value: "n8n-postgres"
+            - name: DB_POSTGRESDB_PORT
+              value: "5432"
+            - name: N8N_USER_MANAGER_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: n8n-secret
+                  key: n8n-user-manager-api-key
+            - name: N8N_USER_MANAGER_PORT
+              value: "3000"
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: n8n-user-manager
+  namespace: hydra-infra
+  labels:
+    app: n8n-user-manager
+spec:
+  selector:
+    app: n8n-user-manager
+  ports:
+    - port: 3000
+      targetPort: 3000
+      name: http
