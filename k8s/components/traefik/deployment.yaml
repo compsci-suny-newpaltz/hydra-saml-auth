@@ -19,6 +19,8 @@ spec:
         app.kubernetes.io/component: ingress
     spec:
       serviceAccountName: traefik
+      nodeSelector:
+        kubernetes.io/hostname: hydra
       containers:
         - name: traefik
           image: traefik:v2.11
@@ -26,12 +28,16 @@ spec:
             - --api.dashboard=true
             - --api.insecure=true
             - --providers.kubernetescrd
-            - --providers.kubernetescrd.namespaces=hydra-system,hydra-students
+            - --providers.kubernetescrd.namespaces=hydra-system,hydra-students,hydra-infra
             - --providers.kubernetescrd.allowCrossNamespace=true
+            - --providers.kubernetescrd.allowExternalNameServices=true
             - --entrypoints.web.address=:80
             - --entrypoints.websecure.address=:443
             - --entrypoints.hydra.address=:6969
-            - --log.level=INFO
+            - --certificatesresolvers.letsencrypt.acme.email=cslab@newpaltz.edu
+            - --certificatesresolvers.letsencrypt.acme.storage=/acme/acme.json
+            - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
+            - --log.level=DEBUG
           ports:
             - name: web
               containerPort: 80
@@ -55,6 +61,9 @@ spec:
             limits:
               memory: "256Mi"
               cpu: "500m"
+          volumeMounts:
+            - name: acme
+              mountPath: /acme
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
@@ -62,6 +71,11 @@ spec:
                 - ALL
               add:
                 - NET_BIND_SERVICE
+      volumes:
+        - name: acme
+          hostPath:
+            path: /data/traefik-acme
+            type: DirectoryOrCreate
 ---
 apiVersion: v1
 kind: ServiceAccount
