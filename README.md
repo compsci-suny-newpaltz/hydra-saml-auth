@@ -2,7 +2,7 @@
 
 A containerized development platform providing persistent development environments for Computer Science students and faculty, with SAML 2.0 SSO integration via Azure AD.
 
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ## Table of Contents
 
@@ -136,9 +136,9 @@ The platform runs on RKE2 (Rancher Kubernetes Engine 2) with orchestration mode 
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│              Apache Reverse Proxy (Hydra)                       │
+│            Traefik Ingress Controller (K8s, Hydra)              │
 │                      (Ports 80, 443)                            │
-│  • TLS Termination   • ProxyPass   • Load Balancing             │
+│  • TLS (ACME)   • IngressRoutes   • ForwardAuth                │
 └────────┬──────────────────┬──────────────────┬──────────────────┘
          │                  │                  │
          ▼                  ▼                  ▼
@@ -162,11 +162,11 @@ The platform runs on RKE2 (Rancher Kubernetes Engine 2) with orchestration mode 
 
 ### Network
 
-- **Hydra**: Hosts Traefik for internal routing on `hydra_students_net`
+- **Hydra**: Hosts Traefik ingress controller (K8s pod with hostPort 80/443), student containers, core services
 - **Chimera**: Runs OpenWebUI + Ollama with GPU passthrough for inference
-- **Cerberus**: Reserved for GPU training workloads
+- **Cerberus**: Reserved for GPU training workloads (Ray worker, future vLLM)
 
-Student containers run on Hydra with isolated Docker networking. All external traffic is mediated through Apache reverse proxy.
+Student containers run on Hydra as K8s pods. All external traffic is routed through the Traefik IngressController with ForwardAuth for protected routes.
 
 ## Quick Start
 
@@ -633,7 +633,7 @@ pdflatex hydra_infrastructure_guide.tex  # Run twice for TOC
 
 ## License
 
-Apache-2.0 - see [LICENSE](LICENSE) for details.
+MIT - see [LICENSE](LICENSE) for details.
 
 ---
 
