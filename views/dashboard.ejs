@@ -530,6 +530,10 @@
           <button id="tab-n8n" class="px-4 py-2 text-gray-600 hover:text-gray-900" data-target="#panel-n8n">n8n</button>
           <button id="tab-minecraft" class="px-4 py-2 text-gray-600 hover:text-gray-900 hidden"
             data-target="#panel-minecraft">Minecraft</button>
+          <% if (typeof isAdmin !== 'undefined' && isAdmin) { %>
+          <button id="tab-infra" class="px-4 py-2 text-gray-600 hover:text-gray-900"
+            data-target="#panel-infra"><i class="fas fa-server"></i> Infra Services</button>
+          <% } %>
         </div>
 
         <section id="panel-minecraft" class="hidden">
@@ -1526,9 +1530,167 @@
                 Yes! If you have a service that would benefit the CS lab or department (research tools, course-specific software, etc.), please contact the <a href="mailto:compsci@newpaltz.edu" class="text-blue-600 underline">department assistant</a> with your request.
               </div>
             </details>
+            <details class="group">
+              <summary class="flex justify-between items-center p-4 cursor-pointer hover:bg-gray-50">
+                <span class="font-medium">How do Kubernetes pods work?</span>
+                <i class="fas fa-chevron-down text-gray-400 group-open:rotate-180 transition-transform"></i>
+              </summary>
+              <div class="px-4 pb-4 text-sm text-gray-600">
+                <p class="mb-2">Pods are the smallest deployable unit in Kubernetes. Each pod contains one or more containers that share the same network namespace and storage volumes.</p>
+                <p class="mb-2">Hydra uses three Kubernetes namespaces:</p>
+                <ul class="list-disc list-inside space-y-1 ml-2 mb-2">
+                  <li><strong>hydra-system</strong> — Core platform services (auth, proxy, registry)</li>
+                  <li><strong>hydra-students</strong> — Student development containers</li>
+                  <li><strong>hydra-infra</strong> — Faculty and department infrastructure services</li>
+                </ul>
+                <p class="mb-2">Each pod gets its own IP address within the cluster and can have persistent storage via PersistentVolumeClaims (PVCs) backed by the RAID array. Pods are managed by Deployments, which handle scaling, rolling updates, and automatic restarts if a pod crashes.</p>
+              </div>
+            </details>
+            <details class="group">
+              <summary class="flex justify-between items-center p-4 cursor-pointer hover:bg-gray-50">
+                <span class="font-medium">How do I create a pod or deploy a service?</span>
+                <i class="fas fa-chevron-down text-gray-400 group-open:rotate-180 transition-transform"></i>
+              </summary>
+              <div class="px-4 pb-4 text-sm text-gray-600">
+                <p class="mb-2"><strong>Students:</strong> Click the "Initialize Container" button on the Containers tab. This creates a personal development pod with VS Code, Jupyter, and SSH pre-configured.</p>
+                <p class="mb-2"><strong>Faculty / Admins:</strong> Use the "Infra Services" tab to deploy from Docker Compose, a GitHub repo, or raw Kubernetes YAML. Docker Compose files are automatically converted to Kubernetes manifests. Named volumes in your Compose file become PersistentVolumeClaims backed by RAID storage.</p>
+              </div>
+            </details>
+            <details class="group">
+              <summary class="flex justify-between items-center p-4 cursor-pointer hover:bg-gray-50">
+                <span class="font-medium">Can I run containers inside my container?</span>
+                <i class="fas fa-chevron-down text-gray-400 group-open:rotate-180 transition-transform"></i>
+              </summary>
+              <div class="px-4 pb-4 text-sm text-gray-600">
+                <p class="mb-2">Yes! Student containers include the Docker CLI. You can build and run containers within your pod using Docker-in-Docker (DinD).</p>
+                <p class="mb-2">Use <code class="bg-gray-100 px-1 rounded">docker build</code> to create images and <code class="bg-gray-100 px-1 rounded">docker run</code> to launch containers. For persistent images, push to the Hydra registry at <code class="bg-gray-100 px-1 rounded">hydra.newpaltz.edu:5000</code>.</p>
+              </div>
+            </details>
           </div>
         </div>
       </section>
+
+      <% if (typeof isAdmin !== 'undefined' && isAdmin) { %>
+      <section id="panel-infra" class="hidden">
+        <!-- Header Row -->
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-xl font-semibold"><i class="fas fa-server text-blue-600"></i> Infrastructure Services</h3>
+          <button onclick="document.getElementById('infra-deploy-modal').classList.remove('hidden')"
+            class="inline-flex items-center px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700 text-sm font-medium">
+            <i class="fas fa-plus mr-2"></i> Deploy New Service
+          </button>
+        </div>
+
+        <!-- Service Grid -->
+        <div id="infra-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="text-center py-8 text-gray-500 col-span-full">
+            <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+            <p>Loading infrastructure services...</p>
+          </div>
+        </div>
+
+        <!-- Deploy Modal -->
+        <div id="infra-deploy-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+          <div class="relative top-4 sm:top-10 mx-auto p-3 sm:p-5 border w-[95%] sm:w-11/12 max-w-lg sm:max-w-2xl shadow-lg rounded-md bg-white">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-xl font-semibold text-gray-900"><i class="fas fa-rocket text-green-600"></i> Deploy New Service</h3>
+              <button onclick="document.getElementById('infra-deploy-modal').classList.add('hidden')" class="text-gray-500 hover:text-gray-700">
+                <i class="fas fa-times text-xl"></i>
+              </button>
+            </div>
+
+            <!-- Deploy Sub-Tabs -->
+            <div class="flex border-b mb-4">
+              <button id="deploy-tab-compose" onclick="switchDeployTab('compose')" class="px-4 py-2 -mb-px border-b-2 border-blue-600 text-blue-600 font-medium text-sm">
+                <i class="fas fa-file-code mr-1"></i> Docker Compose
+              </button>
+              <button id="deploy-tab-github" onclick="switchDeployTab('github')" class="px-4 py-2 text-gray-600 hover:text-gray-900 text-sm">
+                <i class="fab fa-github mr-1"></i> GitHub Repo
+              </button>
+              <button id="deploy-tab-manifest" onclick="switchDeployTab('manifest')" class="px-4 py-2 text-gray-600 hover:text-gray-900 text-sm">
+                <i class="fas fa-dharmachakra mr-1"></i> K8s YAML
+              </button>
+            </div>
+
+            <!-- Docker Compose Sub-Panel -->
+            <div id="deploy-panel-compose">
+              <div class="mb-3">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Service Name</label>
+                <input type="text" id="compose-service-name" placeholder="e.g. my-web-app"
+                  class="w-full px-3 py-2 border rounded text-sm" />
+              </div>
+              <div class="mb-3">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Docker Compose YAML</label>
+                <textarea id="compose-yaml" rows="10" placeholder="version: '3'&#10;services:&#10;  web:&#10;    image: nginx:latest&#10;    ports:&#10;      - '80:80'"
+                  class="w-full px-3 py-2 border rounded text-sm font-mono"></textarea>
+              </div>
+              <button onclick="deployFromCompose()" class="w-full px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 text-sm font-medium">
+                <i class="fas fa-upload mr-1"></i> Deploy from Compose
+              </button>
+            </div>
+
+            <!-- GitHub Repo Sub-Panel -->
+            <div id="deploy-panel-github" class="hidden">
+              <div class="mb-3">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Repository URL</label>
+                <input type="url" id="github-repo-url" placeholder="https://github.com/user/repo"
+                  class="w-full px-3 py-2 border rounded text-sm" />
+              </div>
+              <div class="mb-3">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Branch (optional)</label>
+                <input type="text" id="github-branch" placeholder="main"
+                  class="w-full px-3 py-2 border rounded text-sm" />
+              </div>
+              <button onclick="deployFromGithub()" class="w-full px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 text-sm font-medium">
+                <i class="fab fa-github mr-1"></i> Deploy from GitHub
+              </button>
+            </div>
+
+            <!-- K8s YAML Sub-Panel -->
+            <div id="deploy-panel-manifest" class="hidden">
+              <div class="mb-3">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Kubernetes Manifests (YAML)</label>
+                <textarea id="k8s-manifest" rows="12" placeholder="apiVersion: apps/v1&#10;kind: Deployment&#10;metadata:&#10;  name: my-app&#10;spec:&#10;  replicas: 1&#10;  ..."
+                  class="w-full px-3 py-2 border rounded text-sm font-mono"></textarea>
+              </div>
+              <button onclick="deployFromManifest()" class="w-full px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 text-sm font-medium">
+                <i class="fas fa-dharmachakra mr-1"></i> Deploy Manifest
+              </button>
+            </div>
+
+            <div id="deploy-message" class="mt-3"></div>
+          </div>
+        </div>
+
+        <!-- Logs Modal -->
+        <div id="infra-logs-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+          <div class="relative top-4 sm:top-10 mx-auto p-3 sm:p-5 border w-[95%] sm:w-11/12 max-w-lg sm:max-w-3xl shadow-lg rounded-md bg-white">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-xl font-semibold text-gray-900"><i class="fas fa-scroll text-purple-600"></i> Service Logs — <span id="infra-logs-title"></span></h3>
+              <button onclick="document.getElementById('infra-logs-modal').classList.add('hidden')" class="text-gray-500 hover:text-gray-700">
+                <i class="fas fa-times text-xl"></i>
+              </button>
+            </div>
+            <pre id="infra-logs-output" class="bg-gray-900 text-green-400 p-4 rounded text-xs font-mono overflow-auto max-h-96 whitespace-pre-wrap">Loading logs...</pre>
+          </div>
+        </div>
+
+        <!-- Service Detail Modal -->
+        <div id="infra-detail-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+          <div class="relative top-4 sm:top-10 mx-auto p-3 sm:p-5 border w-[95%] sm:w-11/12 max-w-lg sm:max-w-2xl shadow-lg rounded-md bg-white">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-xl font-semibold text-gray-900"><i class="fas fa-info-circle text-blue-600"></i> Service Details — <span id="infra-detail-title"></span></h3>
+              <button onclick="document.getElementById('infra-detail-modal').classList.add('hidden')" class="text-gray-500 hover:text-gray-700">
+                <i class="fas fa-times text-xl"></i>
+              </button>
+            </div>
+            <div id="infra-detail-content" class="space-y-4">
+              <p class="text-gray-500 text-center">Loading details...</p>
+            </div>
+          </div>
+        </div>
+      </section>
+      <% } %>
 
     </div>
   </main>
@@ -1570,6 +1732,9 @@
         { btn: 'tab-n8n', panel: 'panel-n8n' },
         { btn: 'tab-minecraft', panel: 'panel-minecraft' }
       ];
+      <% if (typeof isAdmin !== 'undefined' && isAdmin) { %>
+      tabs.push({ btn: 'tab-infra', panel: 'panel-infra' });
+      <% } %>
       tabs.forEach(t => {
         document.getElementById(t.btn).addEventListener('click', () => {
           tabs.forEach(x => {
@@ -3821,6 +3986,474 @@
     });
     <% } %>
   </script>
+
+  <% if (typeof isAdmin !== 'undefined' && isAdmin) { %>
+  <script>
+    // ==================== Infra Services ====================
+    const INFRA_API = '/dashboard/api/infra';
+    let infraRefreshInterval = null;
+    let infraServicesCache = [];
+
+    // Escape HTML helper for infra script scope
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    async function loadInfraServices() {
+      try {
+        const res = await fetch(INFRA_API);
+        const data = await res.json();
+        const grid = document.getElementById('infra-grid');
+        infraServicesCache = data.services || [];
+
+        if (infraServicesCache.length === 0) {
+          grid.innerHTML = `
+            <div class="text-center py-8 text-gray-500 col-span-full">
+              <i class="fas fa-box-open text-4xl mb-3"></i>
+              <p class="text-lg font-medium">No infrastructure services deployed</p>
+              <p class="text-sm mt-1">Click "Deploy New Service" to get started.</p>
+            </div>`;
+          return;
+        }
+
+        grid.innerHTML = infraServicesCache.map(svc => renderInfraCard(svc)).join('');
+      } catch (err) {
+        console.error('Error loading infra services:', err);
+        document.getElementById('infra-grid').innerHTML = `
+          <div class="text-center py-8 text-red-500 col-span-full">
+            <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
+            <p>Error loading infrastructure services.</p>
+            <button onclick="loadInfraServices()" class="mt-2 px-3 py-1 rounded bg-blue-600 text-white text-sm hover:bg-blue-700">Retry</button>
+          </div>`;
+      }
+    }
+
+    function getStatusColor(status) {
+      switch ((status || '').toLowerCase()) {
+        case 'running': return { bg: 'bg-green-100', text: 'text-green-800', dot: 'bg-green-500' };
+        case 'stopped': return { bg: 'bg-gray-100', text: 'text-gray-800', dot: 'bg-gray-500' };
+        case 'degraded': return { bg: 'bg-yellow-100', text: 'text-yellow-800', dot: 'bg-yellow-500' };
+        case 'pending': return { bg: 'bg-blue-100', text: 'text-blue-800', dot: 'bg-blue-500' };
+        default: return { bg: 'bg-gray-100', text: 'text-gray-800', dot: 'bg-gray-500' };
+      }
+    }
+
+    function renderInfraCard(svc) {
+      const status = getStatusColor(svc.status);
+      const image = svc.image || 'N/A';
+      const truncImage = image.length > 40 ? image.substring(0, 37) + '...' : image;
+      const readyPods = svc.pods ? svc.pods.filter(p => p.ready).length : 0;
+      const totalPods = svc.pods ? svc.pods.length : 0;
+      const cpu = svc.cpu || 'N/A';
+      const memory = svc.memory || 'N/A';
+      const safeName = escapeHtml(svc.name);
+
+      return `
+        <div class="border rounded-lg p-4 bg-gray-50 hover:shadow-md transition-shadow">
+          <div class="flex items-start justify-between mb-3">
+            <div class="flex-1 min-w-0">
+              <h4 class="font-semibold text-gray-900 truncate">${safeName}</h4>
+              <p class="text-xs text-gray-500 font-mono truncate" title="${escapeHtml(image)}">${escapeHtml(truncImage)}</p>
+            </div>
+            <span class="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${status.bg} ${status.text} shrink-0 ml-2">
+              <span class="w-2 h-2 rounded-full ${status.dot}"></span>
+              ${escapeHtml(svc.status || 'unknown')}
+            </span>
+          </div>
+
+          <div class="grid grid-cols-3 gap-2 mb-3 text-xs text-gray-600">
+            <div class="flex items-center gap-1">
+              <i class="fas fa-microchip text-blue-500"></i>
+              <span>${escapeHtml(String(cpu))}</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <i class="fas fa-memory text-purple-500"></i>
+              <span>${escapeHtml(String(memory))}</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <i class="fas fa-cubes text-green-500"></i>
+              <span>${readyPods}/${totalPods} pods</span>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap gap-1">
+            <button onclick="startInfraService('${safeName}')" class="px-2 py-1 rounded bg-green-600 text-white text-xs hover:bg-green-700" title="Start">
+              <i class="fas fa-play"></i>
+            </button>
+            <button onclick="stopInfraService('${safeName}')" class="px-2 py-1 rounded bg-gray-600 text-white text-xs hover:bg-gray-700" title="Stop">
+              <i class="fas fa-stop"></i>
+            </button>
+            <button onclick="restartInfraService('${safeName}')" class="px-2 py-1 rounded bg-yellow-600 text-white text-xs hover:bg-yellow-700" title="Restart">
+              <i class="fas fa-redo"></i>
+            </button>
+            <button onclick="viewInfraLogs('${safeName}')" class="px-2 py-1 rounded bg-purple-600 text-white text-xs hover:bg-purple-700" title="Logs">
+              <i class="fas fa-scroll"></i>
+            </button>
+            <button onclick="openInfraTerminal('${safeName}')" class="px-2 py-1 rounded bg-blue-600 text-white text-xs hover:bg-blue-700" title="Shell">
+              <i class="fas fa-terminal"></i>
+            </button>
+            <button onclick="viewInfraDetail('${safeName}')" class="px-2 py-1 rounded bg-indigo-600 text-white text-xs hover:bg-indigo-700" title="Details">
+              <i class="fas fa-info-circle"></i>
+            </button>
+            <button onclick="deleteInfraService('${safeName}')" class="px-2 py-1 rounded bg-red-600 text-white text-xs hover:bg-red-700" title="Delete">
+              <i class="fas fa-trash"></i>
+            </button>
+          </div>
+        </div>`;
+    }
+
+    async function startInfraService(name) {
+      try {
+        const res = await fetch(INFRA_API + '/' + encodeURIComponent(name) + '/start', { method: 'POST' });
+        const data = await res.json();
+        if (data.error) {
+          alert('Error starting service: ' + data.error);
+        }
+        loadInfraServices();
+      } catch (err) {
+        console.error('Error starting infra service:', err);
+        alert('Failed to start service.');
+      }
+    }
+
+    async function stopInfraService(name) {
+      try {
+        const res = await fetch(INFRA_API + '/' + encodeURIComponent(name) + '/stop', { method: 'POST' });
+        const data = await res.json();
+        if (data.error) {
+          alert('Error stopping service: ' + data.error);
+        }
+        loadInfraServices();
+      } catch (err) {
+        console.error('Error stopping infra service:', err);
+        alert('Failed to stop service.');
+      }
+    }
+
+    async function restartInfraService(name) {
+      try {
+        const res = await fetch(INFRA_API + '/' + encodeURIComponent(name) + '/restart', { method: 'POST' });
+        const data = await res.json();
+        if (data.error) {
+          alert('Error restarting service: ' + data.error);
+        }
+        loadInfraServices();
+      } catch (err) {
+        console.error('Error restarting infra service:', err);
+        alert('Failed to restart service.');
+      }
+    }
+
+    async function deleteInfraService(name) {
+      if (!confirm('Are you sure you want to delete "' + name + '"? This action cannot be undone.')) return;
+      try {
+        const res = await fetch(INFRA_API + '/' + encodeURIComponent(name), { method: 'DELETE' });
+        const data = await res.json();
+        if (data.error) {
+          alert('Error deleting service: ' + data.error);
+        }
+        loadInfraServices();
+      } catch (err) {
+        console.error('Error deleting infra service:', err);
+        alert('Failed to delete service.');
+      }
+    }
+
+    async function viewInfraLogs(name) {
+      document.getElementById('infra-logs-title').textContent = name;
+      document.getElementById('infra-logs-output').textContent = 'Loading logs...';
+      document.getElementById('infra-logs-modal').classList.remove('hidden');
+      try {
+        const res = await fetch(INFRA_API + '/' + encodeURIComponent(name) + '/logs');
+        const data = await res.json();
+        document.getElementById('infra-logs-output').textContent = data.logs || 'No logs available.';
+      } catch (err) {
+        console.error('Error fetching infra logs:', err);
+        document.getElementById('infra-logs-output').textContent = 'Error fetching logs.';
+      }
+    }
+
+    async function viewInfraDetail(name) {
+      document.getElementById('infra-detail-title').textContent = name;
+      document.getElementById('infra-detail-content').innerHTML = '<p class="text-gray-500 text-center">Loading details...</p>';
+      document.getElementById('infra-detail-modal').classList.remove('hidden');
+      try {
+        const res = await fetch(INFRA_API + '/' + encodeURIComponent(name));
+        const svc = await res.json();
+        const pods = svc.pods || [];
+        const ports = svc.ports || [];
+
+        let podsHtml = '';
+        if (pods.length > 0) {
+          podsHtml = `
+            <div>
+              <h4 class="font-semibold text-sm mb-2"><i class="fas fa-cubes text-green-600"></i> Pods</h4>
+              <div class="space-y-2">
+                ${pods.map(p => {
+                  const pStatus = getStatusColor(p.ready ? 'running' : (p.status || 'pending'));
+                  return `
+                    <div class="flex items-center justify-between p-2 bg-gray-50 rounded border text-sm">
+                      <span class="font-mono text-xs truncate flex-1">${escapeHtml(p.name)}</span>
+                      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs ${pStatus.bg} ${pStatus.text} ml-2">
+                        <span class="w-1.5 h-1.5 rounded-full ${pStatus.dot}"></span>
+                        ${p.ready ? 'Ready' : (escapeHtml(p.status) || 'Pending')}
+                      </span>
+                    </div>`;
+                }).join('')}
+              </div>
+            </div>`;
+        }
+
+        let portsHtml = '';
+        if (ports.length > 0) {
+          portsHtml = `
+            <div>
+              <h4 class="font-semibold text-sm mb-2"><i class="fas fa-network-wired text-blue-600"></i> Ports</h4>
+              <div class="flex flex-wrap gap-2">
+                ${ports.map(p => `
+                  <span class="inline-block px-2 py-1 bg-blue-50 border border-blue-200 rounded text-xs font-mono">
+                    ${escapeHtml(String(p.port || p))}${p.protocol ? '/' + escapeHtml(p.protocol) : ''}
+                  </span>`).join('')}
+              </div>
+            </div>`;
+        }
+
+        let resourcesHtml = `
+          <div>
+            <h4 class="font-semibold text-sm mb-2"><i class="fas fa-chart-bar text-purple-600"></i> Resources</h4>
+            <div class="grid grid-cols-2 gap-3 text-sm">
+              <div class="p-2 bg-gray-50 rounded border">
+                <span class="text-gray-500 text-xs">CPU</span>
+                <p class="font-medium">${escapeHtml(String(svc.cpu || 'N/A'))}</p>
+              </div>
+              <div class="p-2 bg-gray-50 rounded border">
+                <span class="text-gray-500 text-xs">Memory</span>
+                <p class="font-medium">${escapeHtml(String(svc.memory || 'N/A'))}</p>
+              </div>
+            </div>
+          </div>`;
+
+        document.getElementById('infra-detail-content').innerHTML =
+          `<div class="space-y-4">${resourcesHtml}${podsHtml}${portsHtml}</div>`;
+      } catch (err) {
+        console.error('Error fetching infra details:', err);
+        document.getElementById('infra-detail-content').innerHTML =
+          '<p class="text-red-500 text-center"><i class="fas fa-exclamation-circle mr-1"></i>Error loading service details.</p>';
+      }
+    }
+
+    function openInfraTerminal(name) {
+      // Find the first pod name from cached service data
+      const svc = infraServicesCache.find(s => s.name === name);
+      if (!svc || !svc.pods || svc.pods.length === 0) {
+        alert('No pods available for this service. Make sure the service is running.');
+        return;
+      }
+      const podName = svc.pods[0].name;
+
+      const w = window.open('', '_blank', 'width=1000,height=700');
+      const doc = w.document;
+
+      doc.open();
+      doc.write('<!DOCTYPE html><html><head><title>Shell: ' + escapeHtml(podName) + '</title></head><body></body></html>');
+      doc.close();
+
+      // Add stylesheet
+      const link = doc.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = 'https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css';
+      doc.head.appendChild(link);
+
+      // Add styles
+      const style = doc.createElement('style');
+      style.textContent = 'body { margin: 0; padding: 0; background: #000; } #terminal { height: 100vh; padding: 8px; }';
+      doc.head.appendChild(style);
+
+      // Add terminal div
+      const terminalDiv = doc.createElement('div');
+      terminalDiv.id = 'terminal';
+      doc.body.appendChild(terminalDiv);
+
+      // Load xterm.js and initialize
+      const script = doc.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js';
+      script.onload = function () {
+        const term = new w.Terminal({
+          convertEol: true,
+          fontFamily: 'monospace',
+          fontSize: 14,
+          cursorBlink: true,
+          theme: { background: '#000000', foreground: '#ffffff' }
+        });
+        term.open(doc.getElementById('terminal'));
+        term.writeln('Connecting to pod ' + podName + '...');
+
+        const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+        const ws = new WebSocket(proto + '://' + location.host + '/dashboard/ws/infra/' + encodeURIComponent(podName) + '/exec');
+        ws.binaryType = 'arraybuffer';
+        ws.onopen = function () { term.clear(); term.writeln('Connected! Type commands below:'); term.write('$ '); };
+        ws.onmessage = function (ev) { term.write(new Uint8Array(ev.data)); };
+        ws.onclose = function () { term.writeln('\r\n[Connection closed]'); };
+        ws.onerror = function () { term.writeln('\r\n[Connection error]'); };
+        term.onData(function (data) { if (ws.readyState === WebSocket.OPEN) ws.send(data); });
+      };
+      doc.head.appendChild(script);
+    }
+
+    async function deployFromCompose() {
+      const name = document.getElementById('compose-service-name').value.trim();
+      const compose = document.getElementById('compose-yaml').value.trim();
+      const msgDiv = document.getElementById('deploy-message');
+
+      if (!name || !compose) {
+        msgDiv.innerHTML = '<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2 text-sm">Please provide both a service name and Compose YAML.</p>';
+        return;
+      }
+
+      msgDiv.innerHTML = '<p class="text-blue-600 text-sm"><i class="fas fa-spinner fa-spin mr-1"></i>Deploying...</p>';
+      try {
+        const res = await fetch(INFRA_API + '/deploy/compose', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, compose })
+        });
+        const data = await res.json();
+        if (data.error) {
+          msgDiv.innerHTML = '<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2 text-sm">' + escapeHtml(data.error) + '</p>';
+        } else {
+          msgDiv.innerHTML = '<p class="text-green-700 bg-green-100 border border-green-200 rounded p-2 text-sm"><i class="fas fa-check mr-1"></i>Service deployed successfully!</p>';
+          document.getElementById('compose-service-name').value = '';
+          document.getElementById('compose-yaml').value = '';
+          loadInfraServices();
+        }
+      } catch (err) {
+        console.error('Error deploying from compose:', err);
+        msgDiv.innerHTML = '<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2 text-sm">Deployment failed. Please try again.</p>';
+      }
+    }
+
+    async function deployFromGithub() {
+      const repoUrl = document.getElementById('github-repo-url').value.trim();
+      const branch = document.getElementById('github-branch').value.trim() || undefined;
+      const msgDiv = document.getElementById('deploy-message');
+
+      if (!repoUrl) {
+        msgDiv.innerHTML = '<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2 text-sm">Please provide a repository URL.</p>';
+        return;
+      }
+
+      msgDiv.innerHTML = '<p class="text-blue-600 text-sm"><i class="fas fa-spinner fa-spin mr-1"></i>Deploying...</p>';
+      try {
+        const body = { repoUrl };
+        if (branch) body.branch = branch;
+        const res = await fetch(INFRA_API + '/deploy/github', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (data.error) {
+          msgDiv.innerHTML = '<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2 text-sm">' + escapeHtml(data.error) + '</p>';
+        } else {
+          msgDiv.innerHTML = '<p class="text-green-700 bg-green-100 border border-green-200 rounded p-2 text-sm"><i class="fas fa-check mr-1"></i>Service deployed successfully from GitHub!</p>';
+          document.getElementById('github-repo-url').value = '';
+          document.getElementById('github-branch').value = '';
+          loadInfraServices();
+        }
+      } catch (err) {
+        console.error('Error deploying from GitHub:', err);
+        msgDiv.innerHTML = '<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2 text-sm">Deployment failed. Please try again.</p>';
+      }
+    }
+
+    async function deployFromManifest() {
+      const manifests = document.getElementById('k8s-manifest').value.trim();
+      const msgDiv = document.getElementById('deploy-message');
+
+      if (!manifests) {
+        msgDiv.innerHTML = '<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2 text-sm">Please provide Kubernetes YAML manifests.</p>';
+        return;
+      }
+
+      msgDiv.innerHTML = '<p class="text-blue-600 text-sm"><i class="fas fa-spinner fa-spin mr-1"></i>Deploying...</p>';
+      try {
+        const res = await fetch(INFRA_API + '/deploy/manifest', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ manifests })
+        });
+        const data = await res.json();
+        if (data.error) {
+          msgDiv.innerHTML = '<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2 text-sm">' + escapeHtml(data.error) + '</p>';
+        } else {
+          msgDiv.innerHTML = '<p class="text-green-700 bg-green-100 border border-green-200 rounded p-2 text-sm"><i class="fas fa-check mr-1"></i>Manifests applied successfully!</p>';
+          document.getElementById('k8s-manifest').value = '';
+          loadInfraServices();
+        }
+      } catch (err) {
+        console.error('Error deploying manifest:', err);
+        msgDiv.innerHTML = '<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2 text-sm">Deployment failed. Please try again.</p>';
+      }
+    }
+
+    function switchDeployTab(tab) {
+      const tabs = ['compose', 'github', 'manifest'];
+      tabs.forEach(t => {
+        const panel = document.getElementById('deploy-panel-' + t);
+        const btn = document.getElementById('deploy-tab-' + t);
+        if (t === tab) {
+          panel.classList.remove('hidden');
+          btn.classList.add('border-b-2', 'border-blue-600', 'text-blue-600');
+          btn.classList.remove('text-gray-600');
+        } else {
+          panel.classList.add('hidden');
+          btn.classList.remove('border-b-2', 'border-blue-600', 'text-blue-600');
+          btn.classList.add('text-gray-600');
+        }
+      });
+      // Clear deploy message on tab switch
+      document.getElementById('deploy-message').innerHTML = '';
+    }
+
+    // Auto-refresh infra services when tab is active
+    function startInfraRefresh() {
+      if (infraRefreshInterval) clearInterval(infraRefreshInterval);
+      loadInfraServices();
+      infraRefreshInterval = setInterval(loadInfraServices, 10000);
+    }
+
+    function stopInfraRefresh() {
+      if (infraRefreshInterval) {
+        clearInterval(infraRefreshInterval);
+        infraRefreshInterval = null;
+      }
+    }
+
+    // Hook into tab switching to start/stop auto-refresh
+    document.addEventListener('DOMContentLoaded', function () {
+      const infraTab = document.getElementById('tab-infra');
+      if (infraTab) {
+        infraTab.addEventListener('click', function () {
+          startInfraRefresh();
+        });
+
+        // Stop refresh when other tabs are clicked
+        const otherTabs = ['tab-containers', 'tab-openwebui', 'tab-n8n', 'tab-minecraft'];
+        otherTabs.forEach(function (tabId) {
+          const tabBtn = document.getElementById(tabId);
+          if (tabBtn) {
+            tabBtn.addEventListener('click', function () {
+              stopInfraRefresh();
+            });
+          }
+        });
+      }
+    });
+  </script>
+  <% } %>
 
   <!-- Interactive Tutorial System -->
   <div id="tutorial-overlay" class="tutorial-overlay"></div>
