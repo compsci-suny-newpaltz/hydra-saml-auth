@@ -104,6 +104,12 @@
         kubectl apply -f /tmp/hydra-manifests/base/rbac/infra-rbac.yaml
       register: infra_rbac_result
 
+    - name: Deploy CS Lab website
+      shell: |
+        export KUBECONFIG={{ kubeconfig }}
+        kubectl apply -f /tmp/hydra-manifests/components/cs-lab/
+      register: cslab_result
+
     - name: Deploy hackathons
       shell: |
         export KUBECONFIG={{ kubeconfig }}
@@ -153,6 +159,15 @@
       register: ray_result
 
     # Wait for infra deployments
+    - name: Wait for CS Lab backend deployment
+      shell: |
+        export KUBECONFIG={{ kubeconfig }}
+        kubectl -n hydra-system wait --for=condition=Available deployment/cs-lab-backend --timeout=180s
+      register: cslab_ready
+      retries: 3
+      delay: 20
+      until: cslab_ready.rc == 0
+
     - name: Wait for hackathons deployment
       shell: |
         export KUBECONFIG={{ kubeconfig }}

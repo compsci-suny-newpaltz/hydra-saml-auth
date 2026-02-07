@@ -291,50 +291,35 @@
         - nfs_mount_result is defined
         - nfs_mount_result.failed | default(false)
 
-# ============ ZFS SETUP ON CONTROL PLANE ============
-- name: Verify ZFS on control plane (DO NOT CREATE - data preservation)
+# ============ STORAGE VERIFICATION ON CONTROL PLANE ============
+- name: Verify storage on control plane (DO NOT CREATE - data preservation)
   hosts: control_plane
   become: yes
 
   tasks:
-    - name: Check if ZFS is installed
-      command: which zfs
-      register: zfs_installed
+    - name: Check RAID-10 array status
+      shell: cat /proc/mdstat | grep -A1 md0
+      register: mdstat
       ignore_errors: yes
       changed_when: false
 
-    - name: Install ZFS utilities if missing
-      apt:
-        name:
-          - zfsutils-linux
-        state: present
-      when:
-        - ansible_os_family == "Debian"
-        - zfs_installed.rc != 0
-        - storage_backend | default('') == "zfs"
-
-    - name: Check if ZFS pool exists
-      command: zpool status {{ storage_pool | default('hydra-pool') }}
-      register: zpool_status
-      ignore_errors: yes
-      changed_when: false
-      when: storage_backend | default('') == "zfs"
-
-    - name: Display ZFS status
+    - name: Display RAID status
       debug:
         msg: |
-          ZFS Pool: {{ storage_pool | default('hydra-pool') }}
-          Status: {{ 'EXISTS' if zpool_status.rc == 0 else 'NOT FOUND' }}
+          Storage backend: {{ storage_backend | default('mdadm') }}
+          RAID device: {{ storage_device | default('/dev/md0') }}
+          RAID status:
+          {{ mdstat.stdout | default('RAID not found') }}
 
-          {% if zpool_status.rc != 0 %}
-          ⚠️  ZFS pool not found. This playbook will NOT create it automatically
-          to prevent data loss. Please create manually:
+    - name: Verify /data mount point exists
+      command: mountpoint -q /data
+      register: data_mounted
+      ignore_errors: yes
+      changed_when: false
 
-            zpool create {{ storage_pool | default('hydra-pool') }} raidz2 /dev/sdX /dev/sdY ...
-
-          Or if pool exists with different name, update inventory.yml
-          {% endif %}
-      when: storage_backend | default('') == "zfs"
+    - name: Display /data mount status
+      debug:
+        msg: "/data mount: {{ 'mounted' if data_mounted.rc == 0 else 'NOT MOUNTED - CRITICAL!' }}"
 
     - name: Verify student volumes directory exists
       file:
@@ -358,7 +343,7 @@
           Existing student directories: {{ student_volumes.matched | default(0) }}
 
           {% if student_volumes.matched | default(0) > 0 %}
-          ✅ Found existing student data - will be preserved
+          Found existing student data - will be preserved
           {% endif %}
       when: storage_path is defined
 
