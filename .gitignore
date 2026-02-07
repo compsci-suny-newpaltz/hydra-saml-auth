@@ -13,6 +13,7 @@ data/
 
 # Claude Code local settings
 .claude/
+CLAUDE.md
 student-container/cuh63.zip
 
 # SSHPiper user configs (contains keys)

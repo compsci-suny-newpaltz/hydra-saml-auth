@@ -1,0 +1,1268 @@
+% Hydra Infrastructure Complete Reference — SUNY New Paltz CS Lab
+% Consolidated from all docs/ files, K8s manifests, and audit reports
+% Last updated: February 7, 2026
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{fancyhdr}
+\usepackage{enumitem}
+\usepackage{float}
+\usepackage{mdframed}
+\usepackage{longtable}
+\usepackage{tikz}
+\usepackage{graphicx}
+\usepackage{titlesec}
+\usetikzlibrary{shapes,arrows,positioning,fit,backgrounds,calc}
+
+\geometry{margin=1in}
+
+% Colors
+\definecolor{hydra-blue}{RGB}{5,32,73}
+\definecolor{code-bg}{RGB}{248,248,248}
+\definecolor{warning-bg}{RGB}{255,243,205}
+\definecolor{success-bg}{RGB}{212,237,218}
+\definecolor{info-bg}{RGB}{217,237,247}
+\definecolor{danger-bg}{RGB}{248,215,218}
+
+\hypersetup{colorlinks=true,linkcolor=hydra-blue,urlcolor=blue}
+
+\lstdefinestyle{bash}{
+  backgroundcolor=\color{code-bg},
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  numbers=none,
+  xleftmargin=2pt,
+  xrightmargin=2pt,
+  aboveskip=6pt,
+  belowskip=6pt
+}
+\lstdefinestyle{yaml}{
+  backgroundcolor=\color{code-bg},
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  numbers=left,
+  xleftmargin=2pt,
+  xrightmargin=2pt
+}
+\lstdefinestyle{js}{
+  backgroundcolor=\color{code-bg},
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  numbers=left,
+  language=Java
+}
+
+\newmdenv[backgroundcolor=warning-bg,linewidth=0pt,innerleftmargin=10pt,innerrightmargin=10pt,innertopmargin=10pt,innerbottommargin=10pt]{warningbox}
+\newmdenv[backgroundcolor=success-bg,linewidth=0pt,innerleftmargin=10pt,innerrightmargin=10pt,innertopmargin=10pt,innerbottommargin=10pt]{successbox}
+\newmdenv[backgroundcolor=info-bg,linewidth=0pt,innerleftmargin=10pt,innerrightmargin=10pt,innertopmargin=10pt,innerbottommargin=10pt]{infobox}
+\newmdenv[backgroundcolor=danger-bg,linewidth=0pt,innerleftmargin=10pt,innerrightmargin=10pt,innertopmargin=10pt,innerbottommargin=10pt]{dangerbox}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\textbf{Hydra Infrastructure}}
+\fancyhead[R]{\textbf{Complete Reference}}
+\fancyfoot[C]{\thepage}
+\setlength{\headheight}{14pt}
+
+\title{
+  \textbf{Hydra Infrastructure}\\[0.3em]
+  \textbf{Complete Reference Manual}\\[0.8em]
+  \large RKE2 Kubernetes Cluster\\
+  Student Container Platform\\
+  GPU Computing Infrastructure\\[0.5em]
+  \normalsize SUNY New Paltz --- Computer Science Department
+}
+\author{Infrastructure Team}
+\date{February 7, 2026}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+%% ============================================================
+%% PART I: SYSTEM OVERVIEW
+%% ============================================================
+\part{System Overview}
+
+\section{Introduction}
+
+Hydra is a containerized development platform providing persistent development environments for Computer Science students and faculty at SUNY New Paltz. The system runs on a 3-node RKE2 Kubernetes cluster with GPU acceleration for AI/ML workloads.
+
+\subsection{Key Features}
+\begin{itemize}
+    \item \textbf{SSO Authentication:} Azure AD SAML 2.0 with automatic user provisioning
+    \item \textbf{Persistent Containers:} Per-student development environments with SSH, VS Code, and Jupyter
+    \item \textbf{GPU Computing:} 5 GPUs across 2 nodes (3x RTX 3090 + 2x RTX 5090)
+    \item \textbf{AI Chat:} OpenWebUI + Ollama LLM inference (gpt.hydra.newpaltz.edu)
+    \item \textbf{Ray Cluster:} Distributed computing framework for ML training
+    \item \textbf{Dynamic Routing:} Traefik reverse proxy with ForwardAuth
+    \item \textbf{Workflow Automation:} n8n with integrated user management
+    \item \textbf{21 TB Storage:} RAID-10 ZFS array with NFS exports
+\end{itemize}
+
+\subsection{Access URLs}
+\begin{table}[H]
+\centering
+\begin{tabular}{lll}
+\toprule
+\textbf{Service} & \textbf{URL} & \textbf{Description} \\
+\midrule
+Dashboard & \texttt{https://hydra.newpaltz.edu/dashboard} & Main user interface \\
+OpenWebUI & \texttt{https://gpt.hydra.newpaltz.edu/} & AI chat (Ollama) \\
+CS Lab Site & \texttt{https://hydra.newpaltz.edu/} & Department homepage \\
+Student Forms & \texttt{https://hydra.newpaltz.edu/student-forms} & Form hub \\
+Hackathons & \texttt{https://hydra.newpaltz.edu/hackathons} & Hackathon voting \\
+VS Code & \texttt{https://hydra.newpaltz.edu/students/\{user\}/vscode} & Browser IDE \\
+Jupyter & \texttt{https://hydra.newpaltz.edu/students/\{user\}/jupyter} & Notebooks \\
+n8n & \texttt{https://n8n.hydra.newpaltz.edu/} & Workflow automation \\
+Servers & \texttt{https://hydra.newpaltz.edu/servers} & Cluster status \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%% ============================================================
+\section{Cluster Architecture}
+
+\subsection{Node Inventory}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{llllp{4.5cm}}
+\toprule
+\textbf{Node} & \textbf{IP} & \textbf{Role} & \textbf{OS} & \textbf{Hardware} \\
+\midrule
+Hydra & 192.168.1.160 & Control plane, etcd & Ubuntu 22.04.5 & 64 cores, 256 GB RAM, 21 TB RAID-10 \\
+Chimera & 192.168.1.150 & GPU inference & Ubuntu 24.04.2 & 48 cores, 256 GB RAM, 3x RTX 3090 (72 GB VRAM) \\
+Cerberus & 192.168.1.233 & GPU training & Ubuntu 24.04.3 & 48 cores, 64 GB RAM, 2x RTX 5090 (64 GB VRAM) \\
+\bottomrule
+\end{tabular}
+\caption{All nodes run RKE2 v1.28.4+rke2r1 with containerd 1.7.7.}
+\end{table}
+
+\subsection{Architecture Diagram}
+
+\begin{center}
+\begin{tikzpicture}[
+    node distance=1.2cm,
+    box/.style={rectangle, draw, fill=blue!10, minimum width=2.5cm, minimum height=1cm, align=center},
+    server/.style={rectangle, draw, thick, fill=blue!20, minimum width=3.5cm, minimum height=3cm, align=center},
+    gpu/.style={rectangle, draw, thick, fill=green!15, minimum width=3.5cm, minimum height=3cm, align=center},
+    service/.style={rectangle, draw, fill=green!10, minimum width=2.8cm, minimum height=0.5cm, align=center, font=\scriptsize},
+    container/.style={rectangle, draw, fill=orange!10, minimum width=2.8cm, minimum height=0.5cm, align=center, font=\scriptsize},
+    arrow/.style={->, thick},
+    dashed_arrow/.style={->, dashed}
+]
+
+\node[box] (user) {User\\Browser};
+\node[box, right=3cm of user] (azure) {Azure AD\\SAML IdP};
+\node[box, below=1.5cm of user] (traefik) {Traefik\\:80, :443};
+
+\node[server, below=2.5cm of traefik, xshift=-5cm] (hydra) {};
+\node[font=\small\bfseries, anchor=north] at (hydra.north) {Hydra};
+\node[font=\scriptsize, anchor=north] at ([yshift=-0.35cm]hydra.north) {192.168.1.160};
+\node[service] at ([yshift=-0.2cm]hydra.center) (hydra-app) {hydra-saml-auth};
+\node[container, below=0.15cm of hydra-app] (student1) {student-* pods};
+\node[service, below=0.15cm of student1] (zfs) {ZFS 21TB};
+
+\node[gpu, right=0.8cm of hydra] (chimera) {};
+\node[font=\small\bfseries, anchor=north] at (chimera.north) {Chimera};
+\node[font=\scriptsize, anchor=north] at ([yshift=-0.35cm]chimera.north) {3x RTX 3090};
+\node[service] at ([yshift=-0.2cm]chimera.center) (openwebui) {OpenWebUI + Ollama};
+\node[service, below=0.15cm of openwebui] (rayhead) {Ray Head};
+
+\node[gpu, right=0.8cm of chimera] (cerberus) {};
+\node[font=\small\bfseries, anchor=north] at (cerberus.north) {Cerberus};
+\node[font=\scriptsize, anchor=north] at ([yshift=-0.35cm]cerberus.north) {2x RTX 5090};
+\node[service] at ([yshift=-0.2cm]cerberus.center) (rayworker) {Ray Worker};
+\node[container, below=0.15cm of rayworker] (gpu-student) {GPU containers};
+
+\draw[arrow] (user) -- node[above] {HTTPS} (traefik);
+\draw[arrow, bend left=20] (user) -- node[above] {SAML} (azure);
+\draw[arrow, bend left=20] (azure) -- (traefik);
+\draw[arrow] (traefik) -- (hydra);
+\draw[arrow] (traefik) -- (chimera);
+\draw[arrow] (traefik) -- (cerberus);
+\draw[dashed_arrow] (hydra) -- node[below, font=\scriptsize] {NFS} (chimera);
+\draw[dashed_arrow] (chimera) -- node[below, font=\scriptsize] {NFS} (cerberus);
+
+\end{tikzpicture}
+\end{center}
+
+\subsection{Network Architecture}
+
+\begin{itemize}
+    \item All nodes on 192.168.1.0/24 LAN (gateway 192.168.1.1)
+    \item Direct ethernet bridge between Chimera and Cerberus (reserved for RDMA/RoCE)
+    \item WireGuard VPN: Chimera \texttt{wg0} = 10.8.0.2, Cerberus \texttt{wg0} = 10.8.0.3
+    \item Flannel VXLAN (port 8472/udp) for K8s pod networking, restricted to LAN
+    \item UFW firewall on all nodes --- workers expose only SSH publicly
+\end{itemize}
+
+%% ============================================================
+\section{Storage}
+
+\subsection{Hydra Storage Layout}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{llll}
+\toprule
+\textbf{Device} & \textbf{Mount} & \textbf{Size} & \textbf{Purpose} \\
+\midrule
+\texttt{/dev/mapper/ubuntu--vg-*} & \texttt{/} & 1 TB & OS, applications \\
+\texttt{/dev/md0} (RAID-10, 6 SSDs) & \texttt{/data} & 21 TB & Student volumes, K8s PVCs \\
+\texttt{/dev/sdh4} & \texttt{/mnt/sdh4} & 1.1 TB & Daily backups \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{lstlisting}[style=bash]
+# RAID-10 details
+/dev/md0: 6 active devices (sda-sdf), Chunk 512K, Layout near=2
+State: clean, ext4, 4096-byte blocks
+\end{lstlisting}
+
+\subsection{Kubernetes Storage Classes}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lll}
+\toprule
+\textbf{Name} & \textbf{Provisioner} & \textbf{Usage} \\
+\midrule
+hydra-local & rancher.io/local-path & Student PVCs (default) \\
+hydra-nfs & nfs.csi.k8s.io & Cross-node shared storage \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{NFS Configuration}
+
+Hydra exports \texttt{/data/containers} to the cluster LAN:
+
+\begin{lstlisting}[style=bash]
+# /etc/exports on Hydra
+/data/containers 192.168.1.0/24(rw,sync,no_root_squash)
+\end{lstlisting}
+
+CSI-NFS runs as a DaemonSet on all 3 nodes for dynamic PV provisioning.
+
+%% ============================================================
+%% PART II: KUBERNETES SERVICES
+%% ============================================================
+\newpage
+\part{Kubernetes Services}
+
+\section{Namespace Layout}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lp{8cm}}
+\toprule
+\textbf{Namespace} & \textbf{Contents} \\
+\midrule
+\texttt{hydra-system} & Core platform: traefik, hydra-auth, cs-lab-backend, cs-lab-db \\
+\texttt{hydra-infra} & Infrastructure services: ollama, open-webui, n8n, hackathons, java-executor, git-learning, sshpiper, ray-head, ray-worker \\
+\texttt{hydra-students} & Student container pods (25+ active) \\
+\texttt{gpu-operator} & NVIDIA GPU operator, device plugin, DCGM exporter \\
+\texttt{kube-system} & RKE2 system: etcd, coredns, canal, metrics-server, CSI-NFS \\
+\texttt{local-path-storage} & Local-path provisioner \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Core Services (hydra-system)}
+
+\subsection{Traefik (Reverse Proxy)}
+
+\begin{infobox}
+\textbf{Traefik v2.11} serves as the cluster ingress controller. It runs on Hydra with \texttt{hostPort} binding on ports 80, 443, and 6969. The deployment uses \texttt{strategy: Recreate} to avoid hostPort conflicts during rolling updates.
+\end{infobox}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lll}
+\toprule
+\textbf{Port} & \textbf{Name} & \textbf{Purpose} \\
+\midrule
+80 & web & HTTP (redirects to HTTPS) \\
+443 & websecure & HTTPS with Let's Encrypt \\
+6969 & hydra-auth & Direct auth service access \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Manifests:} \texttt{k8s/components/traefik/}
+
+\subsection{Hydra Auth (SAML Gateway)}
+
+The main authentication and container management service. Handles:
+\begin{itemize}[nosep]
+    \item SAML 2.0 SSO via Azure AD
+    \item JWT cookie issuance and JWKS endpoint
+    \item Student container lifecycle (create, start, stop, delete)
+    \item Dashboard UI, admin panel
+    \item OpenWebUI and n8n account provisioning
+    \item WebSocket terminal bridge
+\end{itemize}
+
+\textbf{Manifests:} \texttt{k8s/components/hydra-auth/}
+
+\subsection{CS Lab Website}
+
+React frontend + Express backend + MariaDB database. Serves the department homepage at \texttt{hydra.newpaltz.edu}.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lll}
+\toprule
+\textbf{Component} & \textbf{Port} & \textbf{Image} \\
+\midrule
+cs-lab-backend & 5001 & newpaltz-cs-lab-website-backend:latest \\
+cs-lab-db & 3306 & mariadb:10.11 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Database:} 15 tables including Admins, Events, Faculty, Courses, StudentHighlightBlog, TechBlog, etc.
+
+\textbf{Manifests:} \texttt{k8s/components/cs-lab/}
+
+\subsection{IngressRoute Summary}
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{llll}
+\toprule
+\textbf{Name} & \textbf{Namespace} & \textbf{Match} & \textbf{Backend} \\
+\midrule
+hydra-main & hydra-system & hydra.newpaltz.edu catch-all & hydra-auth:6969 \\
+cs-lab-website & hydra-system & /api/ prefix & cs-lab-backend:5001 \\
+hydra-default & hydra-system & HTTP redirect & HTTPS redirect \\
+hackathons & hydra-infra & /hackathons/ prefix & hackathons:45821 \\
+java-executor & hydra-infra & /java/ prefix & java-executor:55392 \\
+git-learning & hydra-infra & /git/ prefix & git-learning:8080 \\
+n8n & hydra-infra & n8n.hydra.newpaltz.edu & n8n:5678 \\
+openwebui & hydra-infra & gpt.hydra.newpaltz.edu & openwebui-chimera:3000 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%% ============================================================
+\section{Infrastructure Services (hydra-infra)}
+
+\subsection{Ollama (LLM Inference)}
+
+Runs on Chimera with all 3 RTX 3090 GPUs. Serves LLM models (gemma3:12b, etc.) via the Ollama API on port 11434.
+
+\textbf{Manifests:} \texttt{k8s/components/ollama/}
+
+\begin{warningbox}
+Ollama requests all 3 GPUs on Chimera. Other GPU workloads on Chimera (like Ray head) must \textbf{not} request GPU resources, or they will conflict.
+\end{warningbox}
+
+\subsection{OpenWebUI}
+
+AI chat frontend at \texttt{gpt.hydra.newpaltz.edu}. Connects to Ollama for inference. Includes a \textbf{middleman sidecar} container for user account management.
+
+\textbf{Middleman API (port 7070):}
+\begin{itemize}[nosep]
+    \item \texttt{POST /openwebui/api/check-user} --- Check if user exists
+    \item \texttt{POST /openwebui/api/create-account} --- Create new user
+    \item \texttt{POST /openwebui/api/change-password} --- Update password
+\end{itemize}
+
+Authentication via \texttt{x-api-key} header with timing-safe comparison.
+
+\textbf{Source:} \texttt{k8s/components/openwebui/middleman/index.js}\\
+\textbf{Manifests:} \texttt{k8s/components/openwebui/}
+
+\subsection{n8n (Workflow Automation)}
+
+Workflow automation platform at \texttt{n8n.hydra.newpaltz.edu}. Uses PostgreSQL for data storage.
+
+\textbf{Components:}
+\begin{itemize}[nosep]
+    \item n8n application (port 5678)
+    \item PostgreSQL 16 (StatefulSet with PVC)
+    \item n8n User Manager API (port 3000)
+\end{itemize}
+
+\textbf{n8n User Manager API:}
+\begin{itemize}[nosep]
+    \item \texttt{GET /health} --- Health check (no auth)
+    \item \texttt{GET /api/users} --- List all users (auth required)
+    \item \texttt{GET /api/users/:email} --- Get user by email
+    \item \texttt{POST /api/users/change-password} --- Change password
+\end{itemize}
+
+Authentication via \texttt{x-api-key} header.
+
+\textbf{Source:} \texttt{k8s/components/n8n/user-manager/}\\
+\textbf{Manifests:} \texttt{k8s/components/n8n/}
+
+\subsection{Ray Cluster (Distributed Computing)}
+
+Ray provides distributed computing for ML training and inference.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{llll}
+\toprule
+\textbf{Component} & \textbf{Node} & \textbf{GPU} & \textbf{Purpose} \\
+\midrule
+ray-head & Chimera & None (coordinator) & Scheduling, dashboard \\
+ray-worker & Cerberus & 2x RTX 5090 & Training compute \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Manifests:} \texttt{k8s/components/ray/}
+
+\subsection{Other Services}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{llp{6cm}}
+\toprule
+\textbf{Service} & \textbf{Port} & \textbf{Description} \\
+\midrule
+hackathons & 45821 & Hackathon voting/judging app (Vue.js + Express) \\
+java-executor & 55392 & Remote Java code execution service \\
+git-learning & 8080 & Interactive Git learning environment \\
+sshpiper & 2222 & SSH proxy routing to student containers \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Manifests:} \texttt{k8s/components/\{hackathons,java-executor,git-learning,sshpiper\}/}
+
+%% ============================================================
+\section{GPU Infrastructure}
+
+\subsection{NVIDIA GPU Operator}
+
+The GPU Operator runs in the \texttt{gpu-operator} namespace and manages:
+\begin{itemize}[nosep]
+    \item Device plugin (exposes GPUs to K8s scheduler)
+    \item Container toolkit (nvidia-container-runtime)
+    \item GPU Feature Discovery (node labels)
+    \item DCGM Exporter (GPU metrics)
+    \item CUDA validator (verifies GPU access)
+\end{itemize}
+
+\begin{infobox}
+\textbf{Hydra Exclusion:} Hydra (control plane) has no GPUs. All \texttt{nvidia.com/gpu.deploy.*} labels are set to \texttt{false} on Hydra to prevent GPU operator pods from scheduling there.
+\end{infobox}
+
+\subsection{GPU Allocation}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lllll}
+\toprule
+\textbf{Node} & \textbf{GPUs} & \textbf{Model} & \textbf{VRAM} & \textbf{Primary Consumer} \\
+\midrule
+Chimera & 3 & RTX 3090 & 72 GB total & Ollama (all 3) \\
+Cerberus & 2 & RTX 5090 & 64 GB total & Ray Worker / Student GPU containers \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%% ============================================================
+%% PART III: AUTHENTICATION
+%% ============================================================
+\newpage
+\part{Authentication System}
+
+\section{SAML 2.0 SSO Flow}
+
+\begin{center}
+\begin{tikzpicture}[
+    node distance=0.8cm,
+    stepbox/.style={rectangle, draw, fill=blue!5, minimum width=10cm, minimum height=0.7cm, align=left, font=\small}
+]
+\node[stepbox] (s1) {1. User visits https://hydra.newpaltz.edu/login};
+\node[stepbox, below=of s1] (s2) {2. Hydra redirects to Azure AD with SAML AuthnRequest};
+\node[stepbox, below=of s2] (s3) {3. User authenticates with SUNY New Paltz credentials};
+\node[stepbox, below=of s3] (s4) {4. Azure AD returns signed SAML assertion};
+\node[stepbox, below=of s4] (s5) {5. Hydra validates signature, extracts: email, groups, displayName};
+\node[stepbox, below=of s5] (s6) {6. Session created, JWT cookie (np\_access) issued};
+\node[stepbox, below=of s6] (s7) {7. User redirected to /dashboard};
+\end{tikzpicture}
+\end{center}
+
+\section{Session and JWT Management}
+
+\begin{itemize}
+    \item \textbf{Express Session:} Server-side storage in SQLite
+    \item \textbf{JWT Cookie (\texttt{np\_access}):} Site-wide SSO cookie
+    \item \textbf{JWKS Endpoint:} \texttt{/.well-known/jwks.json} for public key distribution
+    \item \textbf{Algorithm:} RS256
+    \item \textbf{TTL:} Configurable via \texttt{JWT\_TTL\_SECONDS} (default: 86400)
+    \item \textbf{Cookie Domain:} \texttt{.newpaltz.edu}
+\end{itemize}
+
+\section{Cross-Service Authentication}
+
+\subsection{OpenWebUI Account Provisioning}
+When a user logs in via SAML, Hydra automatically provisions an OpenWebUI account via the middleman API. The password is derived and set transparently.
+
+\subsection{n8n Account Provisioning}
+Similarly, n8n accounts are provisioned via the n8n User Manager API on first login.
+
+\subsection{CS Lab JWT Verification}
+The CS Lab backend verifies JWT tokens using the public key mounted via ConfigMap \texttt{cs-lab-jwt-key} at \texttt{/app/server/keys/jwt-public.pem}.
+
+%% ============================================================
+%% PART IV: STUDENT CONTAINERS
+%% ============================================================
+\newpage
+\part{Student Containers}
+
+\section{Container Features}
+
+Each student receives a persistent container with:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lp{8cm}}
+\toprule
+\textbf{Feature} & \textbf{Details} \\
+\midrule
+Node.js & Latest LTS via nvm \\
+Python & 3.11+ with pip, venv, Jupyter \\
+Java & OpenJDK 21 \\
+Docker & Docker-in-Docker support \\
+VS Code & code-server browser IDE \\
+Jupyter & Notebook and JupyterLab \\
+SSH & Direct access via SSHPiper (port 2222) \\
+Tools & Git, curl, wget, build-essential \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Container Presets}
+
+\begin{itemize}[nosep]
+    \item \textbf{Jupyter:} \texttt{jupyter/minimal-notebook}, port 8888, ForwardAuth
+    \item \textbf{Static:} \texttt{nginx:alpine}, port 80, no auth
+    \item \textbf{Repo:} Cloned from GitHub, runtime varies (Node/Python/nginx)
+    \item \textbf{VS Code:} \texttt{codercom/code-server}, mounts any project volume
+\end{itemize}
+
+\section{Resource Presets}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{llllll}
+\toprule
+\textbf{Preset} & \textbf{RAM} & \textbf{CPU} & \textbf{Storage} & \textbf{GPU} & \textbf{Approval} \\
+\midrule
+Minimal & 256 MB & 0.5 & 5 GB & 0 & Auto \\
+Conservative & 512 MB & 1 & 10 GB & 0 & Auto \\
+Standard & 1 GB & 1 & 20 GB & 0 & Auto \\
+Enhanced & 2 GB & 2 & 40 GB & 0 & Required \\
+GPU Inference & 32 GB & 8 & 100 GB & 1 & Required \\
+GPU Training & 48 GB & 16 & 200 GB & 2 & Required \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{SSH Access via SSHPiper}
+
+Students access containers via SSH through the SSHPiper proxy:
+
+\begin{lstlisting}[style=bash]
+# Connect to your container
+ssh -p 2222 student@hydra.newpaltz.edu
+
+# Port 2222 is forwarded through the router to the sshpiper K8s pod
+\end{lstlisting}
+
+\begin{itemize}[nosep]
+    \item SSHPiper routes connections based on username to the correct student pod
+    \item Passwords displayed in dashboard after container creation
+    \item Key-based auth supported (\texttt{\~{}/.ssh/authorized\_keys})
+\end{itemize}
+
+\section{Container Labels and Routing}
+
+Common labels on student containers:
+\begin{itemize}[nosep]
+    \item \texttt{hydra.managed\_by=hydra-saml-auth}
+    \item \texttt{hydra.owner=<username>}
+    \item \texttt{hydra.project=<project>}
+    \item \texttt{hydra.basePath=/students/<user>/<project>}
+\end{itemize}
+
+Traefik routes requests at \texttt{/students/<user>/<project>} to the corresponding container using StripPrefix middleware (except Jupyter, which uses \texttt{base\_url}).
+
+%% ============================================================
+%% PART V: NETWORKING
+%% ============================================================
+\newpage
+\part{Networking}
+
+\section{Firewall Configuration (UFW)}
+
+\subsection{Hydra (Control Plane)}
+\begin{lstlisting}[style=bash]
+22/tcp          ALLOW  Anywhere        # SSH
+80/tcp          ALLOW  Anywhere        # HTTP
+443             ALLOW  Anywhere        # HTTPS
+6969            ALLOW  172.17.0.0/16, 172.24.0.0/16  # Auth (Docker)
+51820/udp       ALLOW  Anywhere        # WireGuard
+6443/tcp        ALLOW  192.168.1.0/24  # K8s API
+9345/tcp        ALLOW  192.168.1.0/24  # RKE2 supervisor
+10250/tcp       ALLOW  192.168.1.0/24  # Kubelet
+2379:2380/tcp   ALLOW  192.168.1.0/24  # etcd
+2222/tcp        ALLOW  Anywhere        # SSHPiper
+2049/tcp        ALLOW  192.168.1.0/24  # NFS
+111/tcp,udp     ALLOW  192.168.1.0/24  # portmapper
+8472/udp        ALLOW  192.168.1.0/24  # Flannel VXLAN
+\end{lstlisting}
+
+\subsection{Chimera (GPU Worker)}
+\begin{lstlisting}[style=bash]
+22/tcp          ALLOW  Anywhere        # SSH
+7070/tcp        ALLOW  192.168.1.148   # OpenWebUI middleman
+9100            ALLOW  192.168.1.0/24  # Metrics
+8472/udp        ALLOW  192.168.1.0/24  # Flannel VXLAN
+10250/tcp       ALLOW  192.168.1.0/24  # Kubelet
+\end{lstlisting}
+
+\subsection{Cerberus (GPU Worker)}
+\begin{lstlisting}[style=bash]
+22/tcp          ALLOW  Anywhere        # SSH
+9100            ALLOW  192.168.1.160   # Metrics from Hydra
+2376            ALLOW  192.168.1.160   # Docker from Hydra
+8472/udp        ALLOW  192.168.1.0/24  # Flannel VXLAN
+10250/tcp       ALLOW  192.168.1.0/24  # Kubelet
+\end{lstlisting}
+
+\section{Router Port Forwarding}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{llll}
+\toprule
+\textbf{External Port} & \textbf{Internal IP} & \textbf{Internal Port} & \textbf{Service} \\
+\midrule
+22 & 192.168.1.160 & 22 & Admin SSH \\
+80 & 192.168.1.160 & 80 & HTTP \\
+443 & 192.168.1.160 & 443 & HTTPS \\
+2222 & 192.168.1.160 & 2222 & Student SSH (SSHPiper) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{DNS}
+
+\begin{itemize}[nosep]
+    \item \texttt{hydra.newpaltz.edu} --- Main domain, points to campus public IP
+    \item \texttt{gpt.hydra.newpaltz.edu} --- OpenWebUI subdomain
+    \item \texttt{n8n.hydra.newpaltz.edu} --- n8n subdomain
+\end{itemize}
+
+TLS certificates managed by Let's Encrypt via Traefik ACME.
+
+%% ============================================================
+%% PART VI: DEPLOYMENT AND OPERATIONS
+%% ============================================================
+\newpage
+\part{Deployment and Operations}
+
+\section{Ansible Playbooks}
+
+The cluster can be deployed from scratch using Ansible playbooks in \texttt{ansible/}:
+
+\begin{lstlisting}[style=bash]
+cd /home/infra/hydra-saml-auth/ansible
+ansible-playbook -i inventory.yml playbooks/site.yml
+\end{lstlisting}
+
+\subsection{Playbook Execution Order}
+
+\begin{enumerate}
+    \item \texttt{00-preflight-backup.yml} --- Create backups before changes
+    \item \texttt{01-prepare-nodes.yml} --- Install packages, configure kernel
+    \item \texttt{02-rke2-server.yml} --- Setup RKE2 control plane on Hydra
+    \item \texttt{03-rke2-agents.yml} --- Join Chimera and Cerberus to cluster
+    \item \texttt{04-gpu-setup.yml} --- Configure NVIDIA drivers and GPU Operator
+    \item \texttt{05-deploy-hydra.yml} --- Deploy all K8s manifests
+\end{enumerate}
+
+\subsection{What 05-deploy-hydra.yml Deploys}
+
+In order:
+\begin{enumerate}[nosep]
+    \item Namespaces and RBAC
+    \item Storage classes
+    \item Traefik CRDs and deployment
+    \item Hydra Auth deployment
+    \item CS Lab website (backend + DB)
+    \item Hackathons, Java Executor, Git Learning
+    \item SSHPiper
+    \item n8n (app + Postgres + user manager)
+    \item Ollama
+    \item OpenWebUI (with middleman sidecar)
+    \item Ray cluster (head + worker)
+\end{enumerate}
+
+\section{CS Lab Website Deployment}
+
+\begin{lstlisting}[style=bash]
+# 1. Build the image
+cd /home/infra/NewPaltz-CS-Lab-Website
+docker build --no-cache -t newpaltz-cs-lab-website-backend:latest .
+
+# 2. Export to tarball
+docker save newpaltz-cs-lab-website-backend:latest \
+  -o /data/containers/images/newpaltz-cs-lab-website-backend-latest.tar
+
+# 3. Import into RKE2's containerd
+sudo ctr --address /run/k3s/containerd/containerd.sock \
+  -n k8s.io images import \
+  /data/containers/images/newpaltz-cs-lab-website-backend-latest.tar
+
+# 4. Restart the pod
+kubectl delete pod -l app.kubernetes.io/component=backend -n hydra-system
+\end{lstlisting}
+
+\begin{warningbox}
+\textbf{Docker vs RKE2 Containerd:} Docker and RKE2 use separate containerd instances with separate image stores. Docker builds go to Docker's containerd. You must explicitly import images into RKE2's containerd at \texttt{/run/k3s/containerd/containerd.sock}.
+\end{warningbox}
+
+\section{Image Management}
+
+\begin{itemize}[nosep]
+    \item Image tarballs stored at \texttt{/data/containers/images/}
+    \item Use \texttt{imagePullPolicy: Never} for locally-imported images
+    \item Use unique tags (e.g., \texttt{v20260206144528}) to force pod recreation
+\end{itemize}
+
+\section{Backup System}
+
+\subsection{Daily Cluster Backups}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Setting} & \textbf{Value} \\
+\midrule
+Backup Location & \texttt{/mnt/sdh4/backups/} \\
+Schedule & Daily at 1:00 AM (crontab) \\
+Method & rsync with compression \\
+Script & \texttt{/home/infra/backup-cluster.sh} \\
+Log File & \texttt{/var/log/cluster-backup.log} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{etcd Snapshots}
+
+Automatic every 12 hours via RKE2. Stored in \texttt{/var/lib/rancher/rke2/server/db/snapshots/}.
+
+\subsection{Backup Exclusions}
+
+\texttt{/dev/*}, \texttt{/proc/*}, \texttt{/sys/*}, \texttt{/run/*}, \texttt{/tmp/*}, \texttt{/var/tmp/*}, \texttt{/var/cache/*}, \texttt{/mnt/*}, \texttt{/var/lib/docker/*}, \texttt{/var/lib/rancher/*}
+
+\section{Common Operations}
+
+\subsection{Kubectl Shortcuts}
+
+Sourced from \texttt{\~{}/.hydra-aliases}:
+\begin{lstlisting}[style=bash]
+k          # kubectl
+kgp        # kubectl get pods -A
+kgs        # kubectl get svc -A
+students   # list student pods
+hydra-health  # quick cluster health check
+gpu-check     # GPU availability per node
+\end{lstlisting}
+
+\subsection{Service Management}
+
+\begin{lstlisting}[style=bash]
+# View all pods
+kubectl get pods -A
+
+# Restart a deployment
+kubectl rollout restart deployment/<name> -n <namespace>
+
+# View logs
+kubectl logs -f deployment/<name> -n <namespace>
+
+# Execute shell in pod
+kubectl exec -it <pod-name> -n <namespace> -- /bin/bash
+\end{lstlisting}
+
+%% ============================================================
+%% PART VII: OPENWEBUI API ACCESS
+%% ============================================================
+\newpage
+\part{OpenWebUI API Integration}
+
+\section{Getting Started}
+
+\begin{enumerate}
+    \item Log in at \texttt{https://hydra.newpaltz.edu/dashboard}
+    \item Visit \texttt{https://gpt.hydra.newpaltz.edu}
+    \item Go to Settings $\to$ Account $\to$ Generate New API Key
+    \item Copy the key (format: \texttt{sk-...}) --- shown only once
+\end{enumerate}
+
+\section{API Configuration}
+
+\begin{lstlisting}[style=bash]
+ENDPOINT=https://gpt.hydra.newpaltz.edu/api/chat/completions
+MODEL=gemma3:12b
+API_KEY=sk-your-api-key-here
+\end{lstlisting}
+
+\section{cURL Example}
+
+\begin{lstlisting}[style=bash]
+curl https://gpt.hydra.newpaltz.edu/api/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer sk-your-api-key-here" \
+  -d '{
+    "model": "gemma3:12b",
+    "messages": [{"role": "user", "content": "Hello!"}]
+  }'
+\end{lstlisting}
+
+\section{Python Example}
+
+\begin{lstlisting}[style=bash]
+import openai, os
+openai.api_base = "https://gpt.hydra.newpaltz.edu/api"
+openai.api_key = os.getenv("HYDRA_API_KEY")
+
+response = openai.ChatCompletion.create(
+    model="gemma3:12b",
+    messages=[{"role": "user", "content": "Hello!"}]
+)
+print(response.choices[0].message.content)
+\end{lstlisting}
+
+\section{JavaScript Example}
+
+\begin{lstlisting}[style=bash]
+const response = await fetch(
+  'https://gpt.hydra.newpaltz.edu/api/chat/completions',
+  {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + API_KEY
+    },
+    body: JSON.stringify({
+      model: 'gemma3:12b',
+      messages: [{role: 'user', content: 'Hello!'}]
+    })
+  }
+);
+const data = await response.json();
+console.log(data.choices[0].message.content);
+\end{lstlisting}
+
+\begin{infobox}
+Additional language examples (PHP, Java, C\#, Ruby, Go, Rust) are available in the full API access guide at \texttt{docs/access.md}.
+\end{infobox}
+
+%% ============================================================
+%% PART VIII: SECURITY
+%% ============================================================
+\newpage
+\part{Security}
+
+\section{Security Architecture Layers}
+
+\begin{enumerate}
+    \item \textbf{Network:} UFW firewall, TLS encryption, CORS policy
+    \item \textbf{Authentication:} SAML 2.0, JWT tokens, API keys
+    \item \textbf{Authorization:} Role-based access, container ownership labels
+    \item \textbf{Runtime:} Container isolation, resource limits, seccomp profiles
+\end{enumerate}
+
+\section{Known Vulnerabilities}
+
+\begin{dangerbox}
+\textbf{Critical:}
+\begin{itemize}[nosep]
+    \item \textbf{Privileged containers} in Docker mode grant full host access
+    \item \textbf{Docker socket mount} in student containers is equivalent to root on host
+\end{itemize}
+
+\textbf{High:}
+\begin{itemize}[nosep]
+    \item Passwordless sudo for student user in container images
+    \item Supervisor web interface (port 9001) without authentication
+    \item Mining detection without automatic enforcement
+    \item K8s pod security context missing \texttt{runAsNonRoot}, \texttt{allowPrivilegeEscalation: false}
+\end{itemize}
+
+\textbf{Medium:}
+\begin{itemize}[nosep]
+    \item No NetworkPolicy isolation between student pods
+    \item No PID limits (fork bomb vulnerability)
+    \item Jupyter/VS Code without application-level auth (relies on ForwardAuth)
+\end{itemize}
+\end{dangerbox}
+
+See \texttt{docs/SECURITY\_VULNERABILITIES.md} for full details and remediation steps.
+
+\section{Security Best Practices for Students}
+
+\begin{itemize}[nosep]
+    \item Never share API keys publicly or commit to version control
+    \item Use environment variables for sensitive configuration
+    \item Rotate API keys regularly
+    \item Use HTTPS only for all API communications
+    \item Validate and sanitize user inputs before sending to API
+\end{itemize}
+
+%% ============================================================
+%% PART IX: RDMA AND GPUDIRECT
+%% ============================================================
+\newpage
+\part{RDMA and GPUDirect}
+
+\section{Overview}
+
+The cluster supports RDMA networking for high-performance GPU-to-GPU communication:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{llll}
+\toprule
+\textbf{Node} & \textbf{NIC} & \textbf{GPUs} & \textbf{RDMA} \\
+\midrule
+Hydra & Onboard & None & SoftRoCE (testing) \\
+Chimera & ConnectX & 3x RTX 3090 & Hardware RoCE \\
+Cerberus & ConnectX & 2x RTX 5090 & Hardware RoCE + GPUDirect \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Installation Order (Critical)}
+
+\begin{enumerate}
+    \item MLNX\_OFED / DOCA (network drivers)
+    \item NVIDIA GPU Drivers (includes nvidia-peermem)
+    \item CUDA Toolkit
+    \item Load nvidia-peermem module
+\end{enumerate}
+
+\begin{warningbox}
+If the NVIDIA GPU driver is installed before MLNX\_OFED, the driver must be reinstalled to compile nvidia-peermem with RDMA APIs.
+\end{warningbox}
+
+\section{SoftRoCE Setup}
+
+\begin{lstlisting}[style=bash]
+# Install prerequisites
+sudo apt install rdma-core ibverbs-utils perftest
+
+# Create SoftRoCE device
+sudo rdma link add rxe0 type rxe netdev eth0
+
+# Verify
+rdma link && ibv_devices
+\end{lstlisting}
+
+\section{GPUDirect RDMA Verification}
+
+\begin{lstlisting}[style=bash]
+# Load nvidia-peermem
+sudo modprobe nvidia-peermem
+
+# Make persistent
+echo "nvidia-peermem" | sudo tee /etc/modules-load.d/nvidia-peermem.conf
+
+# Test bandwidth (two nodes)
+# Server: ib_write_bw -d mlx5_0 --use_cuda=0
+# Client: ib_write_bw -d mlx5_0 --use_cuda=0 <server_ip>
+\end{lstlisting}
+
+See \texttt{docs/rdma-gpudirect-setup.md} for complete SR-IOV, DOCA, and KVM passthrough configuration.
+
+%% ============================================================
+%% PART X: TROUBLESHOOTING
+%% ============================================================
+\newpage
+\part{Troubleshooting}
+
+\section{Authentication Issues}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lp{8cm}}
+\toprule
+\textbf{Symptom} & \textbf{Solution} \\
+\midrule
+SAML assertion invalid & Verify \texttt{METADATA\_URL} and \texttt{SAML\_SP\_ENTITY\_ID} match Azure config \\
+Cookie not set & Check \texttt{COOKIE\_DOMAIN}, ensure HTTPS \\
+JWT verification fails & Check JWKS endpoint accessible, verify key rotation \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Container Issues}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lp{8cm}}
+\toprule
+\textbf{Symptom} & \textbf{Solution} \\
+\midrule
+Container won't start & Verify student container image exists in RKE2 containerd \\
+Container 404 & Check Traefik is running, container has correct labels \\
+VS Code not loading & Check code-server process, ForwardAuth middleware \\
+Jupyter issues & Verify \texttt{base\_url} setting matches path \\
+SSH not working & Check SSHPiper pod, verify port 2222 routing \\
+Files not persisting & Only \texttt{/home/student/} is persisted via PVC \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{GPU Issues}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lp{8cm}}
+\toprule
+\textbf{Symptom} & \textbf{Solution} \\
+\midrule
+GPU not detected & Run \texttt{nvidia-smi} on host, check NVIDIA drivers \\
+GPU pod pending & Check GPU operator pods in gpu-operator namespace \\
+Ollama can't use GPU & Verify all 3 GPUs allocated to Ollama deployment \\
+Ray worker can't use GPU & Check NVIDIA device plugin on Cerberus \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Networking Issues}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lp{8cm}}
+\toprule
+\textbf{Symptom} & \textbf{Solution} \\
+\midrule
+Service unreachable & Check pod is Running, service exists, IngressRoute matches \\
+502 Bad Gateway & Backend pod crashed or port mismatch \\
+TLS certificate error & Check Traefik ACME, run \texttt{certbot renew --dry-run} \\
+NFS mount failed & Verify NFS server running on Hydra, firewall allows 2049 \\
+Cross-node pod issue & Check Flannel VXLAN (8472/udp) allowed between nodes \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Traefik Deployment Issues}
+
+\begin{warningbox}
+\textbf{Stuck Rolling Update:} Traefik uses \texttt{hostPort} which means only one pod can bind ports 80/443 at a time. The deployment MUST use \texttt{strategy: Recreate} (not \texttt{RollingUpdate}). If stuck:
+\begin{lstlisting}[style=bash]
+kubectl rollout undo deployment/traefik -n hydra-system
+\end{lstlisting}
+\end{warningbox}
+
+\section{CS Lab Website Catch-All Route}
+
+The Express server has a catch-all that serves \texttt{index.html} for SPA routes. Backend API paths are excluded:
+
+\begin{lstlisting}[style=bash]
+# Paths excluded from SPA catch-all (served by backend):
+/api/*, /faq, /faculty, /uploads, /scripts, /tech-blog,
+/student-resources, /student-highlights, /admins, /auth,
+/school-calendar, /sd-forms
+
+# Paths explicitly allowed through for SPA routing:
+/student-forms, /submit-*
+\end{lstlisting}
+
+\begin{infobox}
+If adding new frontend routes starting with \texttt{/student}, update the catch-all in \texttt{server.js}.
+\end{infobox}
+
+%% ============================================================
+%% PART XI: REPOSITORY STRUCTURE
+%% ============================================================
+\newpage
+\part{Repository Structure}
+
+\section{hydra-saml-auth}
+
+\begin{lstlisting}[style=bash]
+hydra-saml-auth/
+|-- index.js                    # SAML auth, JWT, routes, WebSocket
+|-- routes/
+|   |-- containers.js           # Container lifecycle
+|   |-- resource-requests.js    # Resource allocations
+|   |-- webui-api.js            # OpenWebUI proxy
+|   |-- n8n-api.js              # n8n account management
+|   |-- servers-api.js          # Cluster status
+|   |-- admin.js                # Admin panel
+|-- services/
+|   |-- db-init.js              # Database init
+|   |-- resource-expiry.js      # Resource expiry checker
+|   |-- security-monitor.js     # Process monitoring
+|-- config/
+|   |-- resources.js            # Presets and node config
+|   |-- runtime.js              # Docker/K8s switcher
+|-- k8s/
+|   |-- base/                   # Namespace, RBAC, storage
+|   |-- components/
+|   |   |-- traefik/            # Reverse proxy
+|   |   |-- hydra-auth/         # Auth service
+|   |   |-- cs-lab/             # CS Lab website
+|   |   |-- ollama/             # LLM inference
+|   |   |-- openwebui/          # AI chat + middleman
+|   |   |-- n8n/                # Workflows + user manager
+|   |   |-- ray/                # Distributed computing
+|   |   |-- hackathons/         # Hackathon app
+|   |   |-- java-executor/      # Code execution
+|   |   |-- git-learning/       # Git learning
+|   |   |-- sshpiper/           # SSH proxy
+|   |   |-- student-pods/       # Pod templates
+|   |-- gpu/                    # GPU operator config
+|-- ansible/
+|   |-- inventory.yml           # Node definitions
+|   |-- playbooks/              # Deployment scripts
+|-- student-container/
+|   |-- Dockerfile              # Student image
+|   |-- supervisord.conf        # Process manager
+|-- docs/                       # This document + sources
+|-- docker-compose.yaml         # Legacy Docker deployment
+\end{lstlisting}
+
+\section{Other Repositories}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{llp{5cm}}
+\toprule
+\textbf{Repo} & \textbf{Path} & \textbf{Description} \\
+\midrule
+NewPaltz-CS-Lab-Website & \texttt{\~{}/NewPaltz-CS-Lab-Website/} & React + Express CS Lab homepage \\
+Hackaton-Voting & \texttt{\~{}/Hackaton-Voting/} & Vue.js hackathon app \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%% ============================================================
+%% PART XII: ENVIRONMENT CONFIGURATION
+%% ============================================================
+\newpage
+\part{Environment Configuration}
+
+\section{Required Variables (hydra-saml-auth)}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lp{7cm}}
+\toprule
+\textbf{Variable} & \textbf{Description} \\
+\midrule
+\texttt{BASE\_URL} & https://hydra.newpaltz.edu \\
+\texttt{METADATA\_URL} & Azure AD federation metadata URL \\
+\texttt{SAML\_SP\_ENTITY\_ID} & SP Entity ID (must match Azure) \\
+\texttt{COOKIE\_DOMAIN} & .newpaltz.edu \\
+\texttt{PORT} & Service port (default: 6969) \\
+\texttt{DB\_PATH} & SQLite path (/app/data/hydra.db) \\
+\texttt{JWT\_TTL\_SECONDS} & Token lifetime (default: 86400) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Ansible Inventory Variables}
+
+\begin{lstlisting}[style=bash]
+rke2_version: "v1.28.4+rke2r1"
+cluster_domain: hydra.newpaltz.edu
+nfs_server: "192.168.1.160"
+nfs_path: "/srv/hydra-nfs"
+\end{lstlisting}
+
+%% ============================================================
+%% APPENDIX
+%% ============================================================
+\newpage
+\appendix
+\part*{Appendices}
+\addcontentsline{toc}{part}{Appendices}
+
+\section{Cleanup History (February 2026)}
+
+A comprehensive infrastructure cleanup was performed February 4--7, 2026:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{llr}
+\toprule
+\textbf{Node} & \textbf{Action} & \textbf{Reclaimed} \\
+\midrule
+Hydra & Docker system prune & 114.8 GB \\
+Hydra & Remove stale files (\texttt{/opt/local-path-provisioner.bak}, temp files) & 20+ GB \\
+Hydra & Truncate backup log & 389 MB \\
+Chimera & Remove Docker Ollama duplicate + prune & 41.2 GB \\
+Cerberus & Docker system prune & 51.3 GB \\
+\midrule
+\textbf{Total} & & \textbf{$\sim$227 GB} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Key cleanup actions:
+\begin{itemize}[nosep]
+    \item Migrated all services from Docker containers to K8s pods
+    \item Archived \texttt{legacy/} directory to \texttt{legacy-archive} git branch
+    \item Relocated middleman sources to \texttt{k8s/components/} directories
+    \item Removed stale Apache configs, scripts, temp files across all nodes
+    \item Cleaned orphaned Docker networks, volumes, and images
+    \item Fixed Traefik stuck rolling update (added \texttt{strategy: Recreate})
+    \item Fixed Ray cluster (removed GPU request from head, deployed properly)
+    \item Verified all middleman APIs operational
+    \item Cloned hydra-saml-auth repo to all 3 nodes
+\end{itemize}
+
+\section{Migration History}
+
+The infrastructure evolved through several phases:
+\begin{enumerate}[nosep]
+    \item \textbf{Bare metal} --- Apache web server, manual user management
+    \item \textbf{Docker Compose} --- Containerized services, Nginx reverse proxy
+    \item \textbf{K3s} --- Initial Kubernetes, migrated from Docker Compose
+    \item \textbf{RKE2} --- Current production cluster (January 2026), Traefik ingress
+\end{enumerate}
+
+\section{References}
+
+\begin{itemize}
+    \item RKE2 Documentation: \url{https://docs.rke2.io/}
+    \item Traefik Documentation: \url{https://doc.traefik.io/traefik/}
+    \item SAML 2.0 Spec: \url{https://docs.oasis-open.org/security/saml/v2.0/}
+    \item Azure AD SAML: \url{https://learn.microsoft.com/en-us/entra/identity/}
+    \item NVIDIA GPU Operator: \url{https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/}
+    \item OpenWebUI: \url{https://docs.openwebui.com}
+    \item Ray: \url{https://docs.ray.io/}
+    \item n8n: \url{https://docs.n8n.io/}
+\end{itemize}
+
+\end{document}

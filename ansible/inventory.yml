@@ -19,7 +19,7 @@ all:
 
     # NFS settings for cross-node storage
     nfs_server: "192.168.1.160"  # Hydra's IP
-    nfs_path: "/srv/hydra-nfs"
+    nfs_path: "/data/containers"
 
   children:
     # Control plane node
@@ -33,10 +33,10 @@ all:
             hydra.node-role: control-plane
             hydra.gpu-enabled: "false"
           rke2_type: server
-          # ZFS RAID-10 storage (6x7TB = 21TB usable)
-          storage_backend: zfs
-          storage_pool: hydra-pool
-          storage_path: /srv/student-volumes
+          # mdadm RAID-10 storage (6 SSDs = 21TB usable) at /data
+          storage_backend: mdadm
+          storage_device: /dev/md0
+          storage_path: /data/local-path-provisioner
 
     # GPU worker nodes
     gpu_nodes:
@@ -55,7 +55,7 @@ all:
           nfs_mount: /mnt/hydra-nfs
 
         cerberus:
-          ansible_host: 192.168.1.242
+          ansible_host: 192.168.1.233
           node_role: training
           node_labels:
             hydra.node-role: training

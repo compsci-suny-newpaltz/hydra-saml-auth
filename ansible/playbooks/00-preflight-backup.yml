@@ -137,21 +137,13 @@
     backup_dir: "/var/backups/hydra-migration-{{ ansible_date_time.date }}"
 
   tasks:
-    # ZFS snapshot (non-destructive backup)
-    - name: Check if ZFS pool exists
-      command: zpool status {{ storage_pool | default('hydra-pool') }}
-      register: zfs_status
-      ignore_errors: yes
-      changed_when: false
-
-    - name: Create ZFS snapshot of student volumes
-      command: zfs snapshot -r {{ storage_pool | default('hydra-pool') }}@pre-k8s-migration
-      when: zfs_status.rc == 0
+    # RAID-10 health check (non-destructive)
+    - name: Check RAID-10 array health
+      shell: cat /proc/mdstat > {{ backup_dir }}/raid-status.txt
       ignore_errors: yes
 
-    - name: Record ZFS snapshots
-      shell: zfs list -t snapshot > {{ backup_dir }}/zfs-snapshots.txt
-      when: zfs_status.rc == 0
+    - name: Record disk usage on /data
+      shell: df -h /data > {{ backup_dir }}/data-disk-usage.txt
       ignore_errors: yes
 
     # Backup SQLite database
@@ -254,8 +246,7 @@
 
           Backup location: {{ backup_dir }}
 
-          To restore ZFS snapshot (if needed):
-            zfs rollback {{ storage_pool | default('hydra-pool') }}@pre-k8s-migration
+          Storage: mdadm RAID-10 at /data (21TB)
 
           Proceed with migration? Run:
             ansible-playbook -i inventory.yml playbooks/01-prepare-nodes.yml
