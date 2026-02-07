@@ -41,22 +41,11 @@ spec:
               value: "1"
           resources:
             requests:
-              memory: "8Gi"
-              cpu: "4000m"
-              nvidia.com/gpu: "3"
+              memory: "4Gi"
+              cpu: "2000m"
             limits:
-              memory: "32Gi"
-              cpu: "16000m"
-              nvidia.com/gpu: "3"
-          volumeMounts:
-            - name: infiniband
-              mountPath: /dev/infiniband
-              readOnly: true
-      volumes:
-        - name: infiniband
-          hostPath:
-            path: /dev/infiniband
-            type: DirectoryOrCreate
+              memory: "16Gi"
+              cpu: "8000m"
 ---
 apiVersion: apps/v1
 kind: Deployment

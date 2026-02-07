@@ -104,7 +104,7 @@ spec:
       containers:
         - name: backend
           image: newpaltz-cs-lab-website-backend:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Never
           env:
             - name: NODE_ENV
               value: "production"
@@ -128,10 +128,16 @@ spec:
                 secretKeyRef:
                   name: cs-lab-secrets
                   key: JWT_SECRET
+            - name: JWT_PUBLIC_KEY_PATH
+              value: "/app/server/keys/jwt-public.pem"
           ports:
             - name: http
               containerPort: 5001
               protocol: TCP
+          volumeMounts:
+            - name: jwt-key
+              mountPath: /app/server/keys
+              readOnly: true
           livenessProbe:
             httpGet:
               path: /
@@ -151,3 +157,7 @@ spec:
             limits:
               memory: "256Mi"
               cpu: "300m"
+      volumes:
+        - name: jwt-key
+          configMap:
+            name: cs-lab-jwt-key
