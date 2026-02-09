@@ -32,6 +32,10 @@ mkdir -p /home/student/.local/share/jupyter/runtime
 mkdir -p /home/student/.jupyter
 chown -R student:student /home/student/.local /home/student/.jupyter
 
+# Create Jenkins home if not present
+mkdir -p /home/student/.jenkins
+chown student:student /home/student/.jenkins
+
 # Copy default VS Code settings if user doesn't have any (fresh volume)
 SETTINGS_DIR="/home/student/.local/share/code-server/User"
 if [ ! -f "$SETTINGS_DIR/settings.json" ]; then
@@ -67,6 +71,16 @@ if [ ! -d "/home/student/.nvm" ] && [ -d "/etc/skel/.nvm" ]; then
     cp -r /etc/skel/.nvm /home/student/.nvm
     chown -R student:student /home/student/.nvm
     echo "Node.js $(cat /home/student/.nvm/alias/default) installed"
+fi
+
+# Create Jupyter approval marker if env var is set
+# This enables the CLI wrapper (jupyter-gate.sh) to allow direct jupyter usage
+if [ "$JUPYTER_APPROVED" = "true" ]; then
+    touch /var/run/jupyter-approved
+fi
+
+if [ "$JENKINS_APPROVED" = "true" ]; then
+    touch /var/run/jenkins-approved
 fi
 
 # Handle graceful shutdown

@@ -91,6 +91,9 @@ RUN curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key | tee /u
     apt-get install -y --no-install-recommends jenkins && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
+# Setup Jenkins home directory template in skel
+RUN mkdir -p /etc/skel/.jenkins
+
 # Create student user with docker group access
 RUN groupadd -f docker && \
     useradd -m -s /bin/bash -u 1000 student && \
@@ -154,6 +157,13 @@ RUN pip3 install --no-cache-dir \
     jupyterlab \
     notebook
 
+# Install Jupyter gate wrapper - blocks CLI usage until approved
+# The real binary stays at jupyter.real, wrapper checks /var/run/jupyter-approved
+COPY jupyter-gate.sh /usr/local/bin/jupyter-gate.sh
+RUN chmod +x /usr/local/bin/jupyter-gate.sh && \
+    mv /usr/local/bin/jupyter /usr/local/bin/jupyter.real && \
+    ln -s /usr/local/bin/jupyter-gate.sh /usr/local/bin/jupyter
+
 USER student
 
 # Create supervisor drop-in directory
@@ -216,7 +226,7 @@ COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # Expose ports: SSH, code-server, jupyter, supervisor
-EXPOSE 22 8443 8888 9001
+EXPOSE 22 8443 8080 8888 9001
 
 WORKDIR /home/student
 ENTRYPOINT ["/entrypoint.sh"]

@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS user_quotas (
     max_cpus INTEGER DEFAULT 2,
     gpu_access_approved INTEGER DEFAULT 0,
     jupyter_execution_approved INTEGER DEFAULT 0,
+    jenkins_execution_approved INTEGER DEFAULT 0,
     chimera_approved INTEGER DEFAULT 0,
     cerberus_approved INTEGER DEFAULT 0,
     approved_by TEXT,
@@ -36,7 +37,7 @@ CREATE TABLE IF NOT EXISTS resource_requests (
     requested_gpu_count INTEGER DEFAULT 0,
     requested_duration_days INTEGER DEFAULT NULL,
     preset_id TEXT,
-    request_type TEXT NOT NULL CHECK(request_type IN ('new_container', 'migration', 'resource_upgrade', 'jupyter_execution')),
+    request_type TEXT NOT NULL CHECK(request_type IN ('new_container', 'migration', 'resource_upgrade', 'jupyter_execution', 'jenkins_execution')),
     status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'approved', 'denied', 'expired', 'cancelled')),
     auto_approved INTEGER DEFAULT 0,
     reason TEXT,
@@ -166,6 +167,13 @@ async function runMigrations(db) {
             console.log('[db-init] Migration complete: jupyter_execution_approved added');
         }
 
+        const hasJenkinsColumn = quotaColumns.some(c => c.name === 'jenkins_execution_approved');
+        if (!hasJenkinsColumn) {
+            console.log('[db-init] Adding jenkins_execution_approved column...');
+            await db.run('ALTER TABLE user_quotas ADD COLUMN jenkins_execution_approved INTEGER DEFAULT 0');
+            console.log('[db-init] Migration complete: jenkins_execution_approved added');
+        }
+
         // Check if duration_days and resources_expire_at columns exist in container_configs
         const configColumns = await db.all("PRAGMA table_info(container_configs)");
         const hasDurationColumn = configColumns.some(c => c.name === 'duration_days');
@@ -286,6 +294,10 @@ async function updateUserQuota(username, updates) {
     if (updates.jupyter_execution_approved !== undefined) {
         fields.push('jupyter_execution_approved = ?');
         values.push(updates.jupyter_execution_approved ? 1 : 0);
+    }
+    if (updates.jenkins_execution_approved !== undefined) {
+        fields.push('jenkins_execution_approved = ?');
+        values.push(updates.jenkins_execution_approved ? 1 : 0);
     }
     if (updates.chimera_approved !== undefined) {
         fields.push('chimera_approved = ?');

@@ -400,6 +400,10 @@ router.post('/init', async (req, res) => {
                 });
             }
 
+            // Fetch user quota for approval flags
+            const { getOrCreateUserQuota } = require('../services/db-init');
+            const quota = await getOrCreateUserQuota(username, req.user.email);
+
             // Create container using K8s service
             const result = await k8sContainers.initContainer(username, req.user.email, {
                 preset: req.body.preset || 'conservative',
@@ -407,14 +411,35 @@ router.post('/init', async (req, res) => {
                 storage_gb: req.body.storage_gb || resourceConfig.defaults.storage_gb,
                 memory_mb: req.body.memory_mb || resourceConfig.defaults.memory_mb,
                 cpus: req.body.cpus || resourceConfig.defaults.cpus,
-                gpu_count: req.body.gpu_count || 0
+                gpu_count: req.body.gpu_count || 0,
+                jupyter_approved: !!quota.jupyter_execution_approved,
+                jenkins_approved: !!quota.jenkins_execution_approved
             });
+
+            // Start approved services (supervisor autostart=false for jupyter and jenkins)
+            let jupyterStarted = false;
+            let jenkinsStarted = false;
+            try {
+                if (quota.jupyter_execution_approved) {
+                    await k8sContainers.controlService(username, 'jupyter', 'start');
+                    jupyterStarted = true;
+                }
+                if (quota.jenkins_execution_approved) {
+                    await k8sContainers.controlService(username, 'jenkins', 'start');
+                    jenkinsStarted = true;
+                }
+            } catch (err) {
+                console.log(`[containers] Could not auto-start services for ${username}:`, err.message);
+            }
 
             return res.json({
                 success: true,
                 name: result.name,
                 vscodeUrl: `${publicBase}/${username}/vscode/`,
                 jupyterUrl: `${publicBase}/${username}/jupyter/`,
+                jenkinsUrl: `${publicBase}/${username}/jenkins/`,
+                jupyterStarted,
+                jenkinsStarted,
                 password: result.password // Only returned on first creation
             });
         }
@@ -571,11 +596,40 @@ router.post('/init', async (req, res) => {
         // Create sshpiper config for username-based SSH routing
         await createSSHPiperConfig(username);
 
+        // Start approved services (supervisor autostart=false for jupyter and jenkins)
+        let jupyterStarted = false;
+        let jenkinsStarted = false;
+        try {
+            const { getOrCreateUserQuota } = require('../services/db-init');
+            const quota = await getOrCreateUserQuota(username, req.user.email);
+            if (quota.jupyter_execution_approved) {
+                const exec = await container.exec({
+                    Cmd: ['supervisorctl', 'start', 'jupyter'],
+                    AttachStdout: true, AttachStderr: true
+                });
+                await exec.start({ Detach: false, Tty: false });
+                jupyterStarted = true;
+            }
+            if (quota.jenkins_execution_approved) {
+                const exec = await container.exec({
+                    Cmd: ['supervisorctl', 'start', 'jenkins'],
+                    AttachStdout: true, AttachStderr: true
+                });
+                await exec.start({ Detach: false, Tty: false });
+                jenkinsStarted = true;
+            }
+        } catch (err) {
+            console.log(`[containers] Could not auto-start services for ${username}:`, err.message);
+        }
+
         return res.json({
             success: true,
             name: containerName,
             vscodeUrl: `${publicBase}/${username}/vscode/`,
             jupyterUrl: `${publicBase}/${username}/jupyter/`,
+            jenkinsUrl: `${publicBase}/${username}/jenkins/`,
+            jupyterStarted,
+            jenkinsStarted,
             sshPort: SSHPIPER_PORT,
             sshHost: 'hydra.newpaltz.edu',
             sshUser: username
@@ -801,6 +855,74 @@ router.post('/jupyter-request', async (req, res) => {
     } catch (err) {
         console.error('[containers] jupyter-request error:', err);
         return res.status(500).json({ success: false, message: 'Failed to submit Jupyter request' });
+    }
+});
+
+// ========================================
+// JENKINS EXECUTION APPROVAL
+// ========================================
+
+// GET /dashboard/api/containers/jenkins-status
+// Check if user has Jenkins execution approval
+router.get('/jenkins-status', async (req, res) => {
+    try {
+        if (!req.isAuthenticated?.() || !req.user?.email) {
+            return res.status(401).json({ success: false, message: 'Not authenticated' });
+        }
+        const username = String(req.user.email).split('@')[0];
+        const { getOrCreateUserQuota } = require('../services/db-init');
+        const quota = await getOrCreateUserQuota(username, req.user.email);
+        return res.json({
+            success: true,
+            jenkins_execution_approved: !!quota.jenkins_execution_approved,
+            message: quota.jenkins_execution_approved
+                ? 'Jenkins is enabled. You can run CI/CD pipelines.'
+                : 'Jenkins requires approval. Request access to use CI/CD features.'
+        });
+    } catch (err) {
+        console.error('[containers] jenkins-status error:', err);
+        return res.status(500).json({ success: false, message: 'Failed to check Jenkins status' });
+    }
+});
+
+// POST /dashboard/api/containers/jenkins-request
+// Request Jenkins execution access
+router.post('/jenkins-request', async (req, res) => {
+    try {
+        if (!req.isAuthenticated?.() || !req.user?.email) {
+            return res.status(401).json({ success: false, message: 'Not authenticated' });
+        }
+        const username = String(req.user.email).split('@')[0];
+        const { reason } = req.body;
+        const { getOrCreateUserQuota, getUserPendingRequests, createResourceRequest } = require('../services/db-init');
+        const quota = await getOrCreateUserQuota(username, req.user.email);
+
+        if (quota.jenkins_execution_approved) {
+            return res.json({ success: true, already_approved: true, message: 'Jenkins is already approved for your account.' });
+        }
+
+        const pendingRequests = await getUserPendingRequests(username);
+        const hasPendingJenkinsRequest = pendingRequests.some(r => r.request_type === 'jenkins_execution');
+        if (hasPendingJenkinsRequest) {
+            return res.status(400).json({ success: false, message: 'You already have a pending Jenkins request. Please wait for admin review.' });
+        }
+
+        const requestId = await createResourceRequest({
+            username,
+            email: req.user.email,
+            target_node: 'hydra',
+            memory_gb: 0, cpus: 0, storage_gb: 0, gpu_count: 0,
+            preset_id: null,
+            request_type: 'jenkins_execution',
+            auto_approved: false,
+            reason: reason || 'Request for Jenkins CI/CD access'
+        });
+
+        console.log(`[containers] Jenkins request ${requestId} created for ${username}`);
+        return res.json({ success: true, request_id: requestId, message: 'Jenkins request submitted. An admin will review your request.' });
+    } catch (err) {
+        console.error('[containers] jenkins-request error:', err);
+        return res.status(500).json({ success: false, message: 'Failed to submit Jenkins request' });
     }
 });
 
@@ -1313,8 +1435,8 @@ router.get('/services', async (req, res) => {
                 const match = line.match(/^(\S+)\s+(\S+)/);
                 if (match) {
                     const [, name, state] = match;
-                    // Only include code-server and jupyter
-                    if (name === 'code-server' || name === 'jupyter') {
+                    // Only include managed services
+                    if (name === 'code-server' || name === 'jupyter' || name === 'jenkins') {
                         services.push({
                             name,
                             running: state === 'RUNNING',
@@ -1345,11 +1467,37 @@ router.post('/services/:service/start', async (req, res) => {
         }
 
         const serviceName = String(req.params.service || '').trim();
-        if (!['code-server', 'jupyter'].includes(serviceName)) {
+        if (!['code-server', 'jupyter', 'jenkins'].includes(serviceName)) {
             return res.status(400).json({ success: false, message: 'Invalid service name' });
         }
 
         const username = String(req.user.email).split('@')[0];
+
+        // Check Jupyter execution approval before starting
+        if (serviceName === 'jupyter') {
+            const { getOrCreateUserQuota } = require('../services/db-init');
+            const quota = await getOrCreateUserQuota(username, req.user.email);
+            if (!quota.jupyter_execution_approved) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Jupyter execution requires approval. Please request access from the dashboard Manage Resources menu.',
+                    requires_approval: true
+                });
+            }
+        }
+
+        // Check Jenkins execution approval before starting
+        if (serviceName === 'jenkins') {
+            const { getOrCreateUserQuota } = require('../services/db-init');
+            const quota = await getOrCreateUserQuota(username, req.user.email);
+            if (!quota.jenkins_execution_approved) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Jenkins requires approval. Please request access from the dashboard Manage Resources menu.',
+                    requires_approval: true
+                });
+            }
+        }
 
         // ========== KUBERNETES MODE ==========
         if (runtimeConfig.isKubernetes()) {
@@ -1423,7 +1571,7 @@ router.post('/services/:service/stop', async (req, res) => {
         }
 
         const serviceName = String(req.params.service || '').trim();
-        if (!['code-server', 'jupyter'].includes(serviceName)) {
+        if (!['code-server', 'jupyter', 'jenkins'].includes(serviceName)) {
             return res.status(400).json({ success: false, message: 'Invalid service name' });
         }
 

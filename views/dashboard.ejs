@@ -1151,6 +1151,37 @@
               </div>
             </div>
 
+            <div class="flex items-center justify-between border-t pt-3 mt-3">
+              <div class="flex items-center gap-3">
+                <i class="fas fa-cogs text-orange-600"></i>
+                <div>
+                  <div class="font-semibold">Jenkins CI/CD</div>
+                  <div id="jenkins-service-status" class="text-sm text-gray-600"></div>
+                  <div id="jenkins-execution-status" class="text-xs text-gray-500"></div>
+                </div>
+              </div>
+              <div class="flex gap-2">
+                <!-- Shown when execution NOT approved -->
+                <button onclick="requestJenkinsExecution()" id="jenkins-request-btn"
+                  class="px-3 py-1 text-sm rounded bg-yellow-100 hover:bg-yellow-200 border border-yellow-400 text-yellow-700 hidden">
+                  <i class="fas fa-lock"></i> Request Jenkins Access
+                </button>
+                <!-- Shown when execution IS approved -->
+                <button onclick="startService('jenkins')" id="jenkins-start-btn"
+                  class="px-3 py-1 text-sm rounded bg-green-100 hover:bg-green-200 border border-green-300 text-green-700">
+                  Start
+                </button>
+                <button onclick="stopService('jenkins')" id="jenkins-stop-btn"
+                  class="px-3 py-1 text-sm rounded bg-red-100 hover:bg-red-200 border border-red-300 text-red-700">
+                  Stop
+                </button>
+                <button onclick="openServiceURL('jenkins')" id="jenkins-open-btn"
+                  class="px-3 py-1 text-sm rounded bg-blue-600 text-white hover:bg-blue-700">
+                  <i class="fas fa-external-link-alt"></i> Open
+                </button>
+              </div>
+            </div>
+
             <!-- SSH Access Section -->
             <div class="flex items-center justify-between border-t pt-3 mt-3">
               <div class="flex items-center gap-3">
@@ -2517,8 +2548,69 @@
         }
       };
 
+      // Jenkins Execution Approval Functions
+      async function checkJenkinsExecutionStatus() {
+        try {
+          const res = await fetch('/dashboard/api/containers/jenkins-status', { credentials: 'same-origin' });
+          const data = await res.json();
+
+          const requestBtn = document.getElementById('jenkins-request-btn');
+          const startBtn = document.getElementById('jenkins-start-btn');
+          const stopBtn = document.getElementById('jenkins-stop-btn');
+          const openBtn = document.getElementById('jenkins-open-btn');
+          const statusEl = document.getElementById('jenkins-execution-status');
+
+          if (data.jenkins_execution_approved) {
+            if (requestBtn) requestBtn.classList.add('hidden');
+            if (startBtn) startBtn.classList.remove('hidden');
+            if (stopBtn) stopBtn.classList.remove('hidden');
+            if (openBtn) openBtn.classList.remove('hidden');
+            if (statusEl) {
+              statusEl.textContent = 'CI/CD enabled';
+              statusEl.className = 'text-xs text-green-600';
+            }
+          } else {
+            if (requestBtn) requestBtn.classList.remove('hidden');
+            if (startBtn) startBtn.classList.add('hidden');
+            if (stopBtn) stopBtn.classList.add('hidden');
+            if (openBtn) openBtn.classList.add('hidden');
+            if (statusEl) {
+              statusEl.textContent = 'Requires approval';
+              statusEl.className = 'text-xs text-yellow-600';
+            }
+          }
+        } catch (err) {
+          console.error('Failed to check Jenkins status:', err);
+        }
+      }
+
+      window.requestJenkinsExecution = async function() {
+        const reason = prompt('Why do you need Jenkins CI/CD access? (e.g., course project, software engineering class)');
+        if (!reason) return;
+
+        try {
+          const res = await fetch('/dashboard/api/containers/jenkins-request', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ reason })
+          });
+          const data = await res.json();
+          if (data.success) {
+            alert(data.already_approved
+              ? 'Jenkins is already approved! Please refresh the page.'
+              : 'Jenkins access request submitted! An admin will review your request.');
+          } else {
+            alert(data.message || 'Failed to submit request');
+          }
+        } catch (err) {
+          alert('Failed to submit Jenkins request: ' + err.message);
+        }
+      };
+
       // Check Jupyter status on load
       checkJupyterExecutionStatus();
+      checkJenkinsExecutionStatus();
 
       // SSH Access Functions
       window.toggleSSHDropdown = function() {
@@ -2975,6 +3067,16 @@
           if (jupyter) {
             document.getElementById('jupyter-service-status').textContent = jupyter.running ? '● Running' : '○ Stopped';
             document.getElementById('jupyter-service-status').className = jupyter.running ? 'text-sm text-green-600' : 'text-sm text-gray-500';
+          }
+
+          // Update Jenkins status
+          const jenkins = data.services?.find(s => s.name === 'jenkins');
+          if (jenkins) {
+            const jenkinsStatus = document.getElementById('jenkins-service-status');
+            if (jenkinsStatus) {
+              jenkinsStatus.textContent = jenkins.running ? '● Running' : '○ Stopped';
+              jenkinsStatus.className = jenkins.running ? 'text-sm text-green-600' : 'text-sm text-gray-500';
+            }
           }
         } catch (err) {
           console.error('Failed to load services:', err);

@@ -83,6 +83,8 @@ function buildPodSpec(username, email, config) {
           { name: 'USERNAME', value: username },
           { name: 'USER_EMAIL', value: email },
           { name: 'HOME', value: '/home/student' },
+          { name: 'JUPYTER_APPROVED', value: config.jupyter_approved ? 'true' : 'false' },
+          { name: 'JENKINS_APPROVED', value: config.jenkins_approved ? 'true' : 'false' },
           {
             name: 'PASSWORD',
             valueFrom: {
@@ -96,7 +98,8 @@ function buildPodSpec(username, email, config) {
         ports: [
           { name: 'vscode', containerPort: 8443, protocol: 'TCP' },
           { name: 'jupyter', containerPort: 8888, protocol: 'TCP' },
-          { name: 'supervisor', containerPort: 9001, protocol: 'TCP' }
+          { name: 'supervisor', containerPort: 9001, protocol: 'TCP' },
+          { name: 'jenkins', containerPort: 8080, protocol: 'TCP' }
         ],
         resources: {
           requests: {
@@ -209,7 +212,8 @@ function buildServiceSpec(username) {
       ports: [
         { name: 'vscode', port: 8443, targetPort: 'vscode' },
         { name: 'jupyter', port: 8888, targetPort: 'jupyter' },
-        { name: 'supervisor', port: 9001, targetPort: 'supervisor' }
+        { name: 'supervisor', port: 9001, targetPort: 'supervisor' },
+        { name: 'jenkins', port: 8080, targetPort: 'jenkins' }
       ],
       selector: {
         'app.kubernetes.io/name': 'student-container',
@@ -274,6 +278,16 @@ function buildIngressRouteSpec(username) {
             { name: 'hydra-forward-auth', namespace: runtimeConfig.k8s.systemNamespace }
             // No strip-prefix: Jupyter is configured with base_url and handles the prefix itself
           ]
+        },
+        {
+          match: `Host(\`hydra.newpaltz.edu\`) && PathPrefix(\`/students/${username}/jenkins\`)`,
+          kind: 'Rule',
+          priority: 100,
+          services: [{ name: `student-${username}`, port: 8080 }],
+          middlewares: [
+            { name: 'hydra-forward-auth', namespace: runtimeConfig.k8s.systemNamespace },
+            { name: `strip-prefix-${username}` }
+          ]
         }
       ],
       tls: {
@@ -300,7 +314,8 @@ function buildMiddlewareSpec(username) {
         prefixes: [
           `/students/${username}/vscode`,
           `/students/${username}/jupyter`,
-          `/students/${username}/supervisor`
+          `/students/${username}/supervisor`,
+          `/students/${username}/jenkins`
         ]
       }
     }
@@ -338,6 +353,12 @@ async function writeDockerTraefikConfig(username) {
         [`student-${username}-jupyter`]: {
           entryPoints: ['web'],
           rule: `PathPrefix(\`/students/${username}/jupyter\`)`,
+          service: `k8s-traefik-${username}`,
+          middlewares: [`student-${username}-auth`]
+        },
+        [`student-${username}-jenkins`]: {
+          entryPoints: ['web'],
+          rule: `PathPrefix(\`/students/${username}/jenkins\`)`,
           service: `k8s-traefik-${username}`,
           middlewares: [`student-${username}-auth`]
         }
@@ -549,7 +570,8 @@ async function initContainer(username, email, config = {}) {
       status: readyStatus.status,
       urls: {
         vscode: `/students/${username}/vscode/`,
-        jupyter: `/students/${username}/jupyter/`
+        jupyter: `/students/${username}/jupyter/`,
+        jenkins: `/students/${username}/jenkins/`
       }
     };
   } catch (err) {
@@ -836,6 +858,7 @@ function getRoutes(username) {
   return {
     vscode: `/students/${username}/vscode/`,
     jupyter: `/students/${username}/jupyter/`,
+    jenkins: `/students/${username}/jenkins/`,
     supervisor: `/students/${username}/supervisor/`
   };
 }
@@ -1031,7 +1054,7 @@ async function getServiceStatus(username) {
 
     while ((match = processRegex.exec(xmlResponse)) !== null) {
       const [, name, statename] = match;
-      if (name === 'code-server' || name === 'jupyter') {
+      if (name === 'code-server' || name === 'jupyter' || name === 'jenkins') {
         services.push({
           name,
           running: statename === 'RUNNING',
@@ -1064,6 +1087,16 @@ async function getServiceStatus(username) {
           state: jupyterStopped ? 'STOPPED' : (hasJupyter ? 'RUNNING' : 'UNKNOWN')
         });
       }
+
+      const hasJenkins = xmlResponse.includes('jenkins') && xmlResponse.includes('RUNNING');
+      const jenkinsStopped = xmlResponse.includes('jenkins') && xmlResponse.includes('STOPPED');
+      if (xmlResponse.includes('jenkins')) {
+        services.push({
+          name: 'jenkins',
+          running: hasJenkins && !jenkinsStopped,
+          state: jenkinsStopped ? 'STOPPED' : (hasJenkins ? 'RUNNING' : 'UNKNOWN')
+        });
+      }
     }
 
     return {
@@ -1076,7 +1109,8 @@ async function getServiceStatus(username) {
     return {
       services: [
         { name: 'code-server', running: false, state: 'UNKNOWN' },
-        { name: 'jupyter', running: false, state: 'UNKNOWN' }
+        { name: 'jupyter', running: false, state: 'UNKNOWN' },
+        { name: 'jenkins', running: false, state: 'UNKNOWN' }
       ],
       containerRunning: true,
       error: err.message

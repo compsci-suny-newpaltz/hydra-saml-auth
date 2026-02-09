@@ -139,6 +139,25 @@ router.post('/requests/:id/approve', async (req, res) => {
             });
         }
 
+        // Handle Jenkins execution requests
+        if (request.request_type === 'jenkins_execution') {
+            quotaUpdates.jenkins_execution_approved = true;
+            await updateUserQuota(request.username, quotaUpdates);
+
+            try {
+                const emailNotifications = require('../services/email-notifications');
+                await emailNotifications.sendApprovalResult(request, true, admin_notes);
+            } catch (emailError) {
+                console.warn('[admin] Failed to send approval email:', emailError.message);
+            }
+
+            console.log(`[admin] Jenkins execution request ${id} approved by ${adminEmail}`);
+            return res.json({
+                success: true,
+                message: 'Jenkins execution request approved successfully'
+            });
+        }
+
         // Grant node access if needed
         if (request.target_node === 'chimera') {
             quotaUpdates.chimera_approved = true;
