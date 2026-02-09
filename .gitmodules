@@ -1,0 +1,15 @@
+[submodule "services/cs-lab-website"]
+	path = services/cs-lab-website
+	url = https://github.com/compsci-suny-newpaltz/NewPaltz-CS-Lab-Website.git
+[submodule "services/hackathon-voting"]
+	path = services/hackathon-voting
+	url = https://github.com/compsci-suny-newpaltz/Hackaton-Voting.git
+[submodule "services/flapjs"]
+	path = services/flapjs
+	url = https://github.com/compsci-suny-newpaltz/FLAPJS-WebApp.git
+[submodule "services/git-learning"]
+	path = services/git-learning
+	url = https://github.com/compsci-suny-newpaltz/GG-git-learning.git
+[submodule "services/java-executor"]
+	path = services/java-executor
+	url = https://github.com/compsci-suny-newpaltz/docker-java-executor.git
