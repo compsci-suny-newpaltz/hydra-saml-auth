@@ -58,6 +58,9 @@ spec:
         - name: jupyter
           containerPort: 8888
           protocol: TCP
+        - name: jenkins
+          containerPort: 8080
+          protocol: TCP
         - name: supervisor
           containerPort: 9001
           protocol: TCP

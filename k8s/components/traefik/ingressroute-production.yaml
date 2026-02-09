@@ -349,6 +349,38 @@ spec:
   tls:
     certResolver: letsencrypt
 ---
+# FLAPJS route
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: flapjs
+  namespace: hydra-infra
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/jflap`)
+      kind: Rule
+      priority: 15
+      middlewares:
+        - name: jflap-strip
+      services:
+        - name: flapjs
+          port: 8080
+  tls:
+    certResolver: letsencrypt
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: jflap-strip
+  namespace: hydra-infra
+spec:
+  stripPrefix:
+    prefixes:
+      - /jflap
+---
 # Default catch-all: CS Lab frontend (lowest priority)
 apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRoute

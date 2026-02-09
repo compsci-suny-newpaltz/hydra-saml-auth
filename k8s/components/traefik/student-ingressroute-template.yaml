@@ -37,6 +37,16 @@ spec:
         - name: hydra-forward-auth
           namespace: hydra-system
         - name: strip-jupyter-${USERNAME}
+    # Jenkins route (approval required)
+    - match: PathPrefix(`/students/${USERNAME}/jenkins`)
+      kind: Rule
+      services:
+        - name: student-${USERNAME}
+          port: 8080
+      middlewares:
+        - name: hydra-forward-auth
+          namespace: hydra-system
+        - name: strip-jenkins-${USERNAME}
     # Supervisor route (admin only)
     - match: PathPrefix(`/students/${USERNAME}/supervisor`)
       kind: Rule
@@ -71,6 +81,16 @@ spec:
 apiVersion: traefik.io/v1alpha1
 kind: Middleware
 metadata:
+  name: strip-jenkins-${USERNAME}
+  namespace: hydra-students
+spec:
+  stripPrefix:
+    prefixes:
+      - /students/${USERNAME}/jenkins
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
   name: strip-supervisor-${USERNAME}
   namespace: hydra-students
 spec:
@@ -96,6 +116,9 @@ spec:
     - name: jupyter
       port: 8888
       targetPort: jupyter
+    - name: jenkins
+      port: 8080
+      targetPort: jenkins
     - name: supervisor
       port: 9001
       targetPort: supervisor

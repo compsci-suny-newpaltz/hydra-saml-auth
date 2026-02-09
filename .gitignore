@@ -19,3 +19,7 @@ student-container/cuh63.zip
 # SSHPiper user configs (contains keys)
 sshpiper/config/*/
 data/ssh-keys/
+
+# K8s secrets (contain credentials — use sealed-secrets or external-secrets in prod)
+k8s/components/cs-lab/secret.yaml
+k8s/components/n8n/secret.yaml
