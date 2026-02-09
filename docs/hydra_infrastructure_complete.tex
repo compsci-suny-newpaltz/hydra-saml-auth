@@ -1,6 +1,6 @@
 % Hydra Infrastructure Complete Reference — SUNY New Paltz CS Lab
 % Consolidated from all docs/ files, K8s manifests, and audit reports
-% Last updated: February 7, 2026
+% Last updated: February 9, 2026
 \documentclass[11pt,a4paper]{article}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
@@ -544,14 +544,44 @@ Each student receives a persistent container with:
 Node.js & Latest LTS via nvm \\
 Python & 3.11+ with pip, venv, Jupyter \\
 Java & OpenJDK 21 \\
-Docker & Docker-in-Docker support \\
-VS Code & code-server browser IDE \\
-Jupyter & Notebook and JupyterLab \\
+Docker & Docker CLI (Docker-in-Docker via rootless) \\
+VS Code & code-server browser IDE (port 8443, always on) \\
+Jupyter & JupyterLab (port 8888, approval required) \\
+Jenkins & CI/CD server (port 8080, approval required) \\
 SSH & Direct access via SSHPiper (port 2222) \\
-Tools & Git, curl, wget, build-essential \\
+Tools & Git, curl, wget, build-essential, gdb, cmake \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\subsection{Service Approval Gating}
+
+Each student container runs three managed services via \texttt{supervisord}. Code-server starts automatically; Jupyter and Jenkins require admin approval before they can be started.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{llllp{5cm}}
+\toprule
+\textbf{Service} & \textbf{Port} & \textbf{Path} & \textbf{Autostart} & \textbf{Approval} \\
+\midrule
+code-server & 8443 & \texttt{/students/\{user\}/vscode/} & Yes & None required \\
+Jupyter Lab & 8888 & \texttt{/students/\{user\}/jupyter/} & No & \texttt{jupyter\_execution\_approved} \\
+Jenkins & 8080 & \texttt{/students/\{user\}/jenkins/} & No & \texttt{jenkins\_execution\_approved} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Approval flow:}
+\begin{enumerate}[nosep]
+    \item Student clicks ``Request Access'' on the dashboard
+    \item Request stored in \texttt{resource\_requests} table (type: \texttt{jupyter\_execution} or \texttt{jenkins\_execution})
+    \item Admin approves via admin panel, setting the flag in \texttt{user\_quotas}
+    \item On next container init, the \texttt{JUPYTER\_APPROVED} / \texttt{JENKINS\_APPROVED} env var is injected
+    \item \texttt{entrypoint.sh} creates \texttt{/var/run/jupyter-approved} or \texttt{/var/run/jenkins-approved} marker
+    \item Supervisor starts the approved service
+\end{enumerate}
+
+\textbf{CLI gating:} Jupyter also has a CLI wrapper (\texttt{jupyter-gate.sh}) that blocks direct \texttt{jupyter} command usage. The real binary is at \texttt{/usr/local/bin/jupyter.real}. Students see an error directing them to request access via the dashboard.
 
 \section{Container Presets}
 
@@ -1270,6 +1300,16 @@ Following a 5-hour OOM death spiral that made the server unresponsive, the follo
     \item \texttt{nerdctl} --- Docker-compatible CLI for containerd (\texttt{/usr/local/bin/nerdctl})
     \item Docker daemon is \textbf{disabled} (\texttt{systemctl disable docker})
 \end{itemize}
+
+\section{February 9, 2026 --- Jenkins Service + Jupyter Gating + Repo Cleanup}
+
+\begin{enumerate}[nosep]
+    \item \textbf{Jupyter execution gating} --- Supervisor \texttt{autostart=false}, CLI gate wrapper (\texttt{jupyter-gate.sh}), API approval endpoints, \texttt{JUPYTER\_APPROVED} env var marker. Students cannot run Jupyter until admin approves.
+    \item \textbf{Jenkins CI/CD service} --- Added as 3rd managed service inside student containers. Supervisor config (port 8080, \texttt{autostart=false}), K8s pod/service/IngressRoute/strip-prefix routing, DB schema (\texttt{jenkins\_execution\_approved}), admin approval flow, dashboard UI card with Start/Stop/Open buttons.
+    \item \textbf{Repo cleanup} --- Removed 12 dead Docker-era files (deploy scripts, old Python metrics agent, Apache config, SSHPiper Docker Compose, student-mvp, Ray reference compose files). Scrubbed plaintext secret files from git history. Added \texttt{.example} templates for K8s secrets.
+    \item \textbf{K8s template updates} --- Added Jenkins port 8080 to pod template, Jenkins route/middleware/service port to IngressRoute template, flapjs deployment.
+    \item \textbf{Security} --- Removed \texttt{cs-lab/secret.yaml} and \texttt{n8n/secret.yaml} from git tracking (contained plaintext credentials). Added to \texttt{.gitignore}. Credentials should be rotated.
+\end{enumerate}
 
 \section{References}
 
