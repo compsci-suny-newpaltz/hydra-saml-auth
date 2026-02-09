@@ -1,5 +1,5 @@
-# ExternalName services for Docker containers not yet migrated to K8s
-# These allow K8s IngressRoutes to reach Docker containers on the host
+# ExternalName services for host processes not running in K8s
+# These allow K8s IngressRoutes to reach services on the host network
 ---
 # Java Executor (Docker container on host port 55392)
 apiVersion: v1

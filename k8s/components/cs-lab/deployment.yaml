@@ -1,108 +1,26 @@
-# CS Lab Website - Backend + MariaDB
+# CS Lab Website (SQLite)
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: cs-lab-db
+  name: cs-lab
   namespace: hydra-system
   labels:
     app.kubernetes.io/name: cs-lab
-    app.kubernetes.io/component: database
-spec:
-  replicas: 1
-  strategy:
-    type: Recreate
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: cs-lab
-      app.kubernetes.io/component: database
-  template:
-    metadata:
-      labels:
-        app.kubernetes.io/name: cs-lab
-        app.kubernetes.io/component: database
-    spec:
-      nodeSelector:
-        kubernetes.io/hostname: hydra
-      containers:
-        - name: mariadb
-          image: mariadb:10.11
-          env:
-            - name: MYSQL_ROOT_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: cs-lab-secrets
-                  key: MYSQL_ROOT_PASSWORD
-            - name: MYSQL_DATABASE
-              value: "cslab"
-            - name: MYSQL_USER
-              value: "cslab"
-            - name: MYSQL_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: cs-lab-secrets
-                  key: DB_PASSWORD
-          ports:
-            - name: mysql
-              containerPort: 3306
-              protocol: TCP
-          volumeMounts:
-            - name: db-data
-              mountPath: /var/lib/mysql
-          livenessProbe:
-            exec:
-              command:
-                - healthcheck.sh
-                - --connect
-                - --innodb_initialized
-            initialDelaySeconds: 30
-            periodSeconds: 10
-            timeoutSeconds: 5
-          readinessProbe:
-            exec:
-              command:
-                - healthcheck.sh
-                - --connect
-                - --innodb_initialized
-            initialDelaySeconds: 10
-            periodSeconds: 5
-            timeoutSeconds: 5
-          resources:
-            requests:
-              memory: "256Mi"
-              cpu: "100m"
-            limits:
-              memory: "512Mi"
-              cpu: "500m"
-      volumes:
-        - name: db-data
-          persistentVolumeClaim:
-            claimName: cs-lab-db-data
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: cs-lab-backend
-  namespace: hydra-system
-  labels:
-    app.kubernetes.io/name: cs-lab
-    app.kubernetes.io/component: backend
 spec:
   replicas: 1
   selector:
     matchLabels:
       app.kubernetes.io/name: cs-lab
-      app.kubernetes.io/component: backend
   template:
     metadata:
       labels:
         app.kubernetes.io/name: cs-lab
-        app.kubernetes.io/component: backend
     spec:
       nodeSelector:
         kubernetes.io/hostname: hydra
       containers:
-        - name: backend
+        - name: cs-lab
           image: newpaltz-cs-lab-website-backend:latest
           imagePullPolicy: Never
           env:
@@ -110,19 +28,8 @@ spec:
               value: "production"
             - name: PORT
               value: "5001"
-            - name: DB_HOST
-              value: "cs-lab-db"
-            - name: DB_PORT
-              value: "3306"
-            - name: DB_USER
-              value: "cslab"
-            - name: DB_NAME
-              value: "cslab"
-            - name: DB_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: cs-lab-secrets
-                  key: DB_PASSWORD
+            - name: DB_PATH
+              value: "/app/server/data/cslab.db"
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
@@ -138,6 +45,10 @@ spec:
             - name: jwt-key
               mountPath: /app/server/keys
               readOnly: true
+            - name: cs-lab-data
+              mountPath: /app/server/data
+            - name: cs-lab-uploads
+              mountPath: /app/server/src/uploads
           livenessProbe:
             httpGet:
               path: /
@@ -161,3 +72,9 @@ spec:
         - name: jwt-key
           configMap:
             name: cs-lab-jwt-key
+        - name: cs-lab-data
+          persistentVolumeClaim:
+            claimName: cs-lab-data
+        - name: cs-lab-uploads
+          persistentVolumeClaim:
+            claimName: cs-lab-uploads

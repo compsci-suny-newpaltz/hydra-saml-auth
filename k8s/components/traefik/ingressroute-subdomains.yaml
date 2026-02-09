@@ -15,7 +15,8 @@ spec:
     - match: Host(`gpt.hydra.newpaltz.edu`)
       kind: Rule
       services:
-        - name: openwebui-chimera
+        - name: open-webui
+          namespace: hydra-infra
           port: 3000
   tls:
     certResolver: letsencrypt

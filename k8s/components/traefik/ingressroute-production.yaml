@@ -69,6 +69,12 @@ spec:
       services:
         - name: hydra-auth
           port: 6969
+    - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/SUNYCAT`)
+      kind: Rule
+      priority: 5
+      services:
+        - name: hydra-auth
+          port: 6969
     - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/css`)
       kind: Rule
       priority: 5

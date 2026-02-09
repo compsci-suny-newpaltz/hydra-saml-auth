@@ -1,12 +1,29 @@
-# CS Lab MariaDB Data PVC
+# CS Lab SQLite Data PVC
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: cs-lab-db-data
+  name: cs-lab-data
   namespace: hydra-system
   labels:
     app.kubernetes.io/name: cs-lab
-    app.kubernetes.io/component: database
+    app.kubernetes.io/component: backend
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: hydra-local
+  resources:
+    requests:
+      storage: 1Gi
+---
+# CS Lab Uploads PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cs-lab-uploads
+  namespace: hydra-system
+  labels:
+    app.kubernetes.io/name: cs-lab
+    app.kubernetes.io/component: backend
 spec:
   accessModes:
     - ReadWriteOnce
