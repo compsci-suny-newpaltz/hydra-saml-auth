@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: student-quota
+  namespace: hydra-students
+spec:
+  hard:
+    requests.memory: "128Gi"
+    limits.memory: "200Gi"
+    requests.cpu: "48"
+    limits.cpu: "60"
+    count/pods: "100"

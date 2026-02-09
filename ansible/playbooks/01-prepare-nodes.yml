@@ -64,24 +64,32 @@
       when: ansible_os_family == "Debian"
 
     # ============ SWAP CONFIGURATION ============
+    # NOTE: We enable swap as OOM safety net (vm.swappiness=10 keeps it minimal)
+    # Hydra: 32GB on RAID, Chimera/Cerberus: 16GB on root
     - name: Check current swap status
       command: swapon --show
       register: swap_status
       changed_when: false
       ignore_errors: yes
 
-    - name: Disable swap (required for Kubernetes)
-      command: swapoff -a
-      when:
-        - configure_swap | bool
-        - swap_status.stdout | length > 0
-
-    - name: Comment out swap in fstab (don't delete - preserves ability to re-enable)
-      replace:
-        path: /etc/fstab
-        regexp: '^([^#].*\sswap\s)'
-        replace: '# \1'
+    - name: Set swappiness to 10 (use swap only under memory pressure)
+      sysctl:
+        name: vm.swappiness
+        value: '10'
+        sysctl_file: /etc/sysctl.d/99-hydra.conf
+        reload: yes
       when: configure_swap | bool
+
+    # ============ DOCKER CLEANUP ============
+    - name: Stop and disable Docker (containerd via RKE2 handles all pods)
+      systemd:
+        name: "{{ item }}"
+        state: stopped
+        enabled: no
+      loop:
+        - docker
+        - docker.socket
+      ignore_errors: yes
 
     # ============ KERNEL MODULES ============
     - name: Load required kernel modules
@@ -191,28 +199,12 @@
         create: yes
       loop: "{{ groups['k8s_cluster'] }}"
 
-    # ============ DOCKER COEXISTENCE CHECK ============
-    - name: Check if Docker is running
-      systemd:
-        name: docker
-      register: docker_status
-      ignore_errors: yes
-
-    - name: Docker coexistence notice
-      debug:
-        msg: |
-          ℹ️  Docker detected and running on {{ inventory_hostname }}
-
-          RKE2 uses containerd (not Docker) but both can coexist.
-          Existing Docker containers will continue to run.
-
-          After K8s migration is complete, you can optionally:
-          1. Migrate Docker workloads to K8s
-          2. Keep Docker for development/testing
-          3. Remove Docker if no longer needed
-
-          NO ACTION TAKEN - Docker left untouched.
-      when: docker_status.status.ActiveState | default('') == 'active'
+    # ============ BUILD TOOLS ============
+    - name: Ensure buildah is installed (daemonless image builder)
+      apt:
+        name: buildah
+        state: present
+      when: ansible_os_family == "Debian"
 
 # ============ NFS SETUP ON GPU NODES ============
 - name: Setup NFS mounts on GPU nodes

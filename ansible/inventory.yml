@@ -55,7 +55,7 @@ all:
           nfs_mount: /mnt/hydra-nfs
 
         cerberus:
-          ansible_host: 192.168.1.233
+          ansible_host: 192.168.1.242
           node_role: training
           node_labels:
             hydra.node-role: training

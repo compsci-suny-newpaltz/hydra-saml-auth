@@ -83,7 +83,7 @@
   \normalsize SUNY New Paltz --- Computer Science Department
 }
 \author{Infrastructure Team}
-\date{February 7, 2026}
+\date{February 9, 2026}
 
 \begin{document}
 \maketitle
@@ -144,7 +144,7 @@ Servers & \texttt{https://hydra.newpaltz.edu/servers} & Cluster status \\
 \midrule
 Hydra & 192.168.1.160 & Control plane, etcd & Ubuntu 22.04.5 & 64 cores, 256 GB RAM, 21 TB RAID-10 \\
 Chimera & 192.168.1.150 & GPU inference & Ubuntu 24.04.2 & 48 cores, 256 GB RAM, 3x RTX 3090 (72 GB VRAM) \\
-Cerberus & 192.168.1.233 & GPU training & Ubuntu 24.04.3 & 48 cores, 64 GB RAM, 2x RTX 5090 (64 GB VRAM) \\
+Cerberus & 192.168.1.242 & GPU training & Ubuntu 24.04.3 & 48 cores, 64 GB RAM, 2x RTX 5090 (64 GB VRAM) \\
 \bottomrule
 \end{tabular}
 \caption{All nodes run RKE2 v1.28.4+rke2r1 with containerd 1.7.7.}
@@ -321,7 +321,7 @@ The main authentication and container management service. Handles:
 
 \subsection{CS Lab Website}
 
-React frontend + Express backend + MariaDB database. Serves the department homepage at \texttt{hydra.newpaltz.edu}.
+React frontend + Express backend + SQLite database (single pod). Serves the department homepage at \texttt{hydra.newpaltz.edu}. MariaDB was removed on Feb 9, 2026 --- the codebase uses \texttt{better-sqlite3} exclusively.
 
 \begin{table}[H]
 \centering
@@ -329,13 +329,12 @@ React frontend + Express backend + MariaDB database. Serves the department homep
 \toprule
 \textbf{Component} & \textbf{Port} & \textbf{Image} \\
 \midrule
-cs-lab-backend & 5001 & newpaltz-cs-lab-website-backend:latest \\
-cs-lab-db & 3306 & mariadb:10.11 \\
+cs-lab & 5001 & newpaltz-cs-lab-website-backend:latest \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\textbf{Database:} 15 tables including Admins, Events, Faculty, Courses, StudentHighlightBlog, TechBlog, etc.
+\textbf{Database:} SQLite at \texttt{/app/server/data/cslab.db}. 15 tables including Admins, Events, Faculty, Courses, StudentHighlightBlog, TechBlog, etc. Persisted via PVC \texttt{cs-lab-data}.
 
 \textbf{Manifests:} \texttt{k8s/components/cs-lab/}
 
@@ -1250,7 +1249,27 @@ The infrastructure evolved through several phases:
     \item \textbf{Docker Compose} --- Containerized services, Nginx reverse proxy
     \item \textbf{K3s} --- Initial Kubernetes, migrated from Docker Compose
     \item \textbf{RKE2} --- Current production cluster (January 2026), Traefik ingress
+    \item \textbf{Infrastructure Overhaul} --- February 9, 2026 (see below)
 \end{enumerate}
+
+\section{February 9, 2026 --- Infrastructure Overhaul}
+
+Following a 5-hour OOM death spiral that made the server unresponsive, the following changes were applied:
+
+\begin{enumerate}[nosep]
+    \item \textbf{Phase 1: Docker cleanup} --- Pruned 11.86 GB orphaned Docker volumes, stopped and disabled Docker daemon on all nodes. Build tool changed to \texttt{buildah} (daemonless).
+    \item \textbf{Phase 2: Networking} --- Removed nginx (conflicted with Traefik on port 80), fixed SUNYCAT.png route, fixed OpenWebUI cross-namespace reference, corrected OpenWebUI API fallback URL.
+    \item \textbf{Phase 3: CS Lab consolidation} --- Removed MariaDB pod (app uses SQLite). Went from 2 pods (backend + MariaDB) to 1 pod (cs-lab). Removed \texttt{mariadb} npm dependency.
+    \item \textbf{Phase 4: RKE2 data migration} --- Moved \texttt{/var/lib/rancher/rke2} (40 GB) to RAID at \texttt{/data/rke2}. Symlinked old path for backward compatibility. Config updated: \texttt{data-dir: /data/rke2}.
+    \item \textbf{Phase 5: OOM prevention} --- Added 32 GB swap on RAID (\texttt{vm.swappiness=10}), kubelet eviction thresholds (\texttt{memory.available<2Gi} hard, \texttt{4Gi} soft), \texttt{system-reserved=4Gi}, \texttt{kube-reserved=2Gi}. Applied \texttt{ResourceQuota} and \texttt{LimitRange} to \texttt{hydra-students} namespace (default 2Gi/1CPU per container, max 48Gi/16CPU). Enabled auto-reboot after kernel updates at 04:00.
+\end{enumerate}
+
+\textbf{Build tools after overhaul:}
+\begin{itemize}[nosep]
+    \item \texttt{buildah} --- Daemonless OCI image builder (primary)
+    \item \texttt{nerdctl} --- Docker-compatible CLI for containerd (\texttt{/usr/local/bin/nerdctl})
+    \item Docker daemon is \textbf{disabled} (\texttt{systemctl disable docker})
+\end{itemize}
 
 \section{References}
 

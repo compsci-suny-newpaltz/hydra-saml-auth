@@ -7,7 +7,7 @@
 
   vars:
     rke2_config_dir: /etc/rancher/rke2
-    rke2_data_dir: /var/lib/rancher/rke2
+    rke2_data_dir: /data/rke2
     # Token file - use existing if present, generate once if not
     token_file: "{{ playbook_dir }}/../.cluster-token"
 
@@ -25,13 +25,13 @@
 
     - name: Check for existing node token
       stat:
-        path: /var/lib/rancher/rke2/server/node-token
+        path: /data/rke2/server/node-token
       register: existing_token_file
 
     # ============ TOKEN MANAGEMENT (CRITICAL FOR IDEMPOTENCY) ============
     - name: Read existing token if cluster already running
       slurp:
-        src: /var/lib/rancher/rke2/server/node-token
+        src: /data/rke2/server/node-token
       register: existing_token
       when: existing_token_file.stat.exists
 
@@ -137,8 +137,17 @@
           # Write kubeconfig with proper permissions
           write-kubeconfig-mode: "0644"
 
-          # Data directory (ensure this is on persistent storage)
+          # Data directory on RAID (/data is mdadm RAID-10, 21TB)
           data-dir: {{ rke2_data_dir }}
+
+          # Kubelet eviction thresholds (OOM prevention)
+          kubelet-arg:
+            - "eviction-hard=memory.available<2Gi,nodefs.available<10%"
+            - "eviction-soft=memory.available<4Gi,nodefs.available<15%"
+            - "eviction-soft-grace-period=memory.available=30s,nodefs.available=1m"
+            - "eviction-max-pod-grace-period=120"
+            - "system-reserved=memory=4Gi,cpu=2"
+            - "kube-reserved=memory=2Gi,cpu=1"
         mode: '0600'
       register: config_changed
 
@@ -196,7 +205,7 @@
     - name: Wait for node to be ready
       shell: |
         export KUBECONFIG=/etc/rancher/rke2/rke2.yaml
-        /var/lib/rancher/rke2/bin/kubectl wait --for=condition=Ready node/{{ inventory_hostname }} --timeout=300s
+        /data/rke2/bin/kubectl wait --for=condition=Ready node/{{ inventory_hostname }} --timeout=300s
       register: node_ready
       retries: 10
       delay: 30
@@ -205,7 +214,7 @@
     # ============ POST-INSTALL SETUP ============
     - name: Create kubectl symlink
       file:
-        src: /var/lib/rancher/rke2/bin/kubectl
+        src: /data/rke2/bin/kubectl
         dest: /usr/local/bin/kubectl
         state: link
         force: yes
