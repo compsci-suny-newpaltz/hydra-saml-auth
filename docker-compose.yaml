@@ -1,3 +1,6 @@
+# DEPRECATED: This Docker Compose file is for legacy/fallback use only.
+# Production deployment uses RKE2 Kubernetes. See k8s/components/hydra-auth/
+# To deploy on K8s: kubectl apply -f k8s/components/hydra-auth/
 services:
   hydra-saml-auth:
     build:
