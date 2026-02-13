@@ -124,16 +124,16 @@ function buildPodSpec(username, email, config) {
             // Add back only minimal capabilities needed for container operation
             // CHOWN: Required for volume permission setup
             // DAC_OVERRIDE: Required for entrypoint to modify system files
+            // SETUID/SETGID: Required for supervisor to switch to student user (UID 1000)
             // NET_BIND_SERVICE: Allow binding to ports < 1024 (SSH on 22)
-            // Note: SETUID/SETGID not needed since container runs as root (UID 0)
-            add: ['CHOWN', 'DAC_OVERRIDE', 'NET_BIND_SERVICE']
+            add: ['CHOWN', 'DAC_OVERRIDE', 'SETUID', 'SETGID', 'NET_BIND_SERVICE']
           }
         },
         // Disable password auth on startup for security
         lifecycle: {
           postStart: {
             exec: {
-              command: ['/bin/sh', '-c', 'sed -i "s/^PasswordAuthentication yes/PasswordAuthentication no/" /etc/ssh/sshd_config && sed -i "s/^#*AllowUsers/#AllowUsers/" /etc/ssh/sshd_config || true']
+              command: ['/bin/sh', '-c', 'sed -i \'s|port=127.0.0.1:9001|port=0.0.0.0:9001|\' /etc/supervisor/conf.d/supervisord.conf; sed -i \'/^username=student/d\' /etc/supervisor/conf.d/supervisord.conf; sed -i \'/^password=%(ENV_PASSWORD)s/d\' /etc/supervisor/conf.d/supervisord.conf; sed -i "s/^PasswordAuthentication yes/PasswordAuthentication no/" /etc/ssh/sshd_config; sed -i "s/^#*AllowUsers/#AllowUsers/" /etc/ssh/sshd_config; true']
             }
           }
         }

@@ -413,7 +413,7 @@ router.post('/init', async (req, res) => {
                 cpus: req.body.cpus || resourceConfig.defaults.cpus,
                 gpu_count: req.body.gpu_count || 0,
                 jupyter_approved: !!quota.jupyter_execution_approved,
-                jenkins_approved: !!quota.jenkins_execution_approved
+                jenkins_approved: true
             });
 
             // Start approved services (supervisor autostart=false for jupyter and jenkins)
@@ -424,10 +424,9 @@ router.post('/init', async (req, res) => {
                     await k8sContainers.controlService(username, 'jupyter', 'start');
                     jupyterStarted = true;
                 }
-                if (quota.jenkins_execution_approved) {
-                    await k8sContainers.controlService(username, 'jenkins', 'start');
-                    jenkinsStarted = true;
-                }
+                // Jenkins is always available — auto-start on init
+                await k8sContainers.controlService(username, 'jenkins', 'start');
+                jenkinsStarted = true;
             } catch (err) {
                 console.log(`[containers] Could not auto-start services for ${username}:`, err.message);
             }
@@ -610,7 +609,8 @@ router.post('/init', async (req, res) => {
                 await exec.start({ Detach: false, Tty: false });
                 jupyterStarted = true;
             }
-            if (quota.jenkins_execution_approved) {
+            // Jenkins is always available — auto-start on init
+            {
                 const exec = await container.exec({
                     Cmd: ['supervisorctl', 'start', 'jenkins'],
                     AttachStdout: true, AttachStderr: true
@@ -1481,19 +1481,6 @@ router.post('/services/:service/start', async (req, res) => {
                 return res.status(403).json({
                     success: false,
                     message: 'Jupyter execution requires approval. Please request access from the dashboard Manage Resources menu.',
-                    requires_approval: true
-                });
-            }
-        }
-
-        // Check Jenkins execution approval before starting
-        if (serviceName === 'jenkins') {
-            const { getOrCreateUserQuota } = require('../services/db-init');
-            const quota = await getOrCreateUserQuota(username, req.user.email);
-            if (!quota.jenkins_execution_approved) {
-                return res.status(403).json({
-                    success: false,
-                    message: 'Jenkins requires approval. Please request access from the dashboard Manage Resources menu.',
                     requires_approval: true
                 });
             }

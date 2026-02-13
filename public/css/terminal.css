@@ -495,3 +495,111 @@ body.terminal-bg {
 .storage-summary span {
   color: var(--text-cyan);
 }
+
+/* Hosted Services Section */
+.services-section {
+  margin-top: 30px;
+}
+
+.services-header {
+  text-align: center;
+  margin-bottom: 16px;
+  color: var(--text-green);
+  white-space: pre;
+  font-size: 14px;
+}
+
+.services-header .title {
+  color: var(--text-cyan);
+  font-weight: bold;
+}
+
+.services-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.service-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-dim);
+  padding: 12px;
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+a.service-card {
+  cursor: pointer;
+}
+
+a.service-card:hover {
+  background: #1a1a1a;
+  border-color: var(--text-cyan);
+}
+
+.service-card.online {
+  border-left: 3px solid var(--text-green);
+}
+
+.service-card.warning {
+  border-left: 3px solid var(--text-amber);
+}
+
+.service-card.offline {
+  border-left: 3px solid var(--text-red);
+  opacity: 0.6;
+}
+
+.service-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.service-name {
+  color: var(--text-cyan);
+  font-weight: bold;
+  font-size: 12px;
+}
+
+.service-status {
+  font-size: 10px;
+  padding: 1px 6px;
+  font-weight: bold;
+}
+
+.service-status.online {
+  background: var(--text-green);
+  color: var(--bg-dark);
+}
+
+.service-status.warning {
+  background: var(--text-amber);
+  color: var(--bg-dark);
+}
+
+.service-status.offline {
+  background: var(--text-red);
+  color: var(--text-white);
+}
+
+.service-desc {
+  color: var(--text-dim);
+  font-size: 10px;
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.service-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--text-green-dim);
+}
+
+.service-path {
+  color: var(--text-dim);
+}

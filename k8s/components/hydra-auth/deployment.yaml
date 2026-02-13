@@ -20,6 +20,7 @@ spec:
         app.kubernetes.io/component: auth
     spec:
       serviceAccountName: hydra-auth
+      dnsPolicy: ClusterFirst
       # Dev only: resolve mock-saml-idp to Traefik for metadata fetch
       # Remove or update hostAliases in production
       hostAliases:

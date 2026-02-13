@@ -582,4 +582,151 @@ function generateMockStorageCluster(showPodDetails = false) {
   };
 }
 
+/**
+ * Service definitions for hosted applications
+ * Each service is checked via its K8s service endpoint
+ */
+const HOSTED_SERVICES = [
+  {
+    id: 'cs-lab',
+    name: 'CS Lab Website',
+    path: '/',
+    healthPath: '/api/courses',
+    namespace: 'hydra-system',
+    selector: 'app.kubernetes.io/name=cs-lab',
+    port: 5001,
+    description: 'Department homepage, courses, faculty, events'
+  },
+  {
+    id: 'jflap',
+    name: 'FLAPJS',
+    path: '/jflap',
+    healthPath: '/jflap',
+    namespace: 'hydra-infra',
+    selector: 'app=flapjs',
+    port: 8080,
+    description: 'Formal languages and automata simulator'
+  },
+  {
+    id: 'git-learning',
+    name: 'Git Learning',
+    path: '/git/',
+    healthPath: '/git/',
+    namespace: 'hydra-infra',
+    selector: 'app=git-learning',
+    port: 38765,
+    description: 'Interactive Git tutorial and playground'
+  },
+  {
+    id: 'java-executor',
+    name: 'Java Executor',
+    path: '/java',
+    healthPath: '/java/health',
+    namespace: 'hydra-infra',
+    selector: 'app=java-executor',
+    port: 3000,
+    description: 'Online Java code execution sandbox'
+  },
+  {
+    id: 'hackathons',
+    name: 'Hackathon Voting',
+    path: '/hackathons/',
+    healthPath: '/hackathons/',
+    namespace: 'hydra-infra',
+    selector: 'app=hackathons',
+    port: 45821,
+    description: 'Hackathon project submission and judging'
+  },
+  {
+    id: 'open-webui',
+    name: 'OpenWebUI (GPT)',
+    path: null,
+    externalUrl: 'https://gpt.hydra.newpaltz.edu',
+    healthPath: null,
+    namespace: 'hydra-infra',
+    selector: 'app=open-webui',
+    port: 3000,
+    description: 'AI chat interface powered by local LLMs'
+  },
+  {
+    id: 'n8n',
+    name: 'n8n Workflows',
+    path: null,
+    externalUrl: 'https://n8n.hydra.newpaltz.edu',
+    healthPath: null,
+    namespace: 'hydra-infra',
+    selector: 'app=n8n',
+    port: 5678,
+    description: 'Workflow automation platform'
+  }
+];
+
+/**
+ * GET /api/servers/services
+ * Returns status of all hosted services by checking K8s pod status
+ */
+router.get('/services', async (req, res) => {
+  try {
+    const services = await Promise.all(
+      HOSTED_SERVICES.map(async (svc) => {
+        const result = {
+          id: svc.id,
+          name: svc.name,
+          path: svc.path,
+          externalUrl: svc.externalUrl || null,
+          description: svc.description,
+          status: 'unknown',
+          pods: { running: 0, total: 0 }
+        };
+
+        // Check pod status via K8s
+        try {
+          if (k8sClient) {
+            const pods = await k8sClient.listPods(svc.selector, svc.namespace);
+            result.pods.total = pods.length;
+            result.pods.running = pods.filter(p =>
+              p.status?.phase === 'Running' &&
+              p.status?.containerStatuses?.[0]?.ready
+            ).length;
+
+            if (result.pods.running > 0) {
+              result.status = 'online';
+            } else if (result.pods.total > 0) {
+              result.status = 'degraded';
+            } else {
+              result.status = 'offline';
+            }
+          }
+        } catch (err) {
+          // If K8s check fails, try HTTP health check as fallback
+          result.status = 'unknown';
+        }
+
+        // HTTP health check fallback (only for services with healthPath)
+        if (result.status === 'unknown' && svc.healthPath) {
+          try {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 3000);
+            const resp = await fetch(`http://localhost:6969${svc.healthPath}`, {
+              signal: controller.signal,
+              redirect: 'manual'
+            });
+            clearTimeout(timeout);
+            result.status = (resp.status >= 200 && resp.status < 400) ? 'online' : 'degraded';
+          } catch {
+            result.status = 'offline';
+          }
+        }
+
+        return result;
+      })
+    );
+
+    res.json({ services, checked_at: new Date().toISOString() });
+  } catch (error) {
+    console.error('[servers-api] Failed to check services:', error);
+    res.status(500).json({ error: 'Failed to check service status' });
+  }
+});
+
 module.exports = router;

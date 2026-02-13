@@ -314,7 +314,7 @@ apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRoute
 metadata:
   name: java-executor
-  namespace: hydra-system
+  namespace: hydra-infra
 spec:
   entryPoints:
     - web
@@ -323,18 +323,30 @@ spec:
     - match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/java`)
       kind: Rule
       priority: 15
+      middlewares:
+        - name: java-strip
       services:
-        - name: java-executor-external
-          port: 55392
+        - name: java-executor
+          port: 3000
   tls:
     certResolver: letsencrypt
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: java-strip
+  namespace: hydra-infra
+spec:
+  stripPrefix:
+    prefixes:
+      - /java
 ---
 # Git learning app route
 apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRoute
 metadata:
   name: git-learning
-  namespace: hydra-system
+  namespace: hydra-infra
 spec:
   entryPoints:
     - web
@@ -344,8 +356,8 @@ spec:
       kind: Rule
       priority: 15
       services:
-        - name: git-learning-external
-          port: 8080
+        - name: git-learning
+          port: 38765
   tls:
     certResolver: letsencrypt
 ---

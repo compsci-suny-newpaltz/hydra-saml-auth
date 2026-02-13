@@ -1157,16 +1157,9 @@
                 <div>
                   <div class="font-semibold">Jenkins CI/CD</div>
                   <div id="jenkins-service-status" class="text-sm text-gray-600"></div>
-                  <div id="jenkins-execution-status" class="text-xs text-gray-500"></div>
                 </div>
               </div>
               <div class="flex gap-2">
-                <!-- Shown when execution NOT approved -->
-                <button onclick="requestJenkinsExecution()" id="jenkins-request-btn"
-                  class="px-3 py-1 text-sm rounded bg-yellow-100 hover:bg-yellow-200 border border-yellow-400 text-yellow-700 hidden">
-                  <i class="fas fa-lock"></i> Request Jenkins Access
-                </button>
-                <!-- Shown when execution IS approved -->
                 <button onclick="startService('jenkins')" id="jenkins-start-btn"
                   class="px-3 py-1 text-sm rounded bg-green-100 hover:bg-green-200 border border-green-300 text-green-700">
                   Start
@@ -1466,28 +1459,28 @@
 
                 <p class="font-semibold mb-2">Services in your container:</p>
                 <ul class="list-disc list-inside space-y-1 ml-2">
-                  <li><strong>VS Code (code-server)</strong> - Full IDE in your browser</li>
-                  <li><strong>Jupyter Lab</strong> - Interactive Python notebooks</li>
+                  <li><a href="https://coder.com/docs/code-server" target="_blank" class="text-blue-600 underline"><strong>VS Code</strong></a> (<a href="https://github.com/coder/code-server" target="_blank" class="text-blue-600 underline">code-server</a>) - Full IDE in your browser</li>
+                  <li><a href="https://jupyterlab.readthedocs.io/" target="_blank" class="text-blue-600 underline"><strong>Jupyter Lab</strong></a> - Interactive Python notebooks (requires approval)</li>
+                  <li><a href="https://www.jenkins.io/doc/" target="_blank" class="text-blue-600 underline"><strong>Jenkins</strong></a> - CI/CD automation server for build pipelines and testing</li>
                   <li><strong>SSH Server</strong> - Connect at <code class="bg-gray-100 px-1 rounded">hydra.newpaltz.edu:2222</code></li>
-                  <li><strong>Jenkins</strong> - CI/CD automation server</li>
                   <li><strong>10GB Persistent Storage</strong> - RAID-backed, persists between sessions</li>
                 </ul>
 
                 <p class="mt-3 font-semibold mb-2">Programming Languages:</p>
                 <ul class="list-disc list-inside space-y-1 ml-2">
-                  <li><strong>Python 3</strong> - with pip, venv, Jupyter kernel</li>
-                  <li><strong>Node.js 20</strong> - with nvm, npm, pnpm</li>
-                  <li><strong>Java JDK 21</strong> - full development kit</li>
-                  <li><strong>C/C++</strong> - GCC, G++, Clangd language server</li>
+                  <li><a href="https://docs.python.org/3/" target="_blank" class="text-blue-600 underline"><strong>Python 3</strong></a> - with <a href="https://pip.pypa.io/" target="_blank" class="text-blue-600 underline">pip</a>, venv, <a href="https://jupyter.org/" target="_blank" class="text-blue-600 underline">Jupyter</a> kernel</li>
+                  <li><a href="https://nodejs.org/docs/latest-v20.x/api/" target="_blank" class="text-blue-600 underline"><strong>Node.js 20</strong></a> - with <a href="https://github.com/nvm-sh/nvm" target="_blank" class="text-blue-600 underline">nvm</a>, <a href="https://docs.npmjs.com/" target="_blank" class="text-blue-600 underline">npm</a>, <a href="https://pnpm.io/" target="_blank" class="text-blue-600 underline">pnpm</a></li>
+                  <li><a href="https://docs.oracle.com/en/java/javase/21/" target="_blank" class="text-blue-600 underline"><strong>Java JDK 21</strong></a> - full development kit</li>
+                  <li><strong>C/C++</strong> - <a href="https://gcc.gnu.org/onlinedocs/" target="_blank" class="text-blue-600 underline">GCC</a>, G++, <a href="https://clangd.llvm.org/" target="_blank" class="text-blue-600 underline">Clangd</a> language server</li>
                   <li><strong>LCC Assembly</strong> - lcc, lcc-sim, ilcc (interactive debugger)</li>
                 </ul>
 
                 <p class="mt-3 font-semibold mb-2">Build & Dev Tools:</p>
                 <ul class="list-disc list-inside space-y-1 ml-2">
-                  <li><strong>Build:</strong> CMake, Make, GDB (debugger)</li>
-                  <li><strong>Version Control:</strong> Git</li>
-                  <li><strong>Containers:</strong> Docker CLI, docker-compose, buildx</li>
-                  <li><strong>Editors:</strong> nano, vim</li>
+                  <li><strong>Build:</strong> <a href="https://cmake.org/documentation/" target="_blank" class="text-blue-600 underline">CMake</a>, <a href="https://www.gnu.org/software/make/manual/" target="_blank" class="text-blue-600 underline">Make</a>, <a href="https://sourceware.org/gdb/documentation/" target="_blank" class="text-blue-600 underline">GDB</a> (debugger)</li>
+                  <li><strong>Version Control:</strong> <a href="https://git-scm.com/doc" target="_blank" class="text-blue-600 underline">Git</a></li>
+                  <li><strong>Containers:</strong> <a href="https://docs.docker.com/reference/cli/docker/" target="_blank" class="text-blue-600 underline">Docker CLI</a>, <a href="https://docs.docker.com/compose/" target="_blank" class="text-blue-600 underline">docker-compose</a>, buildx</li>
+                  <li><strong>Editors:</strong> nano, <a href="https://www.vim.org/docs.php" target="_blank" class="text-blue-600 underline">vim</a></li>
                 </ul>
 
                 <p class="mt-3 font-semibold mb-2">VS Code Extensions (pre-installed):</p>
@@ -1495,14 +1488,14 @@
                   <li><strong>Languages:</strong> Python, Java (RedHat + Debug + Test + Maven), C/C++ (Clangd), LCC Tools</li>
                   <li><strong>Web Dev:</strong> ESLint, Prettier, Live Server, HTML/CSS, React snippets</li>
                   <li><strong>Database:</strong> SQLTools (MySQL, PostgreSQL, SQLite drivers)</li>
-                  <li><strong>CI/CD:</strong> Jenkins Pipeline, Groovy, GitHub Actions</li>
+                  <li><strong>CI/CD:</strong> <a href="https://plugins.jenkins.io/workflow-aggregator/" target="_blank" class="text-blue-600 underline">Jenkins Pipeline</a>, Groovy, GitHub Actions</li>
                   <li><strong>Other:</strong> Docker, PDF Viewer, LaTeX Workshop, Hex Editor, Code Runner</li>
                 </ul>
 
                 <p class="mt-3 font-semibold mb-2">Platform Services (outside container):</p>
                 <ul class="list-disc list-inside space-y-1 ml-2">
-                  <li><strong>Open WebUI</strong> - Chat with AI models, generate OpenAI-compatible API keys</li>
-                  <li><strong>n8n</strong> - Visual workflow automation for APIs</li>
+                  <li><a href="https://docs.openwebui.com/" target="_blank" class="text-blue-600 underline"><strong>Open WebUI</strong></a> - Chat with AI models, generate OpenAI-compatible API keys</li>
+                  <li><a href="https://docs.n8n.io/" target="_blank" class="text-blue-600 underline"><strong>n8n</strong></a> - Visual workflow automation for APIs</li>
                   <li><strong>Port Routing</strong> - Expose your web apps with secure URLs</li>
                 </ul>
               </div>
@@ -1523,6 +1516,52 @@
               </summary>
               <div class="px-4 pb-4 text-sm text-gray-600">
                 Your container includes Python 3, Node.js (with pnpm), Java JDK 21, GCC/G++, GDB, NASM (for assembly), CMake, Make, Git, and Docker CLI. Text editors include nano and vim. VS Code comes pre-configured with extensions for C/C++, Python, Java, Go, x86 Assembly, and more.
+              </div>
+            </details>
+            <details class="group">
+              <summary class="flex justify-between items-center p-4 cursor-pointer hover:bg-gray-50">
+                <span class="font-medium">How does Jenkins work in my container?</span>
+                <i class="fas fa-chevron-down text-gray-400 group-open:rotate-180 transition-transform"></i>
+              </summary>
+              <div class="px-4 pb-4 text-sm text-gray-600">
+                <p class="mb-2">Each student container includes a personal <a href="https://www.jenkins.io/doc/" target="_blank" class="text-blue-600 underline">Jenkins</a> instance for continuous integration and testing. Use the <strong>Start</strong>/<strong>Stop</strong> buttons on the dashboard to control it.</p>
+
+                <p class="font-semibold mb-2">Getting started:</p>
+                <ol class="list-decimal list-inside space-y-1 ml-2 mb-3">
+                  <li>Click <strong>Start</strong> next to Jenkins on the dashboard</li>
+                  <li>Click <strong>Open</strong> to access the Jenkins UI in your browser</li>
+                  <li>On first launch, Jenkins will initialize (this takes ~30 seconds)</li>
+                  <li>Create a new <a href="https://www.jenkins.io/doc/book/pipeline/" target="_blank" class="text-blue-600 underline">Pipeline</a> or <a href="https://www.jenkins.io/doc/book/pipeline/multibranch/" target="_blank" class="text-blue-600 underline">Multibranch Pipeline</a> job</li>
+                </ol>
+
+                <p class="font-semibold mb-2">Running tests with Jenkins:</p>
+                <p class="mb-2">Jenkins automates your build-and-test workflow. Create a <code class="bg-gray-100 px-1 rounded">Jenkinsfile</code> in your project root:</p>
+                <pre class="bg-gray-100 p-3 rounded text-xs overflow-x-auto mb-3"><code>pipeline {
+  agent any
+  stages {
+    stage('Build') {
+      steps {
+        sh 'make build'   // or npm install, mvn compile, etc.
+      }
+    }
+    stage('Test') {
+      steps {
+        sh 'make test'    // or npm test, mvn test, pytest, etc.
+      }
+    }
+  }
+}</code></pre>
+
+                <p class="font-semibold mb-2">Common test commands by language:</p>
+                <ul class="list-disc list-inside space-y-1 ml-2 mb-3">
+                  <li><strong>Python:</strong> <code class="bg-gray-100 px-1 rounded">pytest</code> or <code class="bg-gray-100 px-1 rounded">python -m unittest</code></li>
+                  <li><strong>Java:</strong> <code class="bg-gray-100 px-1 rounded">mvn test</code> or <code class="bg-gray-100 px-1 rounded">gradle test</code></li>
+                  <li><strong>Node.js:</strong> <code class="bg-gray-100 px-1 rounded">npm test</code></li>
+                  <li><strong>C/C++:</strong> <code class="bg-gray-100 px-1 rounded">make test</code> or <code class="bg-gray-100 px-1 rounded">ctest</code></li>
+                </ul>
+
+                <p class="mb-2">Jenkins stores its configuration in <code class="bg-gray-100 px-1 rounded">~/.jenkins</code> inside your persistent storage, so your jobs and build history survive container restarts.</p>
+                <p>See the <a href="https://www.jenkins.io/doc/tutorials/" target="_blank" class="text-blue-600 underline">Jenkins Tutorials</a> for step-by-step guides on setting up pipelines for your language.</p>
               </div>
             </details>
             <details class="group">
@@ -2548,69 +2587,8 @@
         }
       };
 
-      // Jenkins Execution Approval Functions
-      async function checkJenkinsExecutionStatus() {
-        try {
-          const res = await fetch('/dashboard/api/containers/jenkins-status', { credentials: 'same-origin' });
-          const data = await res.json();
-
-          const requestBtn = document.getElementById('jenkins-request-btn');
-          const startBtn = document.getElementById('jenkins-start-btn');
-          const stopBtn = document.getElementById('jenkins-stop-btn');
-          const openBtn = document.getElementById('jenkins-open-btn');
-          const statusEl = document.getElementById('jenkins-execution-status');
-
-          if (data.jenkins_execution_approved) {
-            if (requestBtn) requestBtn.classList.add('hidden');
-            if (startBtn) startBtn.classList.remove('hidden');
-            if (stopBtn) stopBtn.classList.remove('hidden');
-            if (openBtn) openBtn.classList.remove('hidden');
-            if (statusEl) {
-              statusEl.textContent = 'CI/CD enabled';
-              statusEl.className = 'text-xs text-green-600';
-            }
-          } else {
-            if (requestBtn) requestBtn.classList.remove('hidden');
-            if (startBtn) startBtn.classList.add('hidden');
-            if (stopBtn) stopBtn.classList.add('hidden');
-            if (openBtn) openBtn.classList.add('hidden');
-            if (statusEl) {
-              statusEl.textContent = 'Requires approval';
-              statusEl.className = 'text-xs text-yellow-600';
-            }
-          }
-        } catch (err) {
-          console.error('Failed to check Jenkins status:', err);
-        }
-      }
-
-      window.requestJenkinsExecution = async function() {
-        const reason = prompt('Why do you need Jenkins CI/CD access? (e.g., course project, software engineering class)');
-        if (!reason) return;
-
-        try {
-          const res = await fetch('/dashboard/api/containers/jenkins-request', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'same-origin',
-            body: JSON.stringify({ reason })
-          });
-          const data = await res.json();
-          if (data.success) {
-            alert(data.already_approved
-              ? 'Jenkins is already approved! Please refresh the page.'
-              : 'Jenkins access request submitted! An admin will review your request.');
-          } else {
-            alert(data.message || 'Failed to submit request');
-          }
-        } catch (err) {
-          alert('Failed to submit Jenkins request: ' + err.message);
-        }
-      };
-
       // Check Jupyter status on load
       checkJupyterExecutionStatus();
-      checkJenkinsExecutionStatus();
 
       // SSH Access Functions
       window.toggleSSHDropdown = function() {

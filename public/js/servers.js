@@ -8,10 +8,12 @@ let isUpdating = false;
 document.addEventListener('DOMContentLoaded', () => {
   updateTimestamp();
   fetchServerStatus();
+  fetchServiceStatus();
 
   // Set up auto-refresh
   refreshTimer = setInterval(() => {
     fetchServerStatus();
+    fetchServiceStatus();
   }, REFRESH_INTERVAL);
 
   // Update timestamp every second
@@ -322,6 +324,51 @@ function renderStorageCluster(data, showPodDetails = false) {
   totalEl.textContent = `${totalPods} / ${maxCapacity} pods`;
   usedEl.textContent = `${runningCount} running`;
   availEl.textContent = `${emptySlots} available`;
+}
+
+// Hosted Services
+async function fetchServiceStatus() {
+  try {
+    const response = await fetch('/api/servers/services');
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    renderServices(data.services);
+  } catch (error) {
+    console.error('Failed to fetch service status:', error);
+  }
+}
+
+function renderServices(services) {
+  const grid = document.getElementById('services-grid');
+  if (!services || services.length === 0) {
+    grid.innerHTML = '<div class="loading">No services found</div>';
+    return;
+  }
+
+  grid.innerHTML = services.map(svc => {
+    const statusClass = svc.status === 'online' ? 'online' :
+                        svc.status === 'degraded' ? 'warning' : 'offline';
+    const statusText = svc.status.toUpperCase();
+    const url = svc.externalUrl || (svc.path ? svc.path : '#');
+    const isClickable = svc.status === 'online' && url !== '#';
+    const tag = isClickable ? 'a' : 'div';
+    const href = isClickable ? ` href="${url}" target="_blank" rel="noopener noreferrer"` : '';
+    const pods = svc.pods ? `${svc.pods.running}/${svc.pods.total}` : '--';
+
+    return `
+      <${tag} class="service-card ${statusClass}"${href}>
+        <div class="service-card-header">
+          <span class="service-name">${svc.name}</span>
+          <span class="service-status ${statusClass}">${statusText}</span>
+        </div>
+        <div class="service-desc">${svc.description}</div>
+        <div class="service-meta">
+          <span class="service-pods">PODS: ${pods}</span>
+          <span class="service-path">${svc.externalUrl || svc.path || '--'}</span>
+        </div>
+      </${tag}>
+    `;
+  }).join('');
 }
 
 // Clean up on page unload
