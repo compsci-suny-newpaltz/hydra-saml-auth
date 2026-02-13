@@ -1288,23 +1288,6 @@ SSHPiper & \texttt{k8s/components/sshpiper/} \\
 \end{tabular}
 \end{table}
 
-\section{Namespace Layout}
-
-\begin{table}[H]
-\centering
-\begin{tabular}{lp{8cm}}
-\toprule
-\textbf{Namespace} & \textbf{Contents} \\
-\midrule
-\texttt{hydra-system} & Core services: traefik, hydra-auth, cs-lab \\
-\texttt{hydra-infra} & Infrastructure: n8n, openwebui, ollama, ray, git-learning, hackathons, flapjs, java-executor, sshpiper \\
-\texttt{hydra-students} & Student containers (dynamically created per-user) \\
-\texttt{gpu-operator} & NVIDIA GPU Operator, device plugin, DCGM exporter \\
-\texttt{kube-system} & K8s system components (etcd, coredns, canal, metrics-server) \\
-\bottomrule
-\end{tabular}
-\end{table}
-
 %% ============================================================
 %% OPENWEBUI API ACCESS
 %% ============================================================
@@ -1799,6 +1782,70 @@ Following a 5-hour OOM death spiral that made the server unresponsive, the follo
     \item OpenWebUI: \url{https://docs.openwebui.com}
     \item Ray: \url{https://docs.ray.io/}
     \item n8n: \url{https://docs.n8n.io/}
+\end{itemize}
+
+\section{February 12--13, 2026 --- Reliability, Scheduling, and Service Fixes}
+
+\subsection{Traefik HA and Eviction Protection}
+
+\begin{enumerate}[nosep]
+    \item \textbf{Health probes} --- Added \texttt{--ping=true} entrypoint on port 8082 with liveness probe (10s period, 3 failures) and readiness probe (5s period, 2 failures). Traefik now auto-restarts on hang.
+    \item \textbf{PodDisruptionBudget} --- Created \texttt{k8s/components/traefik/pdb.yaml} with \texttt{minAvailable: 1} to prevent voluntary eviction during node drains.
+    \item \textbf{PriorityClass} --- Created \texttt{infra-critical} (value 1000000) in \texttt{k8s/components/traefik/priority.yaml}. Applied to all 12 Hydra infrastructure services (traefik, hydra-auth, sshpiper, cs-lab, ollama, open-webui, n8n, flapjs, hackathons, git-learning, java-executor, n8n-user-manager). Student pods use default priority and are evicted first under memory pressure.
+    \item \textbf{Resource bump} --- Traefik CPU request 100m$\to$200m, limit 500m$\to$1000m. Memory request 64Mi$\to$128Mi, limit 256Mi$\to$512Mi.
+\end{enumerate}
+
+\subsection{Backup System Restoration}
+
+\begin{enumerate}[nosep]
+    \item \textbf{Backup disk full} --- \texttt{/mnt/sdh4} was at 100\% due to model weight backups from Chimera/Cerberus (163 GB of \texttt{.gguf} and \texttt{.safetensors} files). Deleted model backups, freed space to 84\%.
+    \item \textbf{Model exclusions} --- Updated \texttt{/usr/local/bin/backup-cluster.sh} to exclude \texttt{/models/*}, \texttt{*.gguf}, \texttt{*.safetensors}, and \texttt{/data/rke2/*} from Chimera/Cerberus backups.
+    \item \textbf{Mount guard} --- Added \texttt{mountpoint -q /mnt/sdh4} check at top of backup script to prevent writing to unmounted path.
+    \item \textbf{Cron re-enabled} --- Uncommented backup cron (Saturday 1:00 AM) and certbot renewal (Saturday 2:45 AM) in root crontab.
+    \item \textbf{fstab entry} --- Added \texttt{/dev/sdh4 /mnt/sdh4 ext4 defaults,nofail 0 2} for auto-mount on boot.
+    \item \textbf{etcd snapshots} --- Added \texttt{etcd-snapshot-schedule-cron: "0 */6 * * *"} and \texttt{etcd-snapshot-retention: 10} to \texttt{/etc/rancher/rke2/config.yaml}.
+\end{enumerate}
+
+\subsection{Cross-Node Pod Scheduling}
+
+\begin{enumerate}[nosep]
+    \item \textbf{Soft affinity} --- Changed student pod scheduling from hard \texttt{nodeSelector} to soft \texttt{preferredDuringSchedulingIgnoredDuringExecution} (weight 80). Pods prefer their target node but spill over to other nodes under pressure.
+    \item \textbf{Node labels} --- Added \texttt{hydra.student-schedulable=true} to all 3 nodes. Hard \texttt{nodeSelector} requires this label so pods only land on labeled nodes.
+    \item \textbf{GPU tolerations} --- All student pods now tolerate \texttt{nvidia.com/gpu} NoSchedule taint so they can schedule on Chimera/Cerberus when Hydra is overloaded.
+    \item \textbf{NFS storage} --- Switched student PVC storage class from \texttt{hydra-local} to \texttt{hydra-nfs} so volumes are accessible from any node.
+    \item \textbf{Image distribution} --- Updated \texttt{scripts/build-deploy.sh} to automatically \texttt{scp} and \texttt{ctr import} student container images to Chimera and Cerberus after build.
+\end{enumerate}
+
+\subsection{Service Start/Stop/Status Fixes}
+
+\begin{enumerate}[nosep]
+    \item \textbf{KILL capability} --- Container security context was missing \texttt{KILL} in the capabilities list. Supervisor (running as root inside the container) could not send SIGTERM to stop managed processes (code-server, jupyter, jenkins). Added \texttt{KILL} to \texttt{capabilities.add} in \texttt{buildPodSpec()}. All 27 student pods rolling-restarted to pick up the fix.
+    \item \textbf{XML status parsing} --- The \texttt{getServiceStatus()} function used a regex that failed on multiline XML from supervisor's \texttt{getAllProcessInfo} API. It fell through to a broken fallback that used \texttt{xmlResponse.includes('STOPPED')} on the entire response --- if ANY service was stopped, ALL services showed as stopped on the dashboard. Replaced with per-struct-block parsing that correctly extracts each process's state independently.
+\end{enumerate}
+
+\subsection{Jenkins Routing Fix}
+
+\begin{enumerate}[nosep]
+    \item \textbf{Strip-prefix conflict} --- Jenkins is started with \texttt{--prefix=/students/\{user\}/jenkins} (handles its own path prefix). But the Traefik IngressRoute applied \texttt{strip-prefix} middleware, stripping the prefix before forwarding --- so Jenkins received \texttt{/} and returned 404.
+    \item \textbf{Fix} --- Removed \texttt{strip-prefix} middleware from Jenkins routes in \texttt{buildIngressRouteSpec()}, matching the existing Jupyter pattern (which also handles its own \texttt{base\_url}). Patched all 32 live student IngressRoutes (28 were missing Jenkins routes entirely, 2 had the strip-prefix bug).
+\end{enumerate}
+
+\subsection{CSS Routing Fix}
+
+\begin{enumerate}[nosep]
+    \item \textbf{Duplicate IngressRoute} --- Two \texttt{hydra-main} IngressRoutes existed: one using \texttt{traefik.containo.us/v1alpha1} (production, with \texttt{/css} route at priority 5) and one using \texttt{traefik.io/v1alpha1} (from \texttt{fix-k8s-routes.sh}, missing \texttt{/css} route). The \texttt{traefik.io} catch-all intercepted CSS requests and returned \texttt{text/html} instead of \texttt{text/css}.
+    \item \textbf{Fix} --- Deleted the \texttt{traefik.io} duplicate: \texttt{kubectl delete ingressroute.traefik.io hydra-main -n hydra-system}. CSS now served correctly with proper content-type.
+\end{enumerate}
+
+\textbf{Files modified:}
+\begin{itemize}[nosep]
+    \item \texttt{services/k8s-containers.js} --- Soft affinity, KILL capability, XML parsing, Jenkins strip-prefix removal
+    \item \texttt{scripts/build-deploy.sh} --- Image distribution to all cluster nodes
+    \item \texttt{k8s/components/traefik/deployment.yaml} --- Health probes, resources, priorityClassName
+    \item \texttt{k8s/components/traefik/pdb.yaml} --- New PodDisruptionBudget
+    \item \texttt{k8s/components/traefik/priority.yaml} --- New PriorityClass
+    \item \texttt{/usr/local/bin/backup-cluster.sh} --- Model exclusions, mount guard
+    \item \texttt{/etc/rancher/rke2/config.yaml} --- etcd snapshot schedule
 \end{itemize}
 
 \end{document}
