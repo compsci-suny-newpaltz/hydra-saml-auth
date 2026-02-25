@@ -397,11 +397,8 @@ async function generateMockServerData(showPodDetails = false) {
  * - Cerberus: 48 CPU cores, 62 GB RAM, 110 pod limit
  * - Total: 116 cores, 564 GB RAM, 330 pod limit
  *
- * With base pod (0.5 CPU, 1.5 GB RAM):
- * - By CPU: 116 / 0.5 = 232 pods
- * - By Memory: 564 / 1.5 = 376 pods
- * - By Pod limit: 330 pods
- * - Effective max: 232 pods (CPU bottleneck)
+ * Idle pods use sleep preset (0.05 CPU, 64Mi RAM) so capacity is
+ * calculated dynamically from actual resource requests, not worst-case.
  */
 async function generateStorageClusterData(showPodDetails = false) {
   // Cluster-wide capacity (all 3 nodes combined)
@@ -416,18 +413,11 @@ async function generateStorageClusterData(showPodDetails = false) {
   const TOTAL_POD_LIMIT = 110 + 110 + 110; // 330
   const TOTAL_STORAGE_TB = 21;
 
-  // Base pod resource allocation (conservative preset)
-  const BASE_CPU_REQUEST = 0.5;  // cores
-  const BASE_MEMORY_GB = 1.5;    // GB
-  const BASE_STORAGE_GB = 10;    // GB
-
-  // Calculate max capacity by each resource (cluster-wide)
-  const maxByCpu = Math.floor(TOTAL_CPU_CORES / BASE_CPU_REQUEST);      // 232
-  const maxByMemory = Math.floor(TOTAL_MEMORY_GB / BASE_MEMORY_GB);     // 376
-  const maxByStorage = Math.floor((TOTAL_STORAGE_TB * 1024) / BASE_STORAGE_GB); // 2150
-
-  // Effective max is minimum of all constraints
-  const MAX_PODS = Math.min(maxByCpu, maxByMemory, TOTAL_POD_LIMIT); // 232
+  // Resource requests per pod state
+  const ACTIVE_CPU_REQUEST = 0.5;  // cores (conservative preset)
+  const SLEEP_CPU_REQUEST = 0.05;  // cores (sleep preset)
+  const BASE_MEMORY_GB = 1.5;     // GB
+  const BASE_STORAGE_GB = 10;     // GB
 
   try {
     if (!k8sClient) {
@@ -440,6 +430,7 @@ async function generateStorageClusterData(showPodDetails = false) {
 
     const students = [];
     let runningCount = 0;
+    let totalCpuRequested = 0; // Track actual CPU reserved by existing pods
 
     for (const pod of pods) {
       const podName = pod.metadata?.name || '';
@@ -464,6 +455,15 @@ async function generateStorageClusterData(showPodDetails = false) {
       const memoryRequest = resources.requests?.memory || '512Mi';
       const cpuRequest = resources.requests?.cpu || '500m';
 
+      // Parse CPU request to cores for capacity tracking
+      let cpuCores = ACTIVE_CPU_REQUEST;
+      if (cpuRequest.endsWith('m')) {
+        cpuCores = parseInt(cpuRequest) / 1000;
+      } else {
+        cpuCores = parseFloat(cpuRequest) || ACTIVE_CPU_REQUEST;
+      }
+      totalCpuRequested += cpuCores;
+
       // Parse memory to GB (rough estimate)
       let memoryGb = 0.5;
       if (memoryRequest.includes('Gi')) {
@@ -481,7 +481,8 @@ async function generateStorageClusterData(showPodDetails = false) {
           used_gb: memoryGb,
           quota_gb: BASE_STORAGE_GB,
           phase,
-          pod_ip: pod.status?.podIP || null
+          pod_ip: pod.status?.podIP || null,
+          cpu_request: cpuRequest
         });
       } else {
         // Redacted info for non-admins - just show status
@@ -490,6 +491,16 @@ async function generateStorageClusterData(showPodDetails = false) {
         });
       }
     }
+
+    // Dynamic capacity: how many new pods can fit given actual CPU usage
+    // Idle pods on sleep preset use 0.05 CPU, active pods use 0.5 CPU
+    // New pods start active (0.5 CPU) but will sleep after idle timeout
+    const remainingCpu = TOTAL_CPU_CORES - totalCpuRequested;
+    const additionalPodsByCpu = Math.floor(remainingCpu / SLEEP_CPU_REQUEST);
+    const additionalPodsByMemory = Math.floor(TOTAL_MEMORY_GB / BASE_MEMORY_GB) - students.length;
+    const additionalPodsByLimit = TOTAL_POD_LIMIT - students.length;
+    const additionalPods = Math.max(0, Math.min(additionalPodsByCpu, additionalPodsByMemory, additionalPodsByLimit));
+    const MAX_PODS = students.length + additionalPods;
 
     // Sort by status: running first, then pending, then stopped
     students.sort((a, b) => {
@@ -504,14 +515,13 @@ async function generateStorageClusterData(showPodDetails = false) {
       max_capacity: MAX_PODS,
       empty_slots: MAX_PODS - students.length,
       capacity_info: {
-        max_by_cpu: maxByCpu,
-        max_by_memory: maxByMemory,
-        max_by_storage: maxByStorage,
+        total_cpu_cores: TOTAL_CPU_CORES,
+        cpu_requested: Math.round(totalCpuRequested * 100) / 100,
+        cpu_available: Math.round(remainingCpu * 100) / 100,
         k8s_limit: TOTAL_POD_LIMIT,
-        bottleneck: 'cpu',
         nodes: CLUSTER_NODES
       },
-      total_used_gb: students.reduce((sum, s) => sum + s.used_gb, 0),
+      total_used_gb: students.reduce((sum, s) => sum + (s.used_gb || 0), 0),
       available_tb: TOTAL_STORAGE_TB - (students.length * BASE_STORAGE_GB / 1024)
     };
   } catch (err) {
