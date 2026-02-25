@@ -1,0 +1,157 @@
+% Example document using hydra-doc.sty
+% Compile from docs/templates/:  pdflatex example.tex && pdflatex example.tex
+\documentclass[11pt,a4paper]{article}
+\usepackage{hydra-doc}
+
+%% Logo is in the same directory when compiling from templates/
+\setlogopath{newpaltz-logo}
+
+%% Header text
+\fancyhead[L]{\small Example Document}
+\fancyhead[R]{\small SUNY New Paltz}
+
+\hydradate{February 2026}
+
+\begin{document}
+
+\hydratitlepage{Example Document}{Hydra Doc Template Demo}{Infrastructure Team}
+
+\tableofcontents
+\newpage
+
+%% ============================================================
+\section{Getting Started}
+%% ============================================================
+
+To use the SUNY New Paltz CS document template, add this to your preamble:
+
+\begin{lstlisting}[style=bash]
+\usepackage{hydra-doc}        % when compiling from docs/templates/
+\usepackage{templates/hydra-doc}  % when compiling from docs/
+\end{lstlisting}
+
+The package loads all required packages, defines official brand colors,
+listing styles, callout box environments, and sets up headers/footers.
+
+%% ============================================================
+\section{Brand Colors}
+%% ============================================================
+
+The template uses the official SUNY New Paltz brand colors:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Color} & \textbf{Name} & \textbf{Hex} \\
+\midrule
+\textcolor{np-blue}{\rule{1em}{1em}} & \texttt{np-blue} (Pantone 281) & \texttt{\#003E7E} \\
+\textcolor{np-orange}{\rule{1em}{1em}} & \texttt{np-orange} (Pantone 165) & \texttt{\#F58426} \\
+\textcolor{np-gold}{\rule{1em}{1em}} & \texttt{np-gold} (Pantone 7409) & \texttt{\#FDB924} \\
+\textcolor{np-lightblue}{\rule{1em}{1em}} & \texttt{np-lightblue} (Pantone 639) & \texttt{\#00A5D9} \\
+\textcolor{np-coral}{\rule{1em}{1em}} & \texttt{np-coral} (Pantone 7417) & \texttt{\#F26649} \\
+\textcolor{np-lime}{\rule{1em}{1em}} & \texttt{np-lime} (Pantone 583) & \texttt{\#B0BC22} \\
+\textcolor{np-slate}{\rule{1em}{1em}} & \texttt{np-slate} (Pantone 5425) & \texttt{\#80A1B6} \\
+\textcolor{np-brown}{\rule{1em}{1em}} & \texttt{np-brown} (Pantone 174) & \texttt{\#A84D10} \\
+\bottomrule
+\end{tabular}
+\caption{Official SUNY New Paltz brand colors}
+\end{table}
+
+%% ============================================================
+\section{Callout Boxes}
+%% ============================================================
+
+Four callout box environments are available:
+
+\begin{infobox}
+\textbf{Info:} Use \texttt{infobox} for general information and tips.
+\end{infobox}
+
+\begin{warningbox}
+\textbf{Warning:} Use \texttt{warningbox} for important warnings.
+\end{warningbox}
+
+\begin{successbox}
+\textbf{Success:} Use \texttt{successbox} for confirmations and good outcomes.
+\end{successbox}
+
+\begin{dangerbox}
+\textbf{Danger:} Use \texttt{dangerbox} for critical alerts.
+\end{dangerbox}
+
+Inline callout commands:
+
+\notebox{This is an inline note created with \cmdref{\textbackslash notebox\{...\}}.}
+
+\warnbox{This is an inline warning created with \cmdref{\textbackslash warnbox\{...\}}.}
+
+%% ============================================================
+\section{Code Listings}
+%% ============================================================
+
+Three listing styles are predefined: \texttt{bash}, \texttt{yaml}, and \texttt{js}.
+
+\subsection{Bash}
+
+\begin{lstlisting}[style=bash]
+# Check cluster health
+kubectl get nodes -o wide
+kubectl get pods -A | grep -v Running
+\end{lstlisting}
+
+\subsection{YAML}
+
+\begin{lstlisting}[style=yaml]
+apiVersion: v1
+kind: Service
+metadata:
+  name: hydra-auth
+  namespace: hydra-system
+spec:
+  ports:
+    - port: 6969
+      targetPort: 6969
+\end{lstlisting}
+
+\subsection{JavaScript}
+
+\begin{lstlisting}[style=js]
+const express = require('express');
+const app = express();
+
+app.get('/health', (req, res) => {
+    res.json({ status: 'ok' });
+});
+\end{lstlisting}
+
+%% ============================================================
+\section{Tables}
+%% ============================================================
+
+Use \texttt{booktabs} for clean tables:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}llr@{}}
+\toprule
+\textbf{Node} & \textbf{Role} & \textbf{RAM} \\
+\midrule
+Hydra    & Control plane   & 256 GB \\
+Chimera  & GPU inference   & 64 GB  \\
+Cerberus & GPU training    & 64 GB  \\
+\bottomrule
+\end{tabular}
+\caption{Cluster nodes}
+\end{table}
+
+%% ============================================================
+\section{References and Links}
+%% ============================================================
+
+Use \cmdref{\textbackslash cmdref\{...\}} for inline monospace references
+like \cmdref{kubectl get pods} or file paths like \cmdref{/etc/rancher/rke2/config.yaml}.
+
+Hyperlinks work as expected: \url{https://docs.rke2.io/}
+
+\end{document}

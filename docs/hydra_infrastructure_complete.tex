@@ -1,98 +1,28 @@
 % Hydra Infrastructure Complete Reference — SUNY New Paltz CS Lab
 % Consolidated from all docs/ files, K8s manifests, and audit reports
-% Last updated: February 9, 2026
+% Last updated: February 25, 2026
 \documentclass[11pt,a4paper]{article}
-\usepackage[utf8]{inputenc}
-\usepackage[T1]{fontenc}
-\usepackage{mathpazo}            % Palatino serif (body + math)
-\usepackage[scaled=0.85]{inconsolata}  % clean monospace for code
-\usepackage{microtype}           % better character spacing/kerning
-\usepackage{geometry}
-\usepackage{hyperref}
-\usepackage{listings}
-\usepackage{xcolor}
-\usepackage{booktabs}
-\usepackage{array}
-\usepackage{fancyhdr}
-\usepackage{enumitem}
-\usepackage{float}
-\usepackage{mdframed}
-\usepackage{longtable}
-\usepackage{tikz}
-\usepackage{graphicx}
-\usepackage{titlesec}
-\usetikzlibrary{shapes,arrows,positioning,fit,backgrounds,calc}
+\usepackage{templates/hydra-doc}
 
-\geometry{margin=1in}
-
-% Colors
-\definecolor{hydra-blue}{RGB}{5,32,73}
-\definecolor{code-bg}{RGB}{248,248,248}
-\definecolor{warning-bg}{RGB}{255,243,205}
-\definecolor{success-bg}{RGB}{212,237,218}
-\definecolor{info-bg}{RGB}{217,237,247}
-\definecolor{danger-bg}{RGB}{248,215,218}
-
-\hypersetup{colorlinks=true,linkcolor=hydra-blue,urlcolor=blue}
-
-\lstdefinestyle{bash}{
-  backgroundcolor=\color{code-bg},
-  basicstyle=\ttfamily\small,
-  breaklines=true,
-  frame=single,
-  numbers=none,
-  xleftmargin=2pt,
-  xrightmargin=2pt,
-  aboveskip=6pt,
-  belowskip=6pt
-}
-\lstdefinestyle{yaml}{
-  backgroundcolor=\color{code-bg},
-  basicstyle=\ttfamily\small,
-  breaklines=true,
-  frame=single,
-  numbers=left,
-  xleftmargin=2pt,
-  xrightmargin=2pt
-}
-\lstdefinestyle{js}{
-  backgroundcolor=\color{code-bg},
-  basicstyle=\ttfamily\small,
-  breaklines=true,
-  frame=single,
-  numbers=left,
-  language=Java
-}
-
-\newmdenv[backgroundcolor=warning-bg,linewidth=0pt,innerleftmargin=10pt,innerrightmargin=10pt,innertopmargin=10pt,innerbottommargin=10pt]{warningbox}
-\newmdenv[backgroundcolor=success-bg,linewidth=0pt,innerleftmargin=10pt,innerrightmargin=10pt,innertopmargin=10pt,innerbottommargin=10pt]{successbox}
-\newmdenv[backgroundcolor=info-bg,linewidth=0pt,innerleftmargin=10pt,innerrightmargin=10pt,innertopmargin=10pt,innerbottommargin=10pt]{infobox}
-\newmdenv[backgroundcolor=danger-bg,linewidth=0pt,innerleftmargin=10pt,innerrightmargin=10pt,innertopmargin=10pt,innerbottommargin=10pt]{dangerbox}
-
-\pagestyle{fancy}
-\fancyhf{}
 \fancyhead[L]{\textbf{Hydra Infrastructure}}
 \fancyhead[R]{\textbf{Complete Reference}}
-\fancyfoot[C]{\thepage}
-\setlength{\headheight}{14pt}
 
-\title{
-  \textbf{Hydra Infrastructure}\\[0.3em]
-  \textbf{Complete Reference Manual}\\[0.8em]
-  \large RKE2 Kubernetes Cluster\\
-  Student Container Platform\\
-  GPU Computing Infrastructure\\[0.5em]
-  \normalsize SUNY New Paltz --- Computer Science Department
-}
-\author{Infrastructure Team}
-\date{February 25, 2026}
+\hydradate{February 25, 2026}
 
 \begin{document}
-\maketitle
+
+\hydratitlepage{Hydra Infrastructure}{Complete Reference Manual}{Infrastructure Team}
 
 \begin{center}
 \fbox{\parbox{0.9\textwidth}{\centering\textbf{Note:} GitHub's PDF viewer may not render this document correctly. Please download the PDF to view it with a local PDF reader. This document contains clickable links and a navigable table of contents.}}
 \end{center}
+
+\vspace{0.5em}
+{\centering\large
+  RKE2 Kubernetes Cluster ~$\cdot$~
+  Student Container Platform ~$\cdot$~
+  GPU Computing Infrastructure\par}
+\vspace{1em}
 
 \tableofcontents
 \newpage
@@ -1684,7 +1614,7 @@ A comprehensive infrastructure cleanup was performed February 4--7, 2026:
 Hydra & Docker system prune & 114.8 GB \\
 Hydra & Remove stale files (\texttt{/opt/local-path-provisioner.bak}, temp files) & 20+ GB \\
 Hydra & Truncate backup log & 389 MB \\
-Chimera & Remove Docker Ollama duplicate + prune & 41.2 GB \\
+Chimera & Remove Docker duplicate images + prune & 41.2 GB \\
 Cerberus & Docker system prune & 51.3 GB \\
 \midrule
 \textbf{Total} & & \textbf{$\sim$227 GB} \\
@@ -1766,7 +1696,6 @@ Following a 5-hour OOM death spiral that made the server unresponsive, the follo
     \item Azure AD SAML: \url{https://learn.microsoft.com/en-us/entra/identity/}
     \item NVIDIA GPU Operator: \url{https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/}
     \item OpenWebUI: \url{https://docs.openwebui.com}
-    \item Ray: \url{https://docs.ray.io/}
     \item n8n: \url{https://docs.n8n.io/}
 \end{itemize}
 

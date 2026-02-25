@@ -1,0 +1,238 @@
+%% hydra-doc.sty — SUNY New Paltz Computer Science document template
+%% Official brand colors from https://www.newpaltz.edu/ocm/style-guide/
+%%
+%% Usage:  \usepackage{templates/hydra-doc}   (from docs/)
+%%         \usepackage{hydra-doc}             (from docs/templates/)
+%%
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{hydra-doc}[2026/02/25 SUNY New Paltz CS document style]
+
+%% ============================================================
+%%  Packages
+%% ============================================================
+\RequirePackage[utf8]{inputenc}
+\RequirePackage[T1]{fontenc}
+\RequirePackage{mathptmx}                        % Times Roman (IEEE-compatible)
+\RequirePackage[scaled=0.85]{inconsolata}        % clean monospace for code
+\RequirePackage{microtype}                       % better character spacing
+\RequirePackage[margin=1in]{geometry}
+\RequirePackage{graphicx}
+\RequirePackage{xcolor}
+\RequirePackage{listings}
+\RequirePackage{enumitem}
+\RequirePackage{booktabs}
+\RequirePackage{longtable}
+\RequirePackage{array}
+\RequirePackage{tabularx}
+\RequirePackage{fancyhdr}
+\RequirePackage{titlesec}
+\RequirePackage{float}
+\RequirePackage{mdframed}
+\RequirePackage{tikz}
+\usetikzlibrary{shapes,arrows,positioning,fit,backgrounds,calc}
+
+%% hyperref loaded last (as recommended)
+\RequirePackage[colorlinks=true,
+                linkcolor=np-blue,
+                urlcolor=np-blue!80!black,
+                citecolor=np-blue,
+                bookmarks=true,
+                pdfauthor={SUNY New Paltz --- Computer Science Department}]{hyperref}
+
+%% ============================================================
+%%  Official SUNY New Paltz Brand Colors
+%%  Source: https://www.newpaltz.edu/ocm/style-guide/
+%% ============================================================
+
+%% Primary palette
+\definecolor{np-blue}{RGB}{0,62,126}        % Pantone 281  — primary blue
+\definecolor{np-orange}{RGB}{245,132,38}     % Pantone 165  — primary orange
+
+%% Secondary palette
+\definecolor{np-gold}{RGB}{253,185,36}       % Pantone 7409
+\definecolor{np-lightblue}{RGB}{0,165,217}   % Pantone 639
+\definecolor{np-coral}{RGB}{242,102,73}      % Pantone 7417
+\definecolor{np-lime}{RGB}{176,188,34}       % Pantone 583
+\definecolor{np-slate}{RGB}{128,161,182}     % Pantone 5425
+\definecolor{np-brown}{RGB}{168,77,16}       % Pantone 174
+
+%% Functional colors (derived from brand)
+\definecolor{code-bg}{RGB}{248,248,248}
+\definecolor{code-frame}{RGB}{200,200,200}
+\definecolor{code-kw}{RGB}{0,62,126}         % np-blue for keywords
+\definecolor{code-comment}{RGB}{0,128,0}
+\definecolor{code-string}{RGB}{168,77,16}    % np-brown for strings
+\definecolor{warning-bg}{RGB}{255,243,205}
+\definecolor{success-bg}{RGB}{212,237,218}
+\definecolor{info-bg}{RGB}{217,237,247}
+\definecolor{danger-bg}{RGB}{248,215,218}
+\definecolor{note-frame}{RGB}{253,185,36}    % np-gold border
+\definecolor{warn-frame}{RGB}{242,102,73}    % np-coral border
+
+%% Legacy aliases (backward compatibility)
+\colorlet{hydra-blue}{np-blue}
+\colorlet{sectionblue}{np-blue}
+
+%% ============================================================
+%%  Listing styles
+%% ============================================================
+\lstset{
+    backgroundcolor=\color{code-bg},
+    frame=single,
+    rulecolor=\color{code-frame},
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{code-kw}\bfseries,
+    commentstyle=\color{code-comment}\itshape,
+    stringstyle=\color{code-string},
+    breaklines=true,
+    breakatwhitespace=false,
+    showstringspaces=false,
+    tabsize=2,
+    captionpos=b,
+    xleftmargin=1em,
+    xrightmargin=1em,
+    aboveskip=1em,
+    belowskip=0.8em,
+    literate={~}{{\raisebox{0.5ex}{\texttildelow}}}{1},
+}
+
+\lstdefinestyle{bash}{
+    language=bash,
+    numbers=none,
+    morekeywords={sudo,apt,brew,curl,docker,kubectl,buildah,nerdctl,
+                  make,git,cd,mkdir,cat,echo,chmod,wget,ssh,export},
+}
+
+\lstdefinestyle{yaml}{
+    numbers=left,
+    morecomment=[l]{\#},
+    morestring=[b]',
+    morestring=[b]",
+}
+
+\lstdefinestyle{js}{
+    language=Java,
+    numbers=left,
+}
+
+%% ============================================================
+%%  Callout box environments (mdframed)
+%% ============================================================
+\newmdenv[backgroundcolor=warning-bg,linewidth=0pt,
+          innerleftmargin=10pt,innerrightmargin=10pt,
+          innertopmargin=10pt,innerbottommargin=10pt]{warningbox}
+
+\newmdenv[backgroundcolor=success-bg,linewidth=0pt,
+          innerleftmargin=10pt,innerrightmargin=10pt,
+          innertopmargin=10pt,innerbottommargin=10pt]{successbox}
+
+\newmdenv[backgroundcolor=info-bg,linewidth=0pt,
+          innerleftmargin=10pt,innerrightmargin=10pt,
+          innertopmargin=10pt,innerbottommargin=10pt]{infobox}
+
+\newmdenv[backgroundcolor=danger-bg,linewidth=0pt,
+          innerleftmargin=10pt,innerrightmargin=10pt,
+          innertopmargin=10pt,innerbottommargin=10pt]{dangerbox}
+
+%% ============================================================
+%%  Convenience commands
+%% ============================================================
+
+%% Inline callout boxes
+\newcommand{\notebox}[1]{%
+    \vspace{0.5em}
+    \noindent
+    \fcolorbox{note-frame}{warning-bg}{%
+        \begin{minipage}{0.94\textwidth}
+            \textbf{Note:} #1
+        \end{minipage}%
+    }
+    \vspace{0.5em}
+}
+
+\newcommand{\warnbox}[1]{%
+    \vspace{0.5em}
+    \noindent
+    \fcolorbox{warn-frame}{danger-bg}{%
+        \begin{minipage}{0.94\textwidth}
+            \textbf{Warning:} #1
+        \end{minipage}%
+    }
+    \vspace{0.5em}
+}
+
+%% Monospace code reference
+\newcommand{\cmdref}[1]{\texttt{#1}}
+
+%% Document date setter
+\newcommand{\hydradate}[1]{\date{#1}}
+
+%% ============================================================
+%%  Title page with SUNY New Paltz branding
+%% ============================================================
+
+%% Internal: store logo path (resolved relative to compile dir)
+\newcommand{\np@logopath}{templates/newpaltz-logo}
+\newcommand{\setlogopath}[1]{\renewcommand{\np@logopath}{#1}}
+
+%% \hydratitlepage{Title}{Subtitle}{Author}
+%% Produces a branded title page with logo, orange rule, and department line
+\newcommand{\hydratitlepage}[3]{%
+    \begin{titlepage}
+    \centering
+    \vspace*{1cm}
+    %% University logo
+    \IfFileExists{\np@logopath.jpg}{%
+        \includegraphics[width=0.55\textwidth]{\np@logopath}%
+    }{%
+        \IfFileExists{\np@logopath.pdf}{%
+            \includegraphics[width=0.55\textwidth]{\np@logopath}%
+        }{%
+            {\Large\bfseries\color{np-blue}SUNY New Paltz}%
+        }%
+    }
+    \vspace{1cm}
+
+    {\color{np-orange}\rule{0.8\textwidth}{2pt}}
+
+    \vspace{0.8cm}
+    {\Huge\bfseries\color{np-blue}#1\par}
+    \vspace{0.4cm}
+    {\LARGE\color{np-blue!80!black}#2\par}
+    \vspace{1.2cm}
+
+    {\color{np-orange}\rule{0.8\textwidth}{2pt}}
+
+    \vspace{0.8cm}
+    {\large\color{np-blue}Computer Science Department\par}
+    \vspace{0.3cm}
+    {\large #3\par}
+    \vspace{0.5cm}
+    {\large \@date\par}
+
+    \vfill
+    {\small\color{np-slate}State University of New York at New Paltz}
+    \end{titlepage}
+}
+
+%% ============================================================
+%%  Header / footer defaults
+%% ============================================================
+\pagestyle{fancy}
+\fancyhf{}
+\fancyfoot[C]{\thepage}
+\setlength{\headheight}{14pt}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.2pt}
+
+%% ============================================================
+%%  Section title coloring (brand blue)
+%% ============================================================
+\titleformat{\section}
+    {\normalfont\Large\bfseries\color{np-blue}}
+    {\thesection}{1em}{}
+\titleformat{\subsection}
+    {\normalfont\large\bfseries\color{np-blue!80!black}}
+    {\thesubsection}{1em}{}
+
+\endinput
