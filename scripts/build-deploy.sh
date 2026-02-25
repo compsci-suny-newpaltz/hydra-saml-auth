@@ -57,11 +57,19 @@ build_student() {
     sudo rm -f "$TAR"
     sudo buildah push "ndg8743/hydra-student-container:$TAG" "docker-archive:${TAR}:${IMAGE}"
     $CTR images import "$TAR"
+
+    # Distribute image to all cluster nodes so pods can schedule anywhere
+    for NODE in chimera cerberus; do
+        echo "=== Distributing to $NODE ==="
+        sudo scp "$TAR" "${NODE}:/tmp/student-container.tar" && \
+        sudo ssh "$NODE" "/var/lib/rancher/rke2/bin/ctr --address /run/k3s/containerd/containerd.sock -n k8s.io images import /tmp/student-container.tar && rm -f /tmp/student-container.tar" \
+            && echo "OK: $NODE" \
+            || echo "WARN: Failed to distribute to $NODE (pods will still work on hydra)"
+    done
     sudo rm -f "$TAR"
 
-    echo "=== student-container image imported ($TAG) ==="
+    echo "=== student-container image distributed to cluster ($TAG) ==="
     echo "NOTE: Existing student pods need restart to use the new image."
-    echo "  Update STUDENT_IMAGE in .env or K8s configmap to: $IMAGE"
 }
 
 case "$TARGET" in

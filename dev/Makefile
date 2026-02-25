@@ -2,6 +2,7 @@
 
 .PHONY: help setup start stop restart logs clean reset nuke nuke-execute nuke-force shell test rm-students \
 	k8s-setup k8s-start k8s-stop k8s-logs k8s-clean k8s-shell k8s-status \
+	k8s-deploy-all k8s-test-student k8s-rm-students \
 	debug-saml test-api normalize-eol normalize-eol-windows
 
 # Default target
@@ -34,6 +35,9 @@ help:
 	@echo "make k8s-shell   - Shell into hydra-auth pod"
 	@echo "make k8s-status  - Show cluster status"
 	@echo "make k8s-clean   - Delete k3d cluster"
+	@echo "make k8s-deploy-all   - Full kubectl deploy (namespaces, RBAC, Traefik, hydra-auth, mocks)"
+	@echo "make k8s-test-student - Create a test student pod and verify code-server"
+	@echo "make k8s-rm-students  - Remove all student pods from k8s cluster"
 
 # Cross-platform sleep command: use Windows timeout when running on Windows
 ifeq ($(OS),Windows_NT)
@@ -412,3 +416,83 @@ k8s-apply-base:
 # Apply GPU manifests (for production nodes)
 k8s-apply-gpu:
 	@kubectl apply -f ../k8s/gpu/
+
+# Full kubectl deployment sequence (manual alternative to k8s-setup + k8s-start)
+k8s-deploy-all:
+	@echo "=== Full kubectl deployment ==="
+	@echo ""
+	@echo "[1/7] Applying namespaces..."
+	@kubectl apply -f ../k8s/base/namespace.yaml
+	@echo ""
+	@echo "[2/7] Applying RBAC (roles, bindings, service accounts)..."
+	@kubectl apply -f ../k8s/base/rbac/
+	@echo ""
+	@echo "[3/7] Applying storage classes..."
+	@kubectl apply -f ../k8s/base/storage/
+	@echo ""
+	@echo "[4/7] Applying Traefik CRDs and components..."
+	@kubectl apply -f https://raw.githubusercontent.com/traefik/traefik/v2.11/docs/content/reference/dynamic-configuration/kubernetes-crd-definition-v1.yml
+	@kubectl apply -f ../k8s/components/traefik/deployment.yaml
+	@kubectl apply -f ../k8s/components/traefik/service.yaml
+	@kubectl apply -f ../k8s/components/traefik/ingressroute-hydra.yaml
+	@echo ""
+	@echo "[5/7] Applying hydra-auth components (configmap, pvc, service, deployment)..."
+	@kubectl apply -f ../k8s/components/hydra-auth/configmap.yaml
+	@kubectl apply -f ../k8s/components/hydra-auth/pvc.yaml
+	@kubectl apply -f ../k8s/components/hydra-auth/service.yaml
+	@kubectl apply -f ../k8s/components/hydra-auth/deployment.yaml
+	@echo ""
+	@echo "[6/7] Applying mock services..."
+	@kubectl apply -k ../k8s/dev/mock-services/
+	@echo ""
+	@echo "[7/7] Waiting for pods to be ready..."
+	@kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=hydra -n $(K8S_NAMESPACE) --timeout=120s || true
+	@kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=traefik -n $(K8S_NAMESPACE) --timeout=60s || true
+	@echo ""
+	@echo "=== Deployment complete ==="
+	@kubectl get pods -n $(K8S_NAMESPACE)
+	@kubectl get pods -n $(K8S_STUDENTS_NS) 2>/dev/null || true
+
+# Create a test student pod to verify the full pipeline
+k8s-test-student:
+	@echo "=== Creating test student pod ==="
+	@echo ""
+	@echo "Ensuring namespace $(K8S_STUDENTS_NS) exists..."
+	@kubectl create namespace $(K8S_STUDENTS_NS) 2>/dev/null || echo "Namespace $(K8S_STUDENTS_NS) already exists"
+	@echo ""
+	@echo "Creating test pod 'student-testuser'..."
+	@kubectl run student-testuser \
+		--image=hydra-saml-auth:dev \
+		--namespace=$(K8S_STUDENTS_NS) \
+		--labels="app.kubernetes.io/name=student-container,app.kubernetes.io/instance=testuser,app.kubernetes.io/managed-by=hydra-auth,hydra.owner=testuser" \
+		--env="USERNAME=testuser" \
+		--env="HOME=/home/student" \
+		--port=8443 \
+		--restart=Always \
+		2>/dev/null || echo "Pod student-testuser may already exist"
+	@echo ""
+	@echo "Waiting for pod to be ready..."
+	@kubectl wait --for=condition=Ready pod/student-testuser -n $(K8S_STUDENTS_NS) --timeout=120s
+	@echo ""
+	@echo "Verifying code-server is running..."
+	@kubectl exec student-testuser -n $(K8S_STUDENTS_NS) -- pgrep -f code-server > /dev/null 2>&1 \
+		&& echo "code-server: RUNNING" \
+		|| echo "code-server: NOT YET RUNNING (may still be starting)"
+	@echo ""
+	@echo "=== Test student pod ready ==="
+	@echo "  Pod:    student-testuser"
+	@echo "  NS:     $(K8S_STUDENTS_NS)"
+	@echo "  Access: kubectl exec -it student-testuser -n $(K8S_STUDENTS_NS) -- /bin/bash"
+	@echo "  URL:    http://hydra.local:6969/students/testuser/vscode/"
+	@echo ""
+	@echo "To clean up: kubectl delete pod student-testuser -n $(K8S_STUDENTS_NS)"
+
+# Remove all student pods from the k8s cluster
+k8s-rm-students:
+	@echo "Removing all student pods from namespace $(K8S_STUDENTS_NS)..."
+	@kubectl delete pods -l app.kubernetes.io/name=student-container -n $(K8S_STUDENTS_NS) 2>/dev/null \
+		|| echo "No student pods found in $(K8S_STUDENTS_NS)"
+	@echo ""
+	@echo "Remaining pods in $(K8S_STUDENTS_NS):"
+	@kubectl get pods -n $(K8S_STUDENTS_NS) 2>/dev/null || echo "  (none)"
+	@echo "Done."

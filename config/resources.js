@@ -89,6 +89,19 @@ module.exports = {
   // Resource presets (dropdown options for students)
   // Designed for ~500 students with 21TB total storage
   presets: {
+    sleep: {
+      id: 'sleep',
+      label: 'Sleep (Idle)',
+      description: 'Minimal resources for idle containers - auto-managed by sleep mode',
+      memory_mb: 256,
+      memory_gb: 0.25,
+      cpus: 0.25,
+      storage_gb: 10,
+      gpu_count: 0,
+      autoApproveOnHydra: true,
+      allowedNodes: ['hydra', 'chimera', 'cerberus'],
+      internal: true // Not shown in student dropdowns
+    },
     minimal: {
       id: 'minimal',
       label: 'Minimal',
@@ -255,6 +268,10 @@ module.exports = {
 
   // Kubernetes resource quota mappings for presets
   k8sResourceQuotas: {
+    sleep: {
+      requests: { memory: '64Mi', cpu: '50m' },
+      limits: { memory: '256Mi', cpu: '250m' }
+    },
     minimal: {
       requests: { memory: '512Mi', cpu: '250m' },
       limits: { memory: '1Gi', cpu: '1' }
@@ -329,7 +346,7 @@ module.exports = {
   // Get presets available for a specific node
   getPresetsForNode(nodeName) {
     return Object.values(this.presets).filter(
-      preset => preset.allowedNodes.includes(nodeName)
+      preset => preset.allowedNodes.includes(nodeName) && !preset.internal
     );
   },
 

@@ -21,6 +21,7 @@ spec:
         app.kubernetes.io/component: ingress
     spec:
       serviceAccountName: traefik
+      priorityClassName: infra-critical
       nodeSelector:
         kubernetes.io/hostname: hydra
       containers:
@@ -36,6 +37,9 @@ spec:
             - --entrypoints.web.address=:80
             - --entrypoints.websecure.address=:443
             - --entrypoints.hydra.address=:6969
+            - --entrypoints.ping.address=:8082
+            - --ping=true
+            - --ping.entryPoint=ping
             - --certificatesresolvers.letsencrypt.acme.email=cslab@newpaltz.edu
             - --certificatesresolvers.letsencrypt.acme.storage=/acme/acme.json
             - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
@@ -56,13 +60,27 @@ spec:
             - name: dashboard
               containerPort: 8080
               protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: 8082
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: 8082
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 2
           resources:
             requests:
-              memory: "64Mi"
-              cpu: "100m"
+              memory: "128Mi"
+              cpu: "200m"
             limits:
-              memory: "256Mi"
-              cpu: "500m"
+              memory: "512Mi"
+              cpu: "1000m"
           volumeMounts:
             - name: acme
               mountPath: /acme

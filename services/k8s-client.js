@@ -454,6 +454,38 @@ class K8sClient {
     return response.body.items;
   }
 
+  // ==================== POD METRICS ====================
+
+  // Get pod metrics from metrics-server (CPU/memory usage)
+  async getPodMetrics(namespace = this.namespace) {
+    this.init();
+    try {
+      const response = await this.customApi.listNamespacedCustomObject(
+        'metrics.k8s.io',
+        'v1beta1',
+        namespace,
+        'pods'
+      );
+      return response.body.items || [];
+    } catch (err) {
+      if (err.statusCode === 404) {
+        console.warn('[K8s] Metrics API not available (metrics-server not installed?)');
+        return [];
+      }
+      throw err;
+    }
+  }
+
+  // Patch a pod (for annotation updates, etc.)
+  async patchPod(name, namespace, patch) {
+    this.init();
+    const options = { headers: { 'Content-Type': 'application/strategic-merge-patch+json' } };
+    const response = await this.coreApi.patchNamespacedPod(
+      name, namespace, patch, undefined, undefined, undefined, undefined, undefined, options
+    );
+    return response.body;
+  }
+
   // ==================== NODE OPERATIONS ====================
 
   // List nodes

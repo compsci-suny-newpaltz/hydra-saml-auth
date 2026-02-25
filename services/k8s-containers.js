@@ -70,10 +70,27 @@ function buildPodSpec(username, email, config) {
           type: 'RuntimeDefault'
         }
       },
-      // Node selection
-      nodeSelector: nodeConfig?.k8s?.nodeSelector || { 'hydra.node-role': 'control-plane' },
-      // GPU tolerations
-      tolerations: nodeConfig?.k8s?.tolerations || [],
+      // Node selection — prefer target node but allow spillover to other nodes
+      // Hard requirement: node must be labeled hydra.student-schedulable=true
+      // Soft preference: schedule on the requested target node when possible
+      nodeSelector: { 'hydra.student-schedulable': 'true' },
+      affinity: {
+        nodeAffinity: {
+          preferredDuringSchedulingIgnoredDuringExecution: [{
+            weight: 80,
+            preference: {
+              matchExpressions: Object.entries(
+                nodeConfig?.k8s?.nodeSelector || { 'hydra.node-role': 'control-plane' }
+              ).map(([key, value]) => ({ key, operator: 'In', values: [value] }))
+            }
+          }]
+        }
+      },
+      // GPU tolerations — always include so pods can land on GPU nodes when needed
+      tolerations: [
+        ...(nodeConfig?.k8s?.tolerations || []),
+        { key: 'nvidia.com/gpu', operator: 'Exists', effect: 'NoSchedule' }
+      ],
       containers: [{
         name: 'student',
         image: gpuCount > 0 ? runtimeConfig.k8s.gpuStudentImage : runtimeConfig.k8s.studentImage,
@@ -126,7 +143,8 @@ function buildPodSpec(username, email, config) {
             // DAC_OVERRIDE: Required for entrypoint to modify system files
             // SETUID/SETGID: Required for supervisor to switch to student user (UID 1000)
             // NET_BIND_SERVICE: Allow binding to ports < 1024 (SSH on 22)
-            add: ['CHOWN', 'DAC_OVERRIDE', 'SETUID', 'SETGID', 'NET_BIND_SERVICE']
+            // KILL: Required for supervisor to stop/restart managed processes
+            add: ['CHOWN', 'DAC_OVERRIDE', 'SETUID', 'SETGID', 'NET_BIND_SERVICE', 'KILL']
           }
         },
         // Disable password auth on startup for security
@@ -285,8 +303,8 @@ function buildIngressRouteSpec(username) {
           priority: 100,
           services: [{ name: `student-${username}`, port: 8080 }],
           middlewares: [
-            { name: 'hydra-forward-auth', namespace: runtimeConfig.k8s.systemNamespace },
-            { name: `strip-prefix-${username}` }
+            { name: 'hydra-forward-auth', namespace: runtimeConfig.k8s.systemNamespace }
+            // No strip-prefix: Jenkins is configured with --prefix and handles the path itself
           ]
         }
       ],
@@ -507,7 +525,8 @@ async function initContainer(username, email, config = {}) {
   const password = generatePassword();
   const storageGb = config.storage_gb || resourceConfig.defaults.storage_gb;
   const nodeConfig = resourceConfig.getNodeConfig(config.target_node || 'hydra');
-  const storageClass = nodeConfig?.k8s?.storageClass || runtimeConfig.k8s.defaultStorageClass;
+  // Use NFS storage so pods can be scheduled on any node
+  const storageClass = 'hydra-nfs';
 
   // Merge config with email for PVC storage
   const fullConfig = { ...config, email };
@@ -714,6 +733,18 @@ async function startContainer(username, email = '', containerConfig = null) {
     const pod = await k8sClient.getPod(`student-${username}`);
     if (pod?.status?.podIP) {
       await updateSshPiperConfig(username, pod.status.podIP);
+    }
+
+    // Reset sleep state when manually started (user clicked Start on dashboard)
+    try {
+      const { updateContainerConfig } = require('./db-init');
+      await updateContainerConfig(username, {
+        sleep_state: 'awake',
+        last_active_at: new Date().toISOString()
+      });
+    } catch (e) {
+      // Non-fatal — sleep state reset is best-effort
+      console.warn(`[K8s] Failed to reset sleep state for ${username}:`, e.message);
     }
 
     return {
@@ -1045,56 +1076,24 @@ async function getServiceStatus(username) {
     const xmlResponse = await supervisorRequest('supervisor.getAllProcessInfo');
 
     // Parse XML response to extract process status
-    // Response format: <array><data><value><struct>...name, state, statename...</struct></value>...</data></array>
+    // Each process is in a <struct>...</struct> block with name and statename members
+    // The XML has newlines between tags, so we split by struct blocks first
     const services = [];
+    const knownServices = ['code-server', 'jupyter', 'jenkins'];
 
-    // Simple regex parsing for the XML response
-    const processRegex = /<member><name>name<\/name><value><string>([^<]+)<\/string><\/value><\/member>.*?<member><name>statename<\/name><value><string>([^<]+)<\/string><\/value><\/member>/gs;
-    let match;
+    // Split response into per-process struct blocks
+    const structBlocks = xmlResponse.split('<value><struct>').slice(1);
 
-    while ((match = processRegex.exec(xmlResponse)) !== null) {
-      const [, name, statename] = match;
-      if (name === 'code-server' || name === 'jupyter' || name === 'jenkins') {
+    for (const block of structBlocks) {
+      // Extract the process name from this block
+      const nameMatch = block.match(/<name>name<\/name>\s*<value><string>([^<]+)<\/string>/);
+      const stateMatch = block.match(/<name>statename<\/name>\s*<value><string>([^<]+)<\/string>/);
+
+      if (nameMatch && stateMatch && knownServices.includes(nameMatch[1])) {
         services.push({
-          name,
-          running: statename === 'RUNNING',
-          state: statename
-        });
-      }
-    }
-
-    // If we didn't parse any services, try a simpler pattern
-    if (services.length === 0) {
-      // Fallback: check if code-server and jupyter are mentioned with RUNNING
-      const hasCodeServer = xmlResponse.includes('code-server') && xmlResponse.includes('RUNNING');
-      const hasJupyter = xmlResponse.includes('jupyter') && xmlResponse.includes('RUNNING');
-
-      // Check for STOPPED state
-      const codeServerStopped = xmlResponse.includes('code-server') && xmlResponse.includes('STOPPED');
-      const jupyterStopped = xmlResponse.includes('jupyter') && xmlResponse.includes('STOPPED');
-
-      if (xmlResponse.includes('code-server')) {
-        services.push({
-          name: 'code-server',
-          running: hasCodeServer && !codeServerStopped,
-          state: codeServerStopped ? 'STOPPED' : (hasCodeServer ? 'RUNNING' : 'UNKNOWN')
-        });
-      }
-      if (xmlResponse.includes('jupyter')) {
-        services.push({
-          name: 'jupyter',
-          running: hasJupyter && !jupyterStopped,
-          state: jupyterStopped ? 'STOPPED' : (hasJupyter ? 'RUNNING' : 'UNKNOWN')
-        });
-      }
-
-      const hasJenkins = xmlResponse.includes('jenkins') && xmlResponse.includes('RUNNING');
-      const jenkinsStopped = xmlResponse.includes('jenkins') && xmlResponse.includes('STOPPED');
-      if (xmlResponse.includes('jenkins')) {
-        services.push({
-          name: 'jenkins',
-          running: hasJenkins && !jenkinsStopped,
-          state: jenkinsStopped ? 'STOPPED' : (hasJenkins ? 'RUNNING' : 'UNKNOWN')
+          name: nameMatch[1],
+          running: stateMatch[1] === 'RUNNING',
+          state: stateMatch[1]
         });
       }
     }

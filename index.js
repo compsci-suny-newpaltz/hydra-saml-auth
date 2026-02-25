@@ -952,6 +952,15 @@ const ensureAuthenticated = (req, res, next) => {
       console.warn('[Init] resource-expiry service not started:', e?.message || e);
     }
 
+    // Start idle pod manager (sleep mode)
+    try {
+      const idleManager = require('./services/idle-manager');
+      idleManager.start();
+      console.log('[Init] Idle manager (sleep mode) started');
+    } catch (e) {
+      console.warn('[Init] idle-manager service not started:', e?.message || e);
+    }
+
     // Start security monitoring service
     try {
       const securityMonitor = require('./services/security-monitor');

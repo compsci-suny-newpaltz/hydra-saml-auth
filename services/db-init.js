@@ -200,6 +200,23 @@ async function runMigrations(db) {
             await db.run('ALTER TABLE resource_requests ADD COLUMN requested_duration_days INTEGER DEFAULT NULL');
             console.log('[db-init] Migration complete: requested_duration_days added');
         }
+
+        // Sleep mode columns for idle pod management
+        const configColumnsRefresh = await db.all("PRAGMA table_info(container_configs)");
+        const hasLastActiveColumn = configColumnsRefresh.some(c => c.name === 'last_active_at');
+        const hasSleepStateColumn = configColumnsRefresh.some(c => c.name === 'sleep_state');
+
+        if (!hasLastActiveColumn) {
+            console.log('[db-init] Adding last_active_at column to container_configs...');
+            await db.run("ALTER TABLE container_configs ADD COLUMN last_active_at TEXT DEFAULT (datetime('now'))");
+            console.log('[db-init] Migration complete: last_active_at added');
+        }
+
+        if (!hasSleepStateColumn) {
+            console.log('[db-init] Adding sleep_state column to container_configs...');
+            await db.run("ALTER TABLE container_configs ADD COLUMN sleep_state TEXT DEFAULT 'awake'");
+            console.log('[db-init] Migration complete: sleep_state added');
+        }
     } catch (error) {
         console.warn('[db-init] Migration warning:', error.message);
     }
@@ -484,6 +501,14 @@ async function updateContainerConfig(username, updates) {
     if (updates.resources_expire_at !== undefined) {
         fields.push('resources_expire_at = ?');
         values.push(updates.resources_expire_at);
+    }
+    if (updates.last_active_at !== undefined) {
+        fields.push('last_active_at = ?');
+        values.push(updates.last_active_at);
+    }
+    if (updates.sleep_state !== undefined) {
+        fields.push('sleep_state = ?');
+        values.push(updates.sleep_state);
     }
 
     fields.push("updated_at = datetime('now')");
