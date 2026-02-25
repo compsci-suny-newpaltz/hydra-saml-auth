@@ -1,0 +1,1033 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Hydra CS Lab -- Development Environment Setup Guide
+%% SUNY New Paltz Computer Science Department
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\documentclass[11pt,a4paper]{article}
+
+% ---------- packages ----------
+\usepackage[margin=1in]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{mathpazo}            % Palatino serif (body + math)
+\usepackage[scaled=0.85]{inconsolata}  % clean monospace for code
+\usepackage{microtype}           % better character spacing/kerning
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage[colorlinks=true,
+            linkcolor=blue!70!black,
+            urlcolor=blue!60!black,
+            citecolor=blue!70!black,
+            bookmarks=true,
+            pdfauthor={SUNY New Paltz CS Department},
+            pdftitle={Hydra CS Lab -- Development Environment Setup Guide}]
+            {hyperref}
+
+% ---------- colours ----------
+\definecolor{codebg}{RGB}{245,245,245}
+\definecolor{codeframe}{RGB}{200,200,200}
+\definecolor{codekw}{RGB}{0,0,180}
+\definecolor{codecomment}{RGB}{0,128,0}
+\definecolor{codestr}{RGB}{163,21,21}
+\definecolor{sectionblue}{RGB}{0,51,102}
+\definecolor{notebg}{RGB}{255,249,230}
+\definecolor{noteframe}{RGB}{220,190,100}
+\definecolor{warnbg}{RGB}{255,240,240}
+\definecolor{warnframe}{RGB}{200,80,80}
+
+% ---------- listings ----------
+\lstset{
+    backgroundcolor=\color{codebg},
+    frame=single,
+    rulecolor=\color{codeframe},
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{codekw}\bfseries,
+    commentstyle=\color{codecomment}\itshape,
+    stringstyle=\color{codestr},
+    breaklines=true,
+    breakatwhitespace=false,
+    showstringspaces=false,
+    tabsize=2,
+    captionpos=b,
+    xleftmargin=1em,
+    xrightmargin=1em,
+    aboveskip=1em,
+    belowskip=0.8em,
+    literate={~}{{\raisebox{0.5ex}{\texttildelow}}}{1},
+}
+
+\lstdefinestyle{bash}{
+    language=bash,
+    morekeywords={sudo,apt,brew,choco,curl,docker,kubectl,k3d,make,git,
+                  cd,mkdir,cat,echo,chmod,wget,ssh,export},
+}
+
+\lstdefinestyle{yaml}{
+    basicstyle=\ttfamily\small,
+    morecomment=[l]{\#},
+    morestring=[b]',
+    morestring=[b]",
+}
+
+% ---------- custom commands ----------
+\newcommand{\notebox}[1]{%
+    \vspace{0.5em}
+    \noindent
+    \fcolorbox{noteframe}{notebg}{%
+        \begin{minipage}{0.94\textwidth}
+            \textbf{Note:} #1
+        \end{minipage}%
+    }
+    \vspace{0.5em}
+}
+
+\newcommand{\warnbox}[1]{%
+    \vspace{0.5em}
+    \noindent
+    \fcolorbox{warnframe}{warnbg}{%
+        \begin{minipage}{0.94\textwidth}
+            \textbf{Warning:} #1
+        \end{minipage}%
+    }
+    \vspace{0.5em}
+}
+
+\newcommand{\cmdref}[1]{\texttt{#1}}
+
+% ---------- header / footer ----------
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small Hydra CS Lab -- Dev Environment Guide}
+\fancyhead[R]{\small SUNY New Paltz}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.2pt}
+
+% ---------- section styling ----------
+\titleformat{\section}
+  {\normalfont\Large\bfseries\color{sectionblue}}
+  {\thesection}{1em}{}
+\titleformat{\subsection}
+  {\normalfont\large\bfseries\color{sectionblue!80!black}}
+  {\thesubsection}{1em}{}
+\titleformat{\subsubsection}
+  {\normalfont\normalsize\bfseries\color{sectionblue!60!black}}
+  {\thesubsubsection}{1em}{}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% TITLE PAGE
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{document}
+
+\begin{titlepage}
+    \centering
+    \vspace*{3cm}
+
+    {\Huge\bfseries\color{sectionblue}
+        Hydra CS Lab\\[0.3em]
+        Development Environment\\[0.3em]
+        Setup Guide
+    }
+
+    \vspace{1.5cm}
+
+    {\Large\color{gray}
+        SUNY New Paltz\\
+        Computer Science Department
+    }
+
+    \vspace{2cm}
+
+    \rule{0.6\textwidth}{0.5pt}
+
+    \vspace{1cm}
+
+    {\large
+        \textbf{Production Cluster}\\[0.5em]
+        \begin{tabular}{l l l}
+            Hydra & 192.168.1.160 & Control Plane \\
+            Chimera & 192.168.1.150 & GPU Inference \\
+            Cerberus & 192.168.1.242 & GPU Training \\
+        \end{tabular}
+    }
+
+    \vspace{2cm}
+
+    {\large \today}
+
+    \vfill
+
+    {\small
+        Repository: \url{https://github.com/compsci-suny-newpaltz/hydra-saml-auth}
+    }
+\end{titlepage}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% TABLE OF CONTENTS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\newpage
+\tableofcontents
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% 1. PREREQUISITES
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Prerequisites}
+\label{sec:prerequisites}
+
+Before setting up the Hydra development environment, you need the following
+tools installed on your machine. Instructions are provided for each supported
+platform.
+
+\subsection{Required Software}
+
+\begin{itemize}[leftmargin=2em]
+    \item \textbf{Docker} -- container runtime (Docker Desktop or Docker Engine)
+    \item \textbf{kubectl} -- Kubernetes CLI for cluster interaction
+    \item \textbf{k3d} -- lightweight Kubernetes wrapper around k3s in Docker
+    \item \textbf{Git} -- version control
+    \item \textbf{Make} -- build automation (GNU Make)
+    \item \textbf{Node.js 18+} -- for local development outside containers (optional)
+\end{itemize}
+
+%% ---- Windows ----
+\subsection{Windows}
+\label{sec:prereq-windows}
+
+\subsubsection{Install WSL2}
+
+Windows Subsystem for Linux 2 is required for Docker and the development
+workflow. Open PowerShell as Administrator:
+
+\begin{lstlisting}[style=bash]
+# Install WSL2 with Ubuntu 22.04
+wsl --install -d Ubuntu-22.04
+
+# Verify installation
+wsl -l -v
+\end{lstlisting}
+
+After installation, restart your computer and complete the Ubuntu setup
+(username and password) when prompted.
+
+\subsubsection{Install Docker Desktop}
+
+\begin{enumerate}[leftmargin=2em]
+    \item Download Docker Desktop from
+          \url{https://www.docker.com/products/docker-desktop/}
+    \item During installation, ensure \textbf{``Use WSL 2 based engine''} is
+          checked.
+    \item After installation, open Docker Desktop and go to
+          \textbf{Settings $\rightarrow$ Resources $\rightarrow$ WSL Integration}.
+    \item Enable integration with your Ubuntu-22.04 distribution.
+    \item Click \textbf{Apply \& Restart}.
+\end{enumerate}
+
+Verify from a WSL2 Ubuntu terminal:
+
+\begin{lstlisting}[style=bash]
+docker --version
+docker run hello-world
+\end{lstlisting}
+
+\subsubsection{Install kubectl, k3d, Git, and Make}
+
+Using Chocolatey (run PowerShell as Administrator):
+
+\begin{lstlisting}[style=bash]
+# Install Chocolatey if not already present
+Set-ExecutionPolicy Bypass -Scope Process -Force
+[System.Net.ServicePointManager]::SecurityProtocol = `
+    [System.Net.SecurityProtocolType]::Tls12
+iex ((New-Object System.Net.WebClient).DownloadString(
+    'https://community.chocolatey.org/install.ps1'))
+
+# Install tools
+choco install kubernetes-cli k3d git make -y
+\end{lstlisting}
+
+Alternatively, install inside WSL2 Ubuntu (see the Linux instructions in
+Section~\ref{sec:prereq-linux}).
+
+\subsubsection{Configure WSL2 Memory Limits}
+
+Create or edit \cmdref{\%USERPROFILE\%\textbackslash.wslconfig} in Windows:
+
+\begin{lstlisting}[style=yaml]
+[wsl2]
+memory=8GB
+processors=4
+swap=2GB
+\end{lstlisting}
+
+Restart WSL2: \cmdref{wsl --shutdown} then reopen your terminal.
+
+\subsubsection{Clone the Repository}
+
+From inside WSL2 Ubuntu:
+
+\begin{lstlisting}[style=bash]
+cd ~
+git clone https://github.com/compsci-suny-newpaltz/hydra-saml-auth.git
+cd hydra-saml-auth
+\end{lstlisting}
+
+%% ---- macOS ----
+\subsection{macOS}
+\label{sec:prereq-macos}
+
+\subsubsection{Install Homebrew}
+
+If Homebrew is not installed:
+
+\begin{lstlisting}[style=bash]
+/bin/bash -c "$(curl -fsSL \
+    https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+\end{lstlisting}
+
+\subsubsection{Install Docker Desktop for Mac}
+
+\begin{enumerate}[leftmargin=2em]
+    \item Download Docker Desktop from
+          \url{https://www.docker.com/products/docker-desktop/}
+    \item Install the \texttt{.dmg} and drag Docker to Applications.
+    \item Open Docker Desktop and allow it to finish initializing.
+    \item Allocate at least 4 CPU cores and 8 GB RAM in
+          \textbf{Settings $\rightarrow$ Resources}.
+\end{enumerate}
+
+\subsubsection{Install CLI Tools}
+
+\begin{lstlisting}[style=bash]
+brew install kubectl k3d git make
+\end{lstlisting}
+
+Verify installations:
+
+\begin{lstlisting}[style=bash]
+docker --version
+kubectl version --client
+k3d version
+git --version
+make --version
+\end{lstlisting}
+
+\subsubsection{Clone the Repository}
+
+\begin{lstlisting}[style=bash]
+cd ~
+git clone https://github.com/compsci-suny-newpaltz/hydra-saml-auth.git
+cd hydra-saml-auth
+\end{lstlisting}
+
+%% ---- Linux ----
+\subsection{Linux (Ubuntu / Debian)}
+\label{sec:prereq-linux}
+
+\subsubsection{Install Docker}
+
+\begin{lstlisting}[style=bash]
+# Install Docker
+sudo apt update
+sudo apt install -y docker.io
+
+# Add your user to the docker group (avoids needing sudo)
+sudo usermod -aG docker $USER
+
+# Apply group changes (or log out and back in)
+newgrp docker
+
+# Verify
+docker run hello-world
+\end{lstlisting}
+
+\subsubsection{Install kubectl}
+
+\begin{lstlisting}[style=bash]
+# Download the latest stable kubectl
+curl -LO "https://dl.k8s.io/release/$(curl -L -s \
+    https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+chmod +x kubectl
+sudo mv kubectl /usr/local/bin/
+
+# Verify
+kubectl version --client
+\end{lstlisting}
+
+\subsubsection{Install k3d}
+
+\begin{lstlisting}[style=bash]
+curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh \
+    | bash
+
+# Verify
+k3d version
+\end{lstlisting}
+
+\subsubsection{Install Make and Git}
+
+\begin{lstlisting}[style=bash]
+sudo apt install -y make git
+\end{lstlisting}
+
+\subsubsection{Clone the Repository}
+
+\begin{lstlisting}[style=bash]
+cd ~
+git clone https://github.com/compsci-suny-newpaltz/hydra-saml-auth.git
+cd hydra-saml-auth
+\end{lstlisting}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% 2. QUICK START (DOCKER COMPOSE)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Quick Start (Docker Compose)}
+\label{sec:quickstart}
+
+The fastest way to get the Hydra development environment running is via
+Docker Compose. This mode uses \cmdref{dev/docker-compose.dev.yml} and
+provides a mock SAML IdP, mock GPU metrics for Chimera and Cerberus, a
+Traefik reverse proxy, OpenWebUI, and Ollama.
+
+\subsection{Setup and Start}
+
+\begin{lstlisting}[style=bash]
+cd hydra-saml-auth/dev
+
+# One-time setup: generates JWT keys, creates .env,
+# configures /etc/hosts entries
+make setup
+
+# Start all services in the background
+make start
+\end{lstlisting}
+
+\notebox{The \cmdref{make setup} target will attempt to add entries to your
+hosts file (\cmdref{/etc/hosts} on Linux/macOS,
+\cmdref{C:\textbackslash Windows\textbackslash System32\textbackslash
+drivers\textbackslash etc\textbackslash hosts} on Windows). This requires
+\cmdref{sudo} or Administrator privileges. If it fails, add the entries
+manually (see Section~\ref{sec:troubleshooting}).}
+
+\subsection{Accessible Services}
+
+Once running, the following services are available:
+
+\begin{center}
+\begin{tabular}{l l}
+    \toprule
+    \textbf{Service} & \textbf{URL} \\
+    \midrule
+    Hydra Dashboard & \url{http://hydra.local/dashboard} \\
+    OpenWebUI (Chat) & \url{http://gpt.hydra.local} \\
+    Mock SAML IdP & \url{http://localhost:8080} \\
+    Traefik Dashboard & \url{http://localhost:8081} \\
+    \bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Test Credentials}
+
+The mock SAML IdP (SimpleSAMLphp) comes preconfigured with test users:
+
+\begin{center}
+\begin{tabular}{l l l}
+    \toprule
+    \textbf{Username} & \textbf{Password} & \textbf{Role} \\
+    \midrule
+    user1 & user1pass & Student \\
+    \bottomrule
+\end{tabular}
+\end{center}
+
+Log in at \url{http://hydra.local/dashboard} and use these credentials when
+redirected to the mock IdP.
+
+\subsection{Stopping the Environment}
+
+\begin{lstlisting}[style=bash]
+# Stop all services
+make stop
+
+# Stop and remove all volumes (clean slate)
+make clean
+\end{lstlisting}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% 3. ARCHITECTURE OVERVIEW
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Architecture Overview}
+\label{sec:architecture}
+
+The development environment mirrors the three-node production cluster.
+Below is the mapping between production components and their dev
+equivalents in both Docker Compose mode and k3d mode.
+
+\subsection{Node Mapping}
+
+\begin{center}
+\small
+\begin{tabularx}{\textwidth}{l X X}
+    \toprule
+    \textbf{Production} & \textbf{Dev (Docker Compose)} & \textbf{Dev (k3d)} \\
+    \midrule
+    Hydra (control plane, 192.168.1.160) --- 256 GB RAM, 64 cores &
+        hydra-saml-auth container &
+        k3d-hydra-dev-server-0 \\
+    \addlinespace
+    Chimera (GPU inference, 192.168.1.150) --- 3x RTX 3090, 72 GB VRAM &
+        mock-chimera + ollama + open-webui containers &
+        k3d-hydra-dev-agent-0 (label: \texttt{gpu-role=inference}) \\
+    \addlinespace
+    Cerberus (GPU training, 192.168.1.242) --- 2x RTX 5090, 64 GB VRAM &
+        mock-cerberus container &
+        k3d-hydra-dev-agent-1 (label: \texttt{gpu-role=training}) \\
+    \bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection{Service Mapping}
+
+\begin{center}
+\small
+\begin{tabularx}{\textwidth}{l X X}
+    \toprule
+    \textbf{Production} & \textbf{Dev (Docker Compose)} & \textbf{Dev (k3d)} \\
+    \midrule
+    Traefik v3.6 &
+        Traefik container (Docker provider) &
+        Traefik deployment (K8s CRD provider) \\
+    \addlinespace
+    Azure AD SAML SSO &
+        mock-saml-idp (SimpleSAMLphp) &
+        mock-saml-idp pod \\
+    \addlinespace
+    SQLite (hydra.db) &
+        SQLite in container volume &
+        SQLite in PersistentVolumeClaim \\
+    \addlinespace
+    RKE2 Kubernetes &
+        Docker Compose networking &
+        k3d (k3s in Docker) \\
+    \bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection{Network Topology}
+
+In Docker Compose mode, all containers share a single Docker bridge
+network. Traefik listens on the host's ports 80 and 443 and routes traffic
+based on the \texttt{Host} header.
+
+In k3d mode, the k3d cluster creates its own Docker network. Port mapping
+is configured in \cmdref{k8s/dev/k3d-config.yaml} to forward host ports
+80 and 443 into the k3d load balancer, which in turn routes traffic to the
+Traefik ingress controller inside the cluster.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% 4. KUBERNETES DEVELOPMENT (k3d)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Kubernetes Development (k3d)}
+\label{sec:k3d}
+
+For a more production-faithful development experience, use the k3d mode.
+This creates a local Kubernetes cluster with three nodes (one server and
+two agents) that mirrors the production topology.
+
+\subsection{Automated Setup with Make}
+
+\begin{lstlisting}[style=bash]
+# Step 1: Create the k3d cluster
+cd hydra-saml-auth/dev
+make k8s-setup
+
+# Step 2: Verify nodes match production topology
+kubectl get nodes --show-labels
+
+# Step 3: Deploy all services
+make k8s-start
+
+# Step 4: Check overall status
+make k8s-status
+
+# Step 5: View logs from all pods
+make k8s-logs
+\end{lstlisting}
+
+\notebox{The \cmdref{make k8s-setup} target creates a k3d cluster named
+\texttt{hydra-dev} with node labels that mirror the production cluster.
+It also applies Traefik CRDs and base namespace manifests.}
+
+\subsection{Manual kubectl Deployment}
+
+If you prefer to run each step manually (or need to debug a specific
+stage), follow these commands:
+
+\subsubsection{Create the k3d Cluster}
+
+\begin{lstlisting}[style=bash]
+# Create the 3-node cluster from the config file
+k3d cluster create hydra-dev \
+    --config k8s/dev/k3d-config.yaml
+\end{lstlisting}
+
+Verify the nodes are ready:
+
+\begin{lstlisting}[style=bash]
+kubectl get nodes -o wide
+# Expected output:
+#   k3d-hydra-dev-server-0   Ready   control-plane,master
+#   k3d-hydra-dev-agent-0    Ready   <none>
+#   k3d-hydra-dev-agent-1    Ready   <none>
+\end{lstlisting}
+
+\subsubsection{Apply Traefik CRDs}
+
+\begin{lstlisting}[style=bash]
+kubectl apply -f \
+    https://raw.githubusercontent.com/traefik/traefik/v2.11/docs/content/reference/dynamic-configuration/kubernetes-crd-definition-v1.yml
+\end{lstlisting}
+
+\subsubsection{Apply Base Manifests}
+
+\begin{lstlisting}[style=bash]
+# Namespaces
+kubectl apply -f k8s/base/namespace.yaml
+
+# RBAC roles and bindings
+kubectl apply -f k8s/base/rbac/
+
+# Storage classes and PVCs
+kubectl apply -f k8s/base/storage/
+\end{lstlisting}
+
+\subsubsection{Deploy Traefik}
+
+\begin{lstlisting}[style=bash]
+kubectl apply -f k8s/components/traefik/deployment.yaml
+kubectl apply -f k8s/components/traefik/service.yaml
+\end{lstlisting}
+
+\subsubsection{Deploy hydra-auth}
+
+\begin{lstlisting}[style=bash]
+kubectl apply -f k8s/components/hydra-auth/
+\end{lstlisting}
+
+\subsubsection{Verify All Pods}
+
+\begin{lstlisting}[style=bash]
+kubectl get pods -n hydra-system
+# All pods should show Running or Completed status
+
+kubectl get pods -n hydra-students
+# Should be empty initially (student containers are
+# created on demand)
+\end{lstlisting}
+
+\subsection{Stopping and Cleaning Up}
+
+\begin{lstlisting}[style=bash]
+# Stop the k3d cluster (preserves state)
+make k8s-stop
+
+# Delete the k3d cluster entirely
+make k8s-clean
+# Or manually:
+k3d cluster delete hydra-dev
+\end{lstlisting}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% 5. MAKEFILE REFERENCE
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Makefile Reference}
+\label{sec:makefile}
+
+All targets are invoked from the \cmdref{hydra-saml-auth/dev/} directory.
+
+\subsection{Docker Compose Targets}
+
+\begin{center}
+\begin{tabularx}{\textwidth}{l X}
+    \toprule
+    \textbf{Target} & \textbf{Description} \\
+    \midrule
+    \texttt{make setup} &
+        One-time setup: generates JWT key pair, creates \texttt{.env} from
+        \texttt{.env.example}, adds hosts file entries for
+        \texttt{hydra.local} and \texttt{gpt.hydra.local}. \\
+    \addlinespace
+    \texttt{make start} &
+        Starts all Docker Compose services in detached mode using
+        \texttt{docker-compose.dev.yml}. \\
+    \addlinespace
+    \texttt{make stop} &
+        Stops all running containers without removing volumes. \\
+    \addlinespace
+    \texttt{make restart} &
+        Equivalent to \texttt{make stop \&\& make start}. \\
+    \addlinespace
+    \texttt{make logs} &
+        Tails logs from all running containers. \\
+    \addlinespace
+    \texttt{make clean} &
+        Stops all containers and removes volumes (full reset). \\
+    \addlinespace
+    \texttt{make status} &
+        Shows running containers and their health status. \\
+    \addlinespace
+    \texttt{make build} &
+        Rebuilds all custom images without cache. \\
+    \bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection{Kubernetes (k3d) Targets}
+
+\begin{center}
+\begin{tabularx}{\textwidth}{l X}
+    \toprule
+    \textbf{Target} & \textbf{Description} \\
+    \midrule
+    \texttt{make k8s-setup} &
+        Creates the k3d cluster from \texttt{k8s/dev/k3d-config.yaml},
+        applies CRDs, namespaces, RBAC, and storage manifests. \\
+    \addlinespace
+    \texttt{make k8s-start} &
+        Deploys all Kubernetes workloads (Traefik, hydra-auth, mock-saml-idp,
+        mock metrics agents). \\
+    \addlinespace
+    \texttt{make k8s-stop} &
+        Stops the k3d cluster (preserves state for resume). \\
+    \addlinespace
+    \texttt{make k8s-status} &
+        Shows nodes, pods, services, and ingresses across all namespaces. \\
+    \addlinespace
+    \texttt{make k8s-logs} &
+        Tails logs from all pods in \texttt{hydra-system} namespace. \\
+    \addlinespace
+    \texttt{make k8s-clean} &
+        Deletes the entire k3d cluster (full reset). \\
+    \bottomrule
+\end{tabularx}
+\end{center}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% 6. TROUBLESHOOTING
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Troubleshooting}
+\label{sec:troubleshooting}
+
+\subsection{Hosts File Not Writable}
+
+\textbf{Symptom:} \cmdref{make setup} fails with a permission error when
+writing to the hosts file.
+
+\textbf{Fix:} Manually add the following entries:
+
+\begin{lstlisting}[style=bash]
+# On Linux/macOS: /etc/hosts
+# On Windows: C:\Windows\System32\drivers\etc\hosts
+# (edit as Administrator)
+
+127.0.0.1   hydra.local
+127.0.0.1   gpt.hydra.local
+\end{lstlisting}
+
+On Linux/macOS, you can also run:
+
+\begin{lstlisting}[style=bash]
+echo "127.0.0.1 hydra.local gpt.hydra.local" \
+    | sudo tee -a /etc/hosts
+\end{lstlisting}
+
+\subsection{Port Conflicts (80, 443, 6969)}
+
+\textbf{Symptom:} Containers fail to start with ``port already in use''
+errors.
+
+\textbf{Fix:} Identify and stop the conflicting process:
+
+\begin{lstlisting}[style=bash]
+# Linux/macOS
+sudo lsof -i :80
+sudo lsof -i :443
+sudo lsof -i :6969
+
+# Kill the conflicting process
+sudo kill -9 <PID>
+\end{lstlisting}
+
+Common culprits: Apache (\texttt{apache2}), Nginx (\texttt{nginx}), or
+another instance of Traefik. On macOS, AirPlay Receiver uses port 5000;
+on Windows, IIS may bind to port 80.
+
+\subsection{Docker Socket Permissions on Linux}
+
+\textbf{Symptom:} \cmdref{docker: permission denied} when running Docker
+commands without \texttt{sudo}.
+
+\textbf{Fix:}
+
+\begin{lstlisting}[style=bash]
+sudo usermod -aG docker $USER
+newgrp docker
+# Or log out and log back in
+\end{lstlisting}
+
+\subsection{WSL2 Memory Limits}
+
+\textbf{Symptom:} Containers are killed or become unresponsive on Windows
+with WSL2.
+
+\textbf{Fix:} WSL2 defaults to using up to 50\% of host RAM but may not be
+enough for the full stack. Edit \cmdref{\%USERPROFILE\%\textbackslash.wslconfig}:
+
+\begin{lstlisting}[style=yaml]
+[wsl2]
+memory=8GB
+processors=4
+swap=4GB
+\end{lstlisting}
+
+Then restart WSL2:
+
+\begin{lstlisting}[style=bash]
+wsl --shutdown
+\end{lstlisting}
+
+\subsection{k3d Cluster Won't Start}
+
+\textbf{Symptom:} \cmdref{k3d cluster create} hangs or fails.
+
+\textbf{Fix:}
+
+\begin{enumerate}[leftmargin=2em]
+    \item Ensure Docker is running: \cmdref{docker info}
+    \item Check for existing clusters: \cmdref{k3d cluster list}
+    \item Delete stale clusters: \cmdref{k3d cluster delete hydra-dev}
+    \item Check Docker resource limits (at least 4 GB RAM, 2 CPUs).
+    \item Retry: \cmdref{make k8s-setup}
+\end{enumerate}
+
+\subsection{SAML Callback URL Mismatch}
+
+\textbf{Symptom:} After authenticating with the mock IdP, you are
+redirected to a wrong URL or get a SAML response error.
+
+\textbf{Fix:}
+
+\begin{enumerate}[leftmargin=2em]
+    \item Ensure your hosts file has the correct entries
+          (\cmdref{hydra.local} pointing to \cmdref{127.0.0.1}).
+    \item Verify the SAML callback URL in \cmdref{dev/.env}:
+\begin{lstlisting}[style=bash]
+SAML_CALLBACK_URL=http://hydra.local/auth/saml/callback
+\end{lstlisting}
+    \item Ensure the mock IdP configuration in
+          \cmdref{dev/saml/} matches the callback URL.
+    \item Restart services: \cmdref{make restart}
+\end{enumerate}
+
+\subsection{Student Container Creation Fails in Dev}
+
+\textbf{Symptom:} Clicking ``Create Container'' on the dashboard returns
+an error or the container never appears.
+
+\textbf{Fix:}
+
+\begin{itemize}[leftmargin=2em]
+    \item \textbf{Docker Compose mode:} Container creation goes through
+          Docker socket. Verify the hydra-saml-auth container has the
+          Docker socket mounted:
+\begin{lstlisting}[style=bash]
+docker inspect hydra-saml-auth | grep -A2 "docker.sock"
+\end{lstlisting}
+    \item \textbf{k3d mode:} Container creation uses kubectl against the
+          k3d cluster. Ensure the \texttt{hydra-system} service account
+          has the correct RBAC permissions:
+\begin{lstlisting}[style=bash]
+kubectl auth can-i create pods -n hydra-students \
+    --as=system:serviceaccount:hydra-system:hydra-auth
+\end{lstlisting}
+    \item Check logs: \cmdref{make logs} or \cmdref{make k8s-logs}
+\end{itemize}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% 7. DIFFERENCES FROM PRODUCTION
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Differences from Production}
+\label{sec:differences}
+
+The development environment intentionally simplifies several aspects of
+the production cluster. Understanding these differences is important to
+avoid confusion and to know what cannot be tested locally.
+
+\subsection{No Real GPU Access}
+
+The production cluster has dedicated GPU nodes:
+\begin{itemize}[leftmargin=2em]
+    \item \textbf{Chimera:} 3x NVIDIA RTX 3090 (72 GB VRAM total) for
+          inference via Ollama and OpenWebUI.
+    \item \textbf{Cerberus:} 2x NVIDIA RTX 5090 (64 GB VRAM total) for
+          training workloads.
+\end{itemize}
+
+In development, GPU metrics are provided by mock agents
+(\texttt{mock-chimera} and \texttt{mock-cerberus}) that return static
+JSON payloads simulating GPU utilization, temperature, and memory usage.
+Ollama runs on CPU in dev mode, so inference will be significantly slower.
+
+\subsection{No ZFS RAID-10 Storage}
+
+Production uses a 21 TB ZFS RAID-10 array on Hydra for persistent storage.
+The development environment uses:
+
+\begin{itemize}[leftmargin=2em]
+    \item \textbf{Docker Compose:} Docker volumes (local filesystem).
+    \item \textbf{k3d:} \texttt{local-path-provisioner} for
+          PersistentVolumeClaims (data stored inside Docker volumes).
+\end{itemize}
+
+\subsection{No Real SAML SSO}
+
+Production authenticates against Azure AD via SAML 2.0 (SUNY SSO). The
+development environment uses a mock SAML IdP (SimpleSAMLphp) with
+preconfigured test users. The SAML flow is identical, but the IdP is local.
+
+\subsection{No SSH / SSHPiper}
+
+In production, students connect to their containers via SSH through an
+SSHPiper proxy. In development:
+
+\begin{itemize}[leftmargin=2em]
+    \item \textbf{Docker Compose:} Access containers via
+          \cmdref{docker exec -it <container> /bin/bash}
+    \item \textbf{k3d:} Access pods via
+          \cmdref{kubectl exec -it <pod> -n hydra-students -- /bin/bash}
+\end{itemize}
+
+\subsection{Traefik Provider Differences}
+
+\begin{itemize}[leftmargin=2em]
+    \item \textbf{Docker Compose:} Traefik uses the \textbf{Docker provider}
+          and reads labels from container definitions.
+    \item \textbf{k3d:} Traefik uses the \textbf{Kubernetes CRD provider}
+          and reads IngressRoute resources.
+    \item \textbf{Production:} Traefik v3.6 uses the Kubernetes CRD
+          provider on the RKE2 cluster.
+\end{itemize}
+
+\subsection{Summary Table}
+
+\begin{center}
+\small
+\begin{tabularx}{\textwidth}{l l X}
+    \toprule
+    \textbf{Feature} & \textbf{Production} & \textbf{Development} \\
+    \midrule
+    GPU Access & Real NVIDIA GPUs &
+        Mocked via metrics agents; Ollama on CPU \\
+    \addlinespace
+    Storage & ZFS RAID-10 (21 TB) &
+        Docker volumes / local-path-provisioner \\
+    \addlinespace
+    Authentication & Azure AD SAML 2.0 &
+        Mock SimpleSAMLphp IdP \\
+    \addlinespace
+    SSH Access & SSHPiper proxy &
+        docker exec / kubectl exec \\
+    \addlinespace
+    Kubernetes & RKE2 (3 physical nodes) &
+        k3d (3 Docker containers) \\
+    \addlinespace
+    Traefik & v3.6, K8s CRD provider &
+        Docker provider (Compose) / K8s CRD (k3d) \\
+    \addlinespace
+    Monitoring & Prometheus + Grafana &
+        Not included (optional add-on) \\
+    \bottomrule
+\end{tabularx}
+\end{center}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% APPENDIX
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\newpage
+\appendix
+
+\section{Hosts File Entries}
+\label{app:hosts}
+
+The following entries must be present in your hosts file for the dev
+environment to work correctly:
+
+\begin{lstlisting}
+127.0.0.1   hydra.local
+127.0.0.1   gpt.hydra.local
+\end{lstlisting}
+
+\textbf{File locations:}
+\begin{itemize}[leftmargin=2em]
+    \item \textbf{Linux / macOS:} \cmdref{/etc/hosts}
+    \item \textbf{Windows:}
+          \cmdref{C:\textbackslash Windows\textbackslash System32\textbackslash
+          drivers\textbackslash etc\textbackslash hosts}
+\end{itemize}
+
+\section{Environment Variables}
+\label{app:envvars}
+
+The \cmdref{dev/.env} file is generated by \cmdref{make setup}. Key
+variables include:
+
+\begin{center}
+\begin{tabularx}{\textwidth}{l X}
+    \toprule
+    \textbf{Variable} & \textbf{Description} \\
+    \midrule
+    \texttt{NODE\_ENV} & Set to \texttt{development} \\
+    \texttt{PORT} & Application port (default: \texttt{6969}) \\
+    \texttt{JWT\_SECRET} & Auto-generated JWT signing secret \\
+    \texttt{SAML\_ENTRY\_POINT} & Mock IdP SSO URL \\
+    \texttt{SAML\_CALLBACK\_URL} & SAML assertion consumer service URL \\
+    \texttt{SAML\_ISSUER} & SAML service provider entity ID \\
+    \texttt{DB\_PATH} & Path to SQLite database file \\
+    \texttt{RUNTIME\_MODE} & \texttt{docker} or \texttt{kubernetes} \\
+    \bottomrule
+\end{tabularx}
+\end{center}
+
+\section{Useful Commands}
+\label{app:commands}
+
+\begin{lstlisting}[style=bash]
+# View all running containers (Docker Compose)
+docker compose -f dev/docker-compose.dev.yml ps
+
+# Rebuild a single service
+docker compose -f dev/docker-compose.dev.yml build hydra-auth
+
+# Shell into the auth container
+docker exec -it hydra-saml-auth /bin/sh
+
+# View k3d cluster info
+k3d cluster list
+kubectl cluster-info
+
+# Port-forward a specific service (k3d)
+kubectl port-forward svc/hydra-auth 6969:6969 -n hydra-system
+
+# Check resource usage in k3d
+kubectl top nodes
+kubectl top pods -n hydra-system
+\end{lstlisting}
+
+\end{document}

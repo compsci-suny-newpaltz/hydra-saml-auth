@@ -4,7 +4,9 @@
 \documentclass[11pt,a4paper]{article}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
-\usepackage{lmodern}
+\usepackage{mathpazo}            % Palatino serif (body + math)
+\usepackage[scaled=0.85]{inconsolata}  % clean monospace for code
+\usepackage{microtype}           % better character spacing/kerning
 \usepackage{geometry}
 \usepackage{hyperref}
 \usepackage{listings}
@@ -83,7 +85,7 @@
   \normalsize SUNY New Paltz --- Computer Science Department
 }
 \author{Infrastructure Team}
-\date{February 9, 2026}
+\date{February 25, 2026}
 
 \begin{document}
 \maketitle
@@ -109,8 +111,7 @@ Hydra is a containerized development platform providing persistent development e
     \item \textbf{SSO Authentication:} Azure AD SAML 2.0 with automatic user provisioning
     \item \textbf{Persistent Containers:} Per-student development environments with SSH, VS Code, and Jupyter
     \item \textbf{GPU Computing:} 5 GPUs across 2 nodes (3x RTX 3090 + 2x RTX 5090)
-    \item \textbf{AI Chat:} OpenWebUI + Ollama LLM inference (gpt.hydra.newpaltz.edu)
-    \item \textbf{Ray Cluster:} Distributed computing framework for ML training
+    \item \textbf{AI Chat:} OpenWebUI + KubeAI (21 vLLM models)
     \item \textbf{Dynamic Routing:} Traefik reverse proxy with ForwardAuth
     \item \textbf{Workflow Automation:} n8n with integrated user management
     \item \textbf{21 TB Storage:} RAID-10 ZFS array with NFS exports
@@ -124,7 +125,7 @@ Hydra is a containerized development platform providing persistent development e
 \textbf{Service} & \textbf{URL} & \textbf{Description} \\
 \midrule
 Dashboard & \texttt{https://hydra.newpaltz.edu/dashboard} & Main user interface \\
-OpenWebUI & \texttt{https://gpt.hydra.newpaltz.edu/} & AI chat (Ollama) \\
+OpenWebUI & \texttt{https://gpt.hydra.newpaltz.edu/} & AI chat (KubeAI) \\
 CS Lab Site & \texttt{https://hydra.newpaltz.edu/} & Department homepage \\
 Student Forms & \texttt{https://hydra.newpaltz.edu/student-forms} & Form hub \\
 Hackathons & \texttt{https://hydra.newpaltz.edu/hackathons} & Hackathon voting \\
@@ -183,14 +184,12 @@ Cerberus & 192.168.1.242 & GPU training & Ubuntu 24.04.3 & 48 cores, 64 GB RAM, 
 \node[gpu, right=0.8cm of hydra] (chimera) {};
 \node[font=\small\bfseries, anchor=north] at (chimera.north) {Chimera};
 \node[font=\scriptsize, anchor=north] at ([yshift=-0.35cm]chimera.north) {3x RTX 3090};
-\node[service] at ([yshift=-0.2cm]chimera.center) (openwebui) {OpenWebUI + Ollama};
-\node[service, below=0.15cm of openwebui] (rayhead) {Ray Head};
-
+\node[service] at ([yshift=-0.2cm]chimera.center) (openwebui) {OpenWebUI + KubeAI/vLLM};
 \node[gpu, right=0.8cm of chimera] (cerberus) {};
 \node[font=\small\bfseries, anchor=north] at (cerberus.north) {Cerberus};
 \node[font=\scriptsize, anchor=north] at ([yshift=-0.35cm]cerberus.north) {2x RTX 5090};
-\node[service] at ([yshift=-0.2cm]cerberus.center) (rayworker) {Ray Worker};
-\node[container, below=0.15cm of rayworker] (gpu-student) {GPU containers};
+\node[service] at ([yshift=-0.2cm]cerberus.center) (gpuworkload) {GPU Training};
+\node[container, below=0.15cm of gpuworkload] (gpu-student) {GPU containers};
 
 \draw[arrow] (user) -- node[above] {HTTPS} (traefik);
 \draw[arrow, bend left=20] (user) -- node[above] {SAML} (azure);
@@ -367,19 +366,19 @@ openwebui & hydra-infra & gpt.hydra.newpaltz.edu & openwebui-chimera:3000 \\
 %% ============================================================
 \section{Infrastructure Services (hydra-infra)}
 
-\subsection{Ollama (LLM Inference)}
+\subsection{KubeAI + vLLM (LLM Inference)}
 
-Runs on Chimera with all 3 RTX 3090 GPUs. Serves LLM models (gemma3:12b, etc.) via the Ollama API on port 11434.
+KubeAI orchestrates 21 vLLM model servers across the GPU nodes with scale-to-zero capability. Models are also available via OpenRouter integration. Replaces the previous Ollama-based setup.
 
-\textbf{Manifests:} \texttt{k8s/components/ollama/}
+\textbf{Manifests:} \texttt{k8s/components/kubeai/}
 
-\begin{warningbox}
-Ollama requests all 3 GPUs on Chimera. Other GPU workloads on Chimera (like Ray head) must \textbf{not} request GPU resources, or they will conflict.
-\end{warningbox}
+\begin{infobox}
+KubeAI uses scale-to-zero scheduling --- GPU resources are allocated on-demand per model request. Multiple models can share the same GPU nodes without static allocation conflicts.
+\end{infobox}
 
 \subsection{OpenWebUI}
 
-AI chat frontend at \texttt{gpt.hydra.newpaltz.edu}. Connects to Ollama for inference. Includes a \textbf{middleman sidecar} container for user account management.
+AI chat frontend at \texttt{gpt.hydra.newpaltz.edu}. Connects to KubeAI/vLLM for inference (21 GPU models with scale-to-zero). Also integrates with OpenRouter for additional cloud models. Includes a \textbf{middleman sidecar} container for user account management.
 
 \textbf{Middleman API (port 7070):}
 \begin{itemize}[nosep]
@@ -417,23 +416,11 @@ Authentication via \texttt{x-api-key} header.
 \textbf{Source:} \texttt{k8s/components/n8n/user-manager/}\\
 \textbf{Manifests:} \texttt{k8s/components/n8n/}
 
-\subsection{Ray Cluster (Distributed Computing)}
+\subsection{GPU Training (Cerberus)}
 
-Ray provides distributed computing for ML training and inference.
+Cerberus (2x RTX 5090, 64 GB VRAM) serves as the dedicated GPU training node. Student GPU containers and training jobs are scheduled here via Kubernetes node affinity rules.
 
-\begin{table}[H]
-\centering
-\begin{tabular}{llll}
-\toprule
-\textbf{Component} & \textbf{Node} & \textbf{GPU} & \textbf{Purpose} \\
-\midrule
-ray-head & Chimera & None (coordinator) & Scheduling, dashboard \\
-ray-worker & Cerberus & 2x RTX 5090 & Training compute \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\textbf{Manifests:} \texttt{k8s/components/ray/}
+\textbf{Node label:} \texttt{hydra.node-role=gpu-training}
 
 \subsection{Other Services}
 
@@ -479,8 +466,8 @@ The GPU Operator runs in the \texttt{gpu-operator} namespace and manages:
 \toprule
 \textbf{Node} & \textbf{GPUs} & \textbf{Model} & \textbf{VRAM} & \textbf{Primary Consumer} \\
 \midrule
-Chimera & 3 & RTX 3090 & 72 GB total & Ollama (all 3) \\
-Cerberus & 2 & RTX 5090 & 64 GB total & Ray Worker / Student GPU containers \\
+Chimera & 3 & RTX 3090 & 72 GB total & KubeAI/vLLM inference \\
+Cerberus & 2 & RTX 5090 & 64 GB total & GPU training / Student GPU containers \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -892,9 +879,8 @@ In order:
     \item Hackathons, Java Executor, Git Learning
     \item SSHPiper
     \item n8n (app + Postgres + user manager)
-    \item Ollama
+    \item KubeAI + vLLM model servers
     \item OpenWebUI (with middleman sidecar)
-    \item Ray cluster (head + worker)
 \end{enumerate}
 
 \section{CS Lab Website Deployment}
@@ -1281,7 +1267,7 @@ FLAPJS & \texttt{k8s/components/flapjs/} \\
 Java Executor & \texttt{k8s/components/java-executor/} \\
 n8n & \texttt{k8s/components/n8n/} \\
 OpenWebUI & \texttt{k8s/components/openwebui/} \\
-Ollama & \texttt{k8s/components/ollama/} \\
+KubeAI & \texttt{k8s/components/kubeai/} \\
 Student Pods & \texttt{k8s/components/student-pods/} \\
 SSHPiper & \texttt{k8s/components/sshpiper/} \\
 \bottomrule
@@ -1528,8 +1514,8 @@ Files not persisting & Only \texttt{/home/student/} is persisted via PVC \\
 \midrule
 GPU not detected & Run \texttt{nvidia-smi} on host, check NVIDIA drivers \\
 GPU pod pending & Check GPU operator pods in gpu-operator namespace \\
-Ollama can't use GPU & Verify all 3 GPUs allocated to Ollama deployment \\
-Ray worker can't use GPU & Check NVIDIA device plugin on Cerberus \\
+KubeAI model won't start & Check vLLM pod logs, verify GPU allocation and model config \\
+GPU training pod pending & Check NVIDIA device plugin on Cerberus, verify node labels \\
 \bottomrule
 \end{tabular}
 \end{table}
