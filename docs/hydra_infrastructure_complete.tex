@@ -1,5 +1,5 @@
 % Hydra Infrastructure Complete Reference — SUNY New Paltz CS Lab
-% Consolidated from all docs/ files, K8s manifests, and audit reports
+% Consolidated from system audit, K8s manifests, and code review
 % Last updated: February 25, 2026
 \documentclass[11pt,a4paper]{article}
 \usepackage{templates/hydra-doc}
@@ -39,12 +39,12 @@ Hydra is a containerized development platform providing persistent development e
 \subsection{Key Features}
 \begin{itemize}
     \item \textbf{SSO Authentication:} Azure AD SAML 2.0 with automatic user provisioning
-    \item \textbf{Persistent Containers:} Per-student development environments with SSH, VS Code, and Jupyter
+    \item \textbf{Persistent Containers:} Per-student environments with SSH, VS Code, Jupyter, and Jenkins
     \item \textbf{GPU Computing:} 5 GPUs across 2 nodes (3x RTX 3090 + 2x RTX 5090)
-    \item \textbf{AI Chat:} OpenWebUI + KubeAI (21 vLLM models)
-    \item \textbf{Dynamic Routing:} Traefik reverse proxy with ForwardAuth
+    \item \textbf{AI Chat:} OpenWebUI + KubeAI (vLLM models with scale-to-zero)
+    \item \textbf{Dynamic Routing:} Traefik v2.11 reverse proxy with ForwardAuth
     \item \textbf{Workflow Automation:} n8n with integrated user management
-    \item \textbf{21 TB Storage:} RAID-10 ZFS array with NFS exports
+    \item \textbf{21 TB Storage:} RAID-10 ZFS array with NFS exports for cross-node access
 \end{itemize}
 
 \subsection{Access URLs}
@@ -55,7 +55,7 @@ Hydra is a containerized development platform providing persistent development e
 \textbf{Service} & \textbf{URL} & \textbf{Description} \\
 \midrule
 Dashboard & \texttt{https://hydra.newpaltz.edu/dashboard} & Main user interface \\
-OpenWebUI & \texttt{https://gpt.hydra.newpaltz.edu/} & AI chat (KubeAI) \\
+OpenWebUI & \texttt{https://gpt.hydra.newpaltz.edu/} & AI chat (KubeAI/vLLM) \\
 CS Lab Site & \texttt{https://hydra.newpaltz.edu/} & Department homepage \\
 Student Forms & \texttt{https://hydra.newpaltz.edu/student-forms} & Form hub \\
 Hackathons & \texttt{https://hydra.newpaltz.edu/hackathons} & Hackathon voting \\
@@ -78,9 +78,9 @@ Servers & \texttt{https://hydra.newpaltz.edu/servers} & Cluster status \\
 \toprule
 \textbf{Node} & \textbf{IP} & \textbf{Role} & \textbf{OS} & \textbf{Hardware} \\
 \midrule
-Hydra & 192.168.1.160 & Control plane, etcd & Ubuntu 22.04.5 & 64 cores, 256 GB RAM, 21 TB RAID-10 \\
+Hydra & 192.168.1.160 & Control plane, etcd, student pods & Ubuntu 22.04.5 & 64 cores, 256 GB RAM, 21 TB RAID-10 \\
 Chimera & 192.168.1.150 & GPU inference & Ubuntu 24.04.2 & 48 cores, 256 GB RAM, 3x RTX 3090 (72 GB VRAM) \\
-Cerberus & 192.168.1.242 & GPU training & Ubuntu 24.04.3 & 48 cores, 64 GB RAM, 2x RTX 5090 (64 GB VRAM) \\
+Cerberus & 192.168.1.233 & GPU training & Ubuntu 24.04.3 & 48 cores, 64 GB RAM, 2x RTX 5090 (64 GB VRAM) \\
 \bottomrule
 \end{tabular}
 \caption{All nodes run RKE2 v1.28.4+rke2r1 with containerd 1.7.7.}
@@ -90,45 +90,56 @@ Cerberus & 192.168.1.242 & GPU training & Ubuntu 24.04.3 & 48 cores, 64 GB RAM, 
 
 \begin{center}
 \begin{tikzpicture}[
-    node distance=1.2cm,
-    box/.style={rectangle, draw, fill=blue!10, minimum width=2.5cm, minimum height=1cm, align=center},
-    server/.style={rectangle, draw, thick, fill=blue!20, minimum width=3.5cm, minimum height=3cm, align=center},
-    gpu/.style={rectangle, draw, thick, fill=green!15, minimum width=3.5cm, minimum height=3cm, align=center},
-    service/.style={rectangle, draw, fill=green!10, minimum width=2.8cm, minimum height=0.5cm, align=center, font=\scriptsize},
-    container/.style={rectangle, draw, fill=orange!10, minimum width=2.8cm, minimum height=0.5cm, align=center, font=\scriptsize},
-    arrow/.style={->, thick},
-    dashed_arrow/.style={->, dashed}
+    node distance=1cm,
+    box/.style={rectangle, draw, fill=blue!8, minimum width=2.5cm, minimum height=0.9cm, align=center, font=\small},
+    server/.style={rectangle, draw, thick, fill=blue!15, minimum width=4cm, minimum height=4.5cm, align=center, rounded corners=3pt},
+    gpu/.style={rectangle, draw, thick, fill=green!12, minimum width=4cm, minimum height=4.5cm, align=center, rounded corners=3pt},
+    svc/.style={rectangle, draw, fill=yellow!15, minimum width=3.2cm, minimum height=0.5cm, align=center, font=\scriptsize},
+    pod/.style={rectangle, draw, fill=orange!12, minimum width=3.2cm, minimum height=0.5cm, align=center, font=\scriptsize},
+    arrow/.style={->, thick, >=stealth},
+    darrow/.style={->, dashed, >=stealth}
 ]
 
-\node[box] (user) {User\\Browser};
-\node[box, right=3cm of user] (azure) {Azure AD\\SAML IdP};
-\node[box, below=1.5cm of user] (traefik) {Traefik\\:80, :443};
+%% External actors
+\node[box] (user) {Users\\(Browser/SSH)};
+\node[box, right=3.5cm of user] (azure) {Azure AD\\SAML 2.0 IdP};
 
-\node[server, below=2.5cm of traefik, xshift=-5cm] (hydra) {};
-\node[font=\small\bfseries, anchor=north] at (hydra.north) {Hydra};
-\node[font=\scriptsize, anchor=north] at ([yshift=-0.35cm]hydra.north) {192.168.1.160};
-\node[service] at ([yshift=-0.2cm]hydra.center) (hydra-app) {hydra-saml-auth};
-\node[container, below=0.15cm of hydra-app] (student1) {student-* pods};
-\node[service, below=0.15cm of student1] (zfs) {ZFS 21TB};
+%% Traefik entry point
+\node[box, below=1.2cm of user, fill=orange!15] (traefik) {Traefik v2.11\\:80 :443 :2222};
 
-\node[gpu, right=0.8cm of hydra] (chimera) {};
-\node[font=\small\bfseries, anchor=north] at (chimera.north) {Chimera};
-\node[font=\scriptsize, anchor=north] at ([yshift=-0.35cm]chimera.north) {3x RTX 3090};
-\node[service] at ([yshift=-0.2cm]chimera.center) (openwebui) {OpenWebUI + KubeAI/vLLM};
-\node[gpu, right=0.8cm of chimera] (cerberus) {};
-\node[font=\small\bfseries, anchor=north] at (cerberus.north) {Cerberus};
-\node[font=\scriptsize, anchor=north] at ([yshift=-0.35cm]cerberus.north) {2x RTX 5090};
-\node[service] at ([yshift=-0.2cm]cerberus.center) (gpuworkload) {GPU Training};
-\node[container, below=0.15cm of gpuworkload] (gpu-student) {GPU containers};
+%% --- Hydra server ---
+\node[server, below=2cm of traefik, xshift=-5.5cm] (hydra) {};
+\node[font=\small\bfseries, anchor=north] at (hydra.north) {Hydra (Control Plane)};
+\node[font=\scriptsize, anchor=north] at ([yshift=-0.3cm]hydra.north) {192.168.1.160 --- 64 cores, 256 GB};
+\node[svc] at ([yshift=0.1cm]hydra.center) (hauth) {hydra-auth :6969};
+\node[pod, below=0.15cm of hauth] (students) {35 student pods};
+\node[svc, below=0.15cm of students] (zfs) {ZFS RAID-10 (21 TB)};
+\node[pod, below=0.15cm of zfs] (infra) {cs-lab, n8n, sshpiper, ...};
 
-\draw[arrow] (user) -- node[above] {HTTPS} (traefik);
-\draw[arrow, bend left=20] (user) -- node[above] {SAML} (azure);
-\draw[arrow, bend left=20] (azure) -- (traefik);
-\draw[arrow] (traefik) -- (hydra);
-\draw[arrow] (traefik) -- (chimera);
-\draw[arrow] (traefik) -- (cerberus);
-\draw[dashed_arrow] (hydra) -- node[below, font=\scriptsize] {NFS} (chimera);
-\draw[dashed_arrow] (chimera) -- node[below, font=\scriptsize] {NFS} (cerberus);
+%% --- Chimera ---
+\node[gpu, right=0.6cm of hydra] (chimera) {};
+\node[font=\small\bfseries, anchor=north] at (chimera.north) {Chimera (GPU Inference)};
+\node[font=\scriptsize, anchor=north] at ([yshift=-0.3cm]chimera.north) {192.168.1.150 --- 3x RTX 3090};
+\node[svc] at ([yshift=0.1cm]chimera.center) (owui) {OpenWebUI :3000};
+\node[pod, below=0.15cm of owui] (kubeai) {KubeAI + vLLM models};
+\node[pod, below=0.15cm of kubeai] (gpustu1) {GPU student pods};
+
+%% --- Cerberus ---
+\node[gpu, right=0.6cm of chimera] (cerberus) {};
+\node[font=\small\bfseries, anchor=north] at (cerberus.north) {Cerberus (GPU Training)};
+\node[font=\scriptsize, anchor=north] at ([yshift=-0.3cm]cerberus.north) {192.168.1.233 --- 2x RTX 5090};
+\node[svc] at ([yshift=0.1cm]cerberus.center) (train) {Training workloads};
+\node[pod, below=0.15cm of train] (gpustu2) {GPU student pods};
+
+%% Arrows
+\draw[arrow] (user) -- node[left, font=\scriptsize] {HTTPS} (traefik);
+\draw[arrow, bend left=20] (user.east) -- node[above, font=\scriptsize] {SAML} (azure.west);
+\draw[arrow, bend left=20] (azure.south west) -- (traefik.east);
+\draw[arrow] (traefik.south) -- (hydra.north);
+\draw[arrow] (traefik.south east) -- (chimera.north);
+\draw[arrow] (traefik.south east) -- (cerberus.north);
+\draw[darrow] (hydra.east) -- node[below, font=\scriptsize] {NFS} (chimera.west);
+\draw[darrow] (chimera.east) -- node[below, font=\scriptsize] {NFS} (cerberus.west);
 
 \end{tikzpicture}
 \end{center}
@@ -139,9 +150,124 @@ Cerberus & 192.168.1.242 & GPU training & Ubuntu 24.04.3 & 48 cores, 64 GB RAM, 
     \item All nodes on 192.168.1.0/24 LAN (gateway 192.168.1.1)
     \item Direct ethernet bridge between Chimera and Cerberus (reserved for RDMA/RoCE)
     \item WireGuard VPN: Chimera \texttt{wg0} = 10.8.0.2, Cerberus \texttt{wg0} = 10.8.0.3
-    \item Flannel VXLAN (port 8472/udp) for K8s pod networking, restricted to LAN
+    \item Canal CNI (Calico + Flannel VXLAN on port 8472/udp) for K8s pod networking
     \item UFW firewall on all nodes --- workers expose only SSH publicly
 \end{itemize}
+
+%% ============================================================
+%% PART II: SYSTEM LAYER
+%% ============================================================
+\newpage
+\part{System Layer}
+
+This section documents the OS-level configuration that underpins the Kubernetes cluster.
+
+\section{Kernel Configuration (sysctl)}
+
+Three configuration files in \texttt{/etc/sysctl.d/} (loaded alphabetically, \texttt{99-*} runs last):
+
+\begin{table}[H]
+\centering
+\begin{tabular}{llp{6cm}}
+\toprule
+\textbf{File} & \textbf{Setting} & \textbf{Purpose} \\
+\midrule
+\texttt{99-kubernetes.conf} & \texttt{net.bridge.bridge-nf-call-iptables=1} & Enable bridge netfilter for K8s networking \\
+ & \texttt{net.bridge.bridge-nf-call-ip6tables=1} & IPv6 bridge netfilter \\
+ & \texttt{net.ipv4.ip\_forward=1} & IP forwarding for pod routing \\
+ & \texttt{vm.max\_map\_count=262144} & Required by Elasticsearch-type workloads \\
+\midrule
+\texttt{99-hydra.conf} & \texttt{vm.swappiness=10} & Prefer RAM over swap; only swap under real pressure (256 GB RAM) \\
+ & \texttt{fs.inotify.max\_user\_watches=2097152} & 2M watches per user (default too low for many pods) \\
+ & \texttt{fs.inotify.max\_user\_instances=1024} & 1K inotify instances (default ~128 too low for containers) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{infobox}
+\texttt{99-sysctl.conf} exists but is empty (all values commented out). The active tuning is in \texttt{99-kubernetes.conf} and \texttt{99-hydra.conf}.
+\end{infobox}
+
+\section{Container Runtimes (containerd)}
+
+Two containerd instances run on Hydra:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lp{4cm}p{6cm}}
+\toprule
+\textbf{Instance} & \textbf{Config Path} & \textbf{Purpose} \\
+\midrule
+Standalone (Docker-era) & \texttt{/etc/containerd/config.toml} & CRI \textbf{disabled}. Kept as Docker dependency. Idle --- no active containers. \\
+RKE2 embedded & \texttt{/var/lib/rancher/rke2/agent/etc/containerd/config.toml} & \textbf{Active runtime.} overlayfs snapshotter, systemd cgroups, data on ZFS at \texttt{/data/rke2}. No NVIDIA runtime on Hydra (no GPUs). \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{warningbox}
+Docker is installed but \textbf{disabled} (\texttt{systemctl disable docker}). It depends on the standalone containerd service. Only start Docker temporarily if buildah/nerdctl cannot handle a specific build task.
+\end{warningbox}
+
+\section{RKE2 Configuration}
+
+Single-server control plane configured at \texttt{/etc/rancher/rke2/config.yaml}:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lp{8cm}}
+\toprule
+\textbf{Setting} & \textbf{Value} \\
+\midrule
+Pod CIDR & \texttt{10.42.0.0/16} \\
+Service CIDR & \texttt{10.43.0.0/16} \\
+TLS SANs & hydra, hydra.newpaltz.edu \\
+CNI & Canal (Calico + Flannel) \\
+Ingress & Built-in nginx-ingress \textbf{disabled} (Traefik used instead) \\
+Data directory & \texttt{/data/rke2} (ZFS RAID-10) \\
+etcd snapshots & Every 6 hours (\texttt{0 */6 * * *}), retain 10 \\
+Eviction thresholds & \texttt{memory.available<2Gi} hard, \texttt{<4Gi} soft \\
+System reserved & 4 Gi RAM, 2 CPU \\
+Kube reserved & 2 Gi RAM, 1 CPU \\
+Kubeconfig mode & \texttt{0644} \\
+Node label & \texttt{hydra.gpu-enabled=false} \\
+Pod Security & Privileged (lab environment) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{KUBECONFIG:} \texttt{/etc/rancher/rke2/rke2.yaml}
+
+\section{Systemd Services}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{llp{6.5cm}}
+\toprule
+\textbf{Unit} & \textbf{Type} & \textbf{Purpose} \\
+\midrule
+\texttt{rke2-server.service} & Main & K8s control plane. High fd limits. Loads \texttt{br\_netfilter} and \texttt{overlay} kernel modules. \\
+\texttt{containerd.service} & Dependency & Standalone containerd (CRI off). Docker dependency, otherwise idle. \\
+\texttt{hydra-backend.service} & Application & Node.js user-creation API at \texttt{/srv/hydra-backend}. Runs as \texttt{infra} user. \\
+\texttt{hydra-routes-fix.service} & Oneshot & Runs 30s after docker/rke2 start. Executes route-fix script as root to restore IngressRoutes. \\
+\texttt{gpu-manager.service} & Remote & Enabled but no unit on Hydra (GPU operator service on Chimera/Cerberus). \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{center}
+\begin{tikzpicture}[
+    layer/.style={rectangle, draw, thick, minimum width=12cm, minimum height=0.9cm, align=center, font=\small},
+    arrow/.style={->, thick, >=stealth}
+]
+\node[layer, fill=red!8]    (kernel)    at (0,0)   {Kernel: sysctl (bridge-nf-call, ip\_forward, swappiness, inotify)};
+\node[layer, fill=yellow!10] (cri)      at (0,1.2) {Container Runtimes: standalone containerd (idle) + RKE2 containerd (active, overlayfs, systemd cgroups)};
+\node[layer, fill=blue!10]   (rke2)     at (0,2.4) {RKE2: etcd + API server + scheduler + controller (data on /data/rke2 ZFS)};
+\node[layer, fill=green!10]  (workloads) at (0,3.6) {Workloads: Traefik, hydra-auth, student pods, KubeAI, OpenWebUI, n8n, ...};
+\draw[arrow] (kernel) -- (cri);
+\draw[arrow] (cri) -- (rke2);
+\draw[arrow] (rke2) -- (workloads);
+\end{tikzpicture}
+\end{center}
 
 %% ============================================================
 \section{Storage}
@@ -155,8 +281,8 @@ Cerberus & 192.168.1.242 & GPU training & Ubuntu 24.04.3 & 48 cores, 64 GB RAM, 
 \textbf{Device} & \textbf{Mount} & \textbf{Size} & \textbf{Purpose} \\
 \midrule
 \texttt{/dev/mapper/ubuntu--vg-*} & \texttt{/} & 1 TB & OS, applications \\
-\texttt{/dev/md0} (RAID-10, 6 SSDs) & \texttt{/data} & 21 TB & Student volumes, K8s PVCs \\
-\texttt{/dev/sdh4} & \texttt{/mnt/sdh4} & 1.1 TB & Daily backups \\
+\texttt{/dev/md0} (RAID-10, 6 SSDs) & \texttt{/data} & 21 TB & Student volumes, K8s PVCs, RKE2 data \\
+\texttt{/dev/sdh4} & \texttt{/mnt/sdh4} & 1.1 TB & Weekly backups \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -171,12 +297,12 @@ State: clean, ext4, 4096-byte blocks
 
 \begin{table}[H]
 \centering
-\begin{tabular}{lll}
+\begin{tabular}{llp{5cm}}
 \toprule
 \textbf{Name} & \textbf{Provisioner} & \textbf{Usage} \\
 \midrule
-hydra-local & rancher.io/local-path & Student PVCs (default) \\
-hydra-nfs & nfs.csi.k8s.io & Cross-node shared storage \\
+hydra-local & rancher.io/local-path & Local-only PVCs (WaitForFirstConsumer) \\
+hydra-nfs & nfs.csi.k8s.io & Cross-node shared storage (student PVCs use this for pod mobility) \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -187,13 +313,13 @@ Hydra exports \texttt{/data/containers} to the cluster LAN:
 
 \begin{lstlisting}[style=bash]
 # /etc/exports on Hydra
-/data/containers 192.168.1.0/24(rw,sync,no_root_squash)
+/data/containers 192.168.1.0/24(rw,sync,no_subtree_check,no_root_squash)
 \end{lstlisting}
 
 CSI-NFS runs as a DaemonSet on all 3 nodes for dynamic PV provisioning.
 
 %% ============================================================
-%% PART II: KUBERNETES SERVICES
+%% PART III: KUBERNETES SERVICES
 %% ============================================================
 \newpage
 \part{Kubernetes Services}
@@ -206,9 +332,10 @@ CSI-NFS runs as a DaemonSet on all 3 nodes for dynamic PV provisioning.
 \toprule
 \textbf{Namespace} & \textbf{Contents} \\
 \midrule
-\texttt{hydra-system} & Core platform: traefik, hydra-auth, cs-lab-backend, cs-lab-db \\
-\texttt{hydra-infra} & Infrastructure services: ollama, open-webui, n8n, hackathons, java-executor, git-learning, sshpiper, ray-head, ray-worker \\
-\texttt{hydra-students} & Student container pods (25+ active) \\
+\texttt{hydra-system} & Core platform: traefik, hydra-auth, cs-lab \\
+\texttt{hydra-infra} & Infrastructure services: open-webui, n8n, hackathons, flapjs, java-executor, git-learning, sshpiper, n8n-user-manager \\
+\texttt{hydra-students} & Student container pods (35+ active) \\
+\texttt{kubeai} & KubeAI controller + vLLM model pods (scale-to-zero) \\
 \texttt{gpu-operator} & NVIDIA GPU operator, device plugin, DCGM exporter \\
 \texttt{kube-system} & RKE2 system: etcd, coredns, canal, metrics-server, CSI-NFS \\
 \texttt{local-path-storage} & Local-path provisioner \\
@@ -221,21 +348,10 @@ CSI-NFS runs as a DaemonSet on all 3 nodes for dynamic PV provisioning.
 \subsection{Traefik (Reverse Proxy)}
 
 \begin{infobox}
-\textbf{Traefik v2.11} serves as the cluster ingress controller. It runs on Hydra with \texttt{hostPort} binding on ports 80, 443, and 6969. The deployment uses \texttt{strategy: Recreate} to avoid hostPort conflicts during rolling updates.
+\textbf{Traefik v2.11} serves as the cluster ingress controller. It runs on Hydra with \texttt{hostPort} binding on ports 80 and 443. The deployment uses \texttt{strategy: Recreate} to avoid hostPort conflicts during rolling updates. Health probes on port 8082 (\texttt{--ping=true}) with PodDisruptionBudget (\texttt{minAvailable: 1}).
 \end{infobox}
 
-\begin{table}[H]
-\centering
-\begin{tabular}{lll}
-\toprule
-\textbf{Port} & \textbf{Name} & \textbf{Purpose} \\
-\midrule
-80 & web & HTTP (redirects to HTTPS) \\
-443 & websecure & HTTPS with Let's Encrypt \\
-6969 & hydra-auth & Direct auth service access \\
-\bottomrule
-\end{tabular}
-\end{table}
+\textbf{Priority class:} \texttt{infra-critical} (value 1000000) applied to all infrastructure services. Student pods use default priority and are evicted first under memory pressure.
 
 \textbf{Manifests:} \texttt{k8s/components/traefik/}
 
@@ -245,7 +361,7 @@ The main authentication and container management service. Handles:
 \begin{itemize}[nosep]
     \item SAML 2.0 SSO via Azure AD
     \item JWT cookie issuance and JWKS endpoint
-    \item Student container lifecycle (create, start, stop, delete)
+    \item Student container lifecycle (create, start, stop, destroy, wipe)
     \item Dashboard UI, admin panel
     \item OpenWebUI and n8n account provisioning
     \item WebSocket terminal bridge
@@ -255,20 +371,9 @@ The main authentication and container management service. Handles:
 
 \subsection{CS Lab Website}
 
-React frontend + Express backend + SQLite database (single pod). Serves the department homepage at \texttt{hydra.newpaltz.edu}. MariaDB was removed on Feb 9, 2026 --- the codebase uses \texttt{better-sqlite3} exclusively.
+React frontend + Express backend + SQLite database (single pod). Serves the department homepage at \texttt{hydra.newpaltz.edu}.
 
-\begin{table}[H]
-\centering
-\begin{tabular}{lll}
-\toprule
-\textbf{Component} & \textbf{Port} & \textbf{Image} \\
-\midrule
-cs-lab & 5001 & newpaltz-cs-lab-website-backend:latest \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\textbf{Database:} SQLite at \texttt{/app/server/data/cslab.db}. 15 tables including Admins, Events, Faculty, Courses, StudentHighlightBlog, TechBlog, etc. Persisted via PVC \texttt{cs-lab-data}.
+\textbf{Database:} SQLite at \texttt{/app/server/data/cslab.db}. Persisted via PVC \texttt{cs-lab-data}.
 
 \textbf{Manifests:} \texttt{k8s/components/cs-lab/}
 
@@ -282,33 +387,35 @@ cs-lab & 5001 & newpaltz-cs-lab-website-backend:latest \\
 \textbf{Name} & \textbf{Namespace} & \textbf{Match} & \textbf{Backend} \\
 \midrule
 hydra-main & hydra-system & hydra.newpaltz.edu catch-all & hydra-auth:6969 \\
-cs-lab-website & hydra-system & /api/ prefix & cs-lab-backend:5001 \\
+cs-lab-website & hydra-system & /api/ prefix & cs-lab:5001 \\
 hydra-default & hydra-system & HTTP redirect & HTTPS redirect \\
 hackathons & hydra-infra & /hackathons/ prefix & hackathons:45821 \\
-java-executor & hydra-infra & /java/ prefix & java-executor:55392 \\
-git-learning & hydra-infra & /git/ prefix & git-learning:8080 \\
+flapjs & hydra-infra & /jflap/ prefix & flapjs:8080 \\
+java-executor & hydra-infra & /java/ prefix & java-executor:3000 \\
+git-learning & hydra-infra & /git/ prefix & git-learning:38765 \\
 n8n & hydra-infra & n8n.hydra.newpaltz.edu & n8n:5678 \\
-openwebui & hydra-infra & gpt.hydra.newpaltz.edu & openwebui-chimera:3000 \\
+openwebui & hydra-infra & gpt.hydra.newpaltz.edu & open-webui:3000 \\
+student-\{user\} & hydra-students & /students/\{user\}/* & per-student svc \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\begin{infobox}
+Student IngressRoutes use \texttt{traefik.io/v1alpha1} API and are created/deleted dynamically by hydra-auth when pods are initialized or destroyed.
+\end{infobox}
 
 %% ============================================================
 \section{Infrastructure Services (hydra-infra)}
 
 \subsection{KubeAI + vLLM (LLM Inference)}
 
-KubeAI orchestrates 21 vLLM model servers across the GPU nodes with scale-to-zero capability. Models are also available via OpenRouter integration. Replaces the previous Ollama-based setup.
+KubeAI runs in its own \texttt{kubeai} namespace and orchestrates vLLM model servers across the GPU nodes with scale-to-zero capability. Models spin up on-demand when users send requests via OpenWebUI.
 
 \textbf{Manifests:} \texttt{k8s/components/kubeai/}
 
-\begin{infobox}
-KubeAI uses scale-to-zero scheduling --- GPU resources are allocated on-demand per model request. Multiple models can share the same GPU nodes without static allocation conflicts.
-\end{infobox}
-
 \subsection{OpenWebUI}
 
-AI chat frontend at \texttt{gpt.hydra.newpaltz.edu}. Connects to KubeAI/vLLM for inference (21 GPU models with scale-to-zero). Also integrates with OpenRouter for additional cloud models. Includes a \textbf{middleman sidecar} container for user account management.
+AI chat frontend at \texttt{gpt.hydra.newpaltz.edu}. Connects to KubeAI/vLLM for GPU inference and OpenRouter for additional cloud models. Includes a \textbf{middleman sidecar} for user account provisioning.
 
 \textbf{Middleman API (port 7070):}
 \begin{itemize}[nosep]
@@ -324,33 +431,17 @@ Authentication via \texttt{x-api-key} header with timing-safe comparison.
 
 \subsection{n8n (Workflow Automation)}
 
-Workflow automation platform at \texttt{n8n.hydra.newpaltz.edu}. Uses PostgreSQL for data storage.
-
-\textbf{Components:}
-\begin{itemize}[nosep]
-    \item n8n application (port 5678)
-    \item PostgreSQL 16 (StatefulSet with PVC)
-    \item n8n User Manager API (port 3000)
-\end{itemize}
+Workflow automation platform at \texttt{n8n.hydra.newpaltz.edu}. Uses PostgreSQL 16 (StatefulSet) for data storage plus a User Manager API (port 3000) for SSO integration.
 
 \textbf{n8n User Manager API:}
 \begin{itemize}[nosep]
     \item \texttt{GET /health} --- Health check (no auth)
-    \item \texttt{GET /api/users} --- List all users (auth required)
-    \item \texttt{GET /api/users/:email} --- Get user by email
+    \item \texttt{GET /api/users} --- List all users
     \item \texttt{POST /api/users/change-password} --- Change password
 \end{itemize}
 
-Authentication via \texttt{x-api-key} header.
-
 \textbf{Source:} \texttt{k8s/components/n8n/user-manager/}\\
 \textbf{Manifests:} \texttt{k8s/components/n8n/}
-
-\subsection{GPU Training (Cerberus)}
-
-Cerberus (2x RTX 5090, 64 GB VRAM) serves as the dedicated GPU training node. Student GPU containers and training jobs are scheduled here via Kubernetes node affinity rules.
-
-\textbf{Node label:} \texttt{hydra.node-role=gpu-training}
 
 \subsection{Other Services}
 
@@ -361,14 +452,15 @@ Cerberus (2x RTX 5090, 64 GB VRAM) serves as the dedicated GPU training node. St
 \textbf{Service} & \textbf{Port} & \textbf{Description} \\
 \midrule
 hackathons & 45821 & Hackathon voting/judging app (Vue.js + Express) \\
-java-executor & 55392 & Remote Java code execution service \\
-git-learning & 8080 & Interactive Git learning environment \\
+flapjs & 8080 & JFLAP web app (React SPA, Nginx) \\
+java-executor & 3000 & Remote Java code execution service \\
+git-learning & 38765 & Interactive Git learning environment \\
 sshpiper & 2222 & SSH proxy routing to student containers \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\textbf{Manifests:} \texttt{k8s/components/\{hackathons,java-executor,git-learning,sshpiper\}/}
+\textbf{Manifests:} \texttt{k8s/components/\{hackathons,flapjs,java-executor,git-learning,sshpiper\}/}
 
 %% ============================================================
 \section{GPU Infrastructure}
@@ -381,11 +473,10 @@ The GPU Operator runs in the \texttt{gpu-operator} namespace and manages:
     \item Container toolkit (nvidia-container-runtime)
     \item GPU Feature Discovery (node labels)
     \item DCGM Exporter (GPU metrics)
-    \item CUDA validator (verifies GPU access)
 \end{itemize}
 
 \begin{infobox}
-\textbf{Hydra Exclusion:} Hydra (control plane) has no GPUs. All \texttt{nvidia.com/gpu.deploy.*} labels are set to \texttt{false} on Hydra to prevent GPU operator pods from scheduling there.
+\textbf{Hydra Exclusion:} Hydra has no GPUs. All \texttt{nvidia.com/gpu.deploy.*} labels are set to \texttt{false} on Hydra to prevent GPU operator pods from scheduling there.
 \end{infobox}
 
 \subsection{GPU Allocation}
@@ -396,14 +487,14 @@ The GPU Operator runs in the \texttt{gpu-operator} namespace and manages:
 \toprule
 \textbf{Node} & \textbf{GPUs} & \textbf{Model} & \textbf{VRAM} & \textbf{Primary Consumer} \\
 \midrule
-Chimera & 3 & RTX 3090 & 72 GB total & KubeAI/vLLM inference \\
-Cerberus & 2 & RTX 5090 & 64 GB total & GPU training / Student GPU containers \\
+Chimera & 3 & RTX 3090 (Ampere) & 72 GB total & KubeAI/vLLM inference \\
+Cerberus & 2 & RTX 5090 (Blackwell) & 64 GB total & GPU training / student containers \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 %% ============================================================
-%% PART III: AUTHENTICATION
+%% PART IV: AUTHENTICATION
 %% ============================================================
 \newpage
 \part{Authentication System}
@@ -412,43 +503,51 @@ Cerberus & 2 & RTX 5090 & 64 GB total & GPU training / Student GPU containers \\
 
 \begin{center}
 \begin{tikzpicture}[
-    node distance=0.8cm,
-    stepbox/.style={rectangle, draw, fill=blue!5, minimum width=10cm, minimum height=0.7cm, align=left, font=\small}
+    node distance=0.7cm,
+    stepbox/.style={rectangle, draw, fill=blue!5, minimum width=11cm, minimum height=0.65cm, align=left, font=\small}
 ]
-\node[stepbox] (s1) {1. User visits https://hydra.newpaltz.edu/login};
+\node[stepbox] (s1) {1. User visits \texttt{https://hydra.newpaltz.edu/login}};
 \node[stepbox, below=of s1] (s2) {2. Hydra redirects to Azure AD with SAML AuthnRequest};
 \node[stepbox, below=of s2] (s3) {3. User authenticates with SUNY New Paltz credentials};
 \node[stepbox, below=of s3] (s4) {4. Azure AD returns signed SAML assertion};
 \node[stepbox, below=of s4] (s5) {5. Hydra validates signature, extracts: email, groups, displayName};
-\node[stepbox, below=of s5] (s6) {6. Session created, JWT cookie (np\_access) issued};
-\node[stepbox, below=of s6] (s7) {7. User redirected to /dashboard};
+\node[stepbox, below=of s5] (s6) {6. Session created; JWT cookie (\texttt{np\_access}) issued; accounts provisioned in OpenWebUI/n8n};
+\node[stepbox, below=of s6] (s7) {7. User redirected to \texttt{/dashboard}};
 \end{tikzpicture}
 \end{center}
 
 \section{Session and JWT Management}
 
-\begin{itemize}
-    \item \textbf{Express Session:} Server-side storage in SQLite
-    \item \textbf{JWT Cookie (\texttt{np\_access}):} Site-wide SSO cookie
-    \item \textbf{JWKS Endpoint:} \texttt{/.well-known/jwks.json} for public key distribution
-    \item \textbf{Algorithm:} RS256
-    \item \textbf{TTL:} Configurable via \texttt{JWT\_TTL\_SECONDS} (default: 86400)
-    \item \textbf{Cookie Domain:} \texttt{.newpaltz.edu}
-\end{itemize}
+\begin{table}[H]
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Setting} & \textbf{Value} \\
+\midrule
+Express session store & SQLite (server-side) \\
+JWT cookie name & \texttt{np\_access} \\
+Algorithm & RS256 \\
+JWKS endpoint & \texttt{/.well-known/jwks.json} \\
+Default TTL & 900 seconds (15 minutes) \\
+Production TTL & 2,592,000 seconds (30 days) \\
+Cookie domain & \texttt{.newpaltz.edu} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Configured via \texttt{JWT\_TTL\_SECONDS} in \texttt{.env}.
 
 \section{Cross-Service Authentication}
 
-\subsection{OpenWebUI Account Provisioning}
-When a user logs in via SAML, Hydra automatically provisions an OpenWebUI account via the middleman API. The password is derived and set transparently.
-
-\subsection{n8n Account Provisioning}
-Similarly, n8n accounts are provisioned via the n8n User Manager API on first login.
-
-\subsection{CS Lab JWT Verification}
-The CS Lab backend verifies JWT tokens using the public key mounted via ConfigMap \texttt{cs-lab-jwt-key} at \texttt{/app/server/keys/jwt-public.pem}.
+\begin{itemize}[nosep]
+    \item \textbf{OpenWebUI:} Account auto-provisioned on SAML login via middleman API
+    \item \textbf{n8n:} Account auto-provisioned via n8n User Manager API
+    \item \textbf{CS Lab:} JWT verified using public key mounted via ConfigMap at \texttt{/app/server/keys/jwt-public.pem}
+    \item \textbf{Student services:} Traefik ForwardAuth calls \texttt{/auth/verify} before proxying to VS Code, Jupyter, Jenkins
+\end{itemize}
 
 %% ============================================================
-%% PART IV: STUDENT CONTAINERS
+%% PART V: STUDENT CONTAINERS
 %% ============================================================
 \newpage
 \part{Student Containers}
@@ -466,30 +565,29 @@ Each student receives a persistent container with:
 Node.js & Latest LTS via nvm \\
 Python & 3.11+ with pip, venv, Jupyter \\
 Java & OpenJDK 21 \\
-Docker & Docker CLI (Docker-in-Docker via rootless) \\
 VS Code & code-server browser IDE (port 8443, always on) \\
-Jupyter & JupyterLab (port 8888, approval required) \\
-Jenkins & CI/CD server (port 8080, approval required) \\
+Jupyter & JupyterLab (port 8888, admin approval required) \\
+Jenkins & CI/CD server (port 8080, always available) \\
 SSH & Direct access via SSHPiper (port 2222) \\
 Tools & Git, curl, wget, build-essential, gdb, cmake \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\subsection{Service Management}
+\section{Service Management}
 
-Each student container runs managed services via \texttt{supervisord}. Code-server and Jenkins are always available; Jupyter requires admin approval.
+Each container runs managed services via \texttt{supervisord}:
 
 \begin{table}[H]
 \centering
-\begin{tabular}{llllp{5cm}}
+\begin{tabular}{llllp{4cm}}
 \toprule
 \textbf{Service} & \textbf{Port} & \textbf{Path} & \textbf{Autostart} & \textbf{Approval} \\
 \midrule
-code-server & 8443 & \texttt{/students/\{user\}/vscode/} & On init & None required \\
-Jenkins & 8080 & \texttt{/students/\{user\}/jenkins/} & On init & None required \\
-Jupyter Lab & 8888 & \texttt{/students/\{user\}/jupyter/} & No & \texttt{jupyter\_execution\_approved} \\
-SSH & 22 & via SSHPiper port 2222 & Yes & None required \\
+code-server & 8443 & \texttt{/students/\{user\}/vscode/} & Yes & None \\
+Jenkins & 8080 & \texttt{/students/\{user\}/jenkins/} & No (dashboard toggle) & None \\
+Jupyter Lab & 8888 & \texttt{/students/\{user\}/jupyter/} & No & Admin approval \\
+SSH & 22 & via SSHPiper port 2222 & Yes & None \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -497,25 +595,12 @@ SSH & 22 & via SSHPiper port 2222 & Yes & None required \\
 \textbf{Jupyter approval flow:}
 \begin{enumerate}[nosep]
     \item Student clicks ``Request Jupyter Access'' on the dashboard
-    \item Request stored in \texttt{resource\_requests} table (type: \texttt{jupyter\_execution})
-    \item Admin approves via admin panel, setting \texttt{jupyter\_execution\_approved} in \texttt{user\_quotas}
-    \item On next container init, the \texttt{JUPYTER\_APPROVED} env var is injected
+    \item Request stored in \texttt{resource\_requests} table
+    \item Admin approves via admin panel, setting \texttt{jupyter\_execution\_approved}
+    \item On next container init, \texttt{JUPYTER\_APPROVED} env var injected
     \item \texttt{entrypoint.sh} creates \texttt{/var/run/jupyter-approved} marker
-    \item Supervisor starts Jupyter
+    \item Supervisor starts Jupyter; CLI gate (\texttt{jupyter-gate.sh}) unlocked
 \end{enumerate}
-
-\textbf{CLI gating:} Jupyter also has a CLI wrapper (\texttt{jupyter-gate.sh}) that blocks direct \texttt{jupyter} command usage. The real binary is at \texttt{/usr/local/bin/jupyter.real}. Students see an error directing them to request access via the dashboard.
-
-\textbf{Jenkins:} Always available to all students. Start/Stop/Open buttons on the dashboard. Jenkins data persists at \texttt{\~{}/.jenkins} in the student's PVC. See the dashboard FAQ for Jenkinsfile examples and test commands.
-
-\section{Container Presets}
-
-\begin{itemize}[nosep]
-    \item \textbf{Jupyter:} \texttt{jupyter/minimal-notebook}, port 8888, ForwardAuth
-    \item \textbf{Static:} \texttt{nginx:alpine}, port 80, no auth
-    \item \textbf{Repo:} Cloned from GitHub, runtime varies (Node/Python/nginx)
-    \item \textbf{VS Code:} \texttt{codercom/code-server}, mounts any project volume
-\end{itemize}
 
 \section{Resource Presets}
 
@@ -535,109 +620,59 @@ GPU Training & 48 GB & 16 & 200 GB & 2 & Required \\
 \end{tabular}
 \end{table}
 
-\section{Pod Timing and Lifecycle}
+\textbf{Auto-approve thresholds:} $\leq$ 4 GB RAM, $\leq$ 2 CPU, $\leq$ 40 GB storage. GPU requests always require admin approval. Pending requests expire after 7 days.
 
-\subsection{Duration Tiers}
+\textbf{Config:} \texttt{config/resources.js}
 
-When requesting resources, students select a duration for how long their allocation lasts:
+\section{Pod Lifecycle}
+
+\subsection{K8s Resources Created on Init}
+
+When a student container is initialized, hydra-auth creates these K8s resources:
+
+\begin{enumerate}[nosep]
+    \item \textbf{PersistentVolumeClaim} (\texttt{hydra-vol-\{user\}}) --- NFS storage class for cross-node access
+    \item \textbf{Secret} (\texttt{student-\{user\}-creds}) --- Random 16-char password
+    \item \textbf{Pod} (\texttt{student-\{user\}}) --- 4 ports: vscode:8443, jupyter:8888, jenkins:8080, supervisor:9001
+    \item \textbf{Service} (\texttt{student-\{user\}}) --- ClusterIP exposing all 4 ports
+    \item \textbf{Middleware} (\texttt{strip-prefix-\{user\}}) --- Traefik path stripping for VS Code
+    \item \textbf{IngressRoute} (\texttt{student-\{user\}}) --- 3 routes with ForwardAuth (see below)
+    \item \textbf{SSHPiper config} --- \texttt{sshpiper/config/\{user\}/sshpiper\_upstream} with pod IP
+\end{enumerate}
+
+\subsection{IngressRoute per Student}
+
+Each student gets 3 Traefik routes (all priority 100, \texttt{Host(hydra.newpaltz.edu)}):
 
 \begin{table}[H]
 \centering
-\begin{tabular}{llll}
+\begin{tabular}{llp{5.5cm}}
 \toprule
-\textbf{Duration} & \textbf{Label} & \textbf{Auto-Approve} & \textbf{Description} \\
+\textbf{Service} & \textbf{Path Match} & \textbf{Middlewares} \\
 \midrule
-1 day & Default & Yes & Quick testing \\
-3 days & Short & Yes & Short assignment \\
-7 days & 1 Week & Yes & Short projects \\
-14 days & 2 Weeks & Yes & Standard project \\
-30 days & 1 Month & Yes & Semester project \\
-60 days & 2 Months & No & Extended project \\
-90 days & 3 Months & No & Full semester \\
+VS Code & \texttt{/students/\{user\}/vscode} & ForwardAuth + strip-prefix \\
+Jupyter & \texttt{/students/\{user\}/jupyter} & ForwardAuth only (Jupyter handles \texttt{base\_url}) \\
+Jenkins & \texttt{/students/\{user\}/jenkins} & ForwardAuth only (Jenkins handles \texttt{--prefix}) \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\textbf{Config:} \texttt{config/resources.js} lines 201--213. Default: 1 day. Maximum: 365 days (enforced at \texttt{routes/resource-requests.js:500}).
-
-\subsection{Resource Limits}
+\subsection{Deletion Levels}
 
 \begin{table}[H]
 \centering
-\begin{tabular}{ll}
+\begin{tabular}{lp{4.5cm}p{4.5cm}}
 \toprule
-\textbf{Limit} & \textbf{Value} \\
+\textbf{Action} & \textbf{Deletes} & \textbf{Keeps} \\
 \midrule
-Max containers per user & 1 \\
-Max storage per user & 200 GB \\
-Max memory per container & 48 GB \\
-Max CPUs per container & 16 \\
-Max GPUs per container & 2 \\
+Stop & Pod only & PVC, Secret, Service, IngressRoute, Middleware \\
+Destroy & Pod, Service, IngressRoute, Middleware, SSHPiper config & PVC, Secret (data survives) \\
+Wipe & Everything: Pod, Service, IngressRoute, Middleware, PVC, Secret & Nothing \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\textbf{Config:} \texttt{config/resources.js} lines 227--234.
-
-\subsection{Auto-Approval Thresholds}
-
-Requests within these limits are automatically approved without admin intervention:
-
-\begin{table}[H]
-\centering
-\begin{tabular}{ll}
-\toprule
-\textbf{Resource} & \textbf{Auto-Approve Up To} \\
-\midrule
-Memory & 4 GB \\
-CPUs & 2 cores \\
-Storage & 40 GB \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-Conservative presets on Hydra are always auto-approved. GPU requests always require admin approval. Pending requests expire after 7 days.
-
-\textbf{Config:} \texttt{config/resources.js} lines 236--246.
-
-\subsection{K8s Resource Quotas per Preset}
-
-Each preset maps to specific Kubernetes requests/limits:
-
-\begin{table}[H]
-\centering
-\begin{tabular}{lllll}
-\toprule
-\textbf{Preset} & \textbf{Request Mem} & \textbf{Limit Mem} & \textbf{Request CPU} & \textbf{Limit CPU} \\
-\midrule
-Minimal & 512Mi & 1Gi & 250m & 1 \\
-Conservative & 768Mi & 1536Mi & 500m & 1 \\
-Standard & 1Gi & 2Gi & 500m & 2 \\
-Enhanced & 2Gi & 4Gi & 1 & 4 \\
-GPU Inference & 16Gi & 32Gi & 4 & 8 \\
-GPU Training & 32Gi & 48Gi & 8 & 16 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\textbf{Config:} \texttt{config/resources.js} lines 256--282.
-
-\subsection{Max Concurrent Pods per Node}
-
-\begin{table}[H]
-\centering
-\begin{tabular}{lll}
-\toprule
-\textbf{Node} & \textbf{Max Containers} & \textbf{Notes} \\
-\midrule
-Hydra & 100 & No GPU, control plane \\
-Chimera & 20 & 3 GPUs (1 reserved for OpenWebUI) \\
-Cerberus & 10 & 2 GPUs (training) \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\subsection{Pod Lifecycle Settings}
+\subsection{Pod Settings}
 
 \begin{table}[H]
 \centering
@@ -649,39 +684,20 @@ Restart policy & \texttt{Always} \\
 Termination grace period & 30 seconds \\
 Resource requests & 50\% of limits \\
 Image pull policy & \texttt{IfNotPresent} \\
-Security context & \texttt{fsGroup: 1000}, \texttt{seccompProfile: RuntimeDefault} \\
-Service account & \texttt{student-workload} \\
-PVC mount & \texttt{/home/student} (persists across restarts) \\
+Security context & Drop ALL caps, add CHOWN, DAC\_OVERRIDE, SETUID, SETGID, NET\_BIND\_SERVICE, KILL \\
+Service account & \texttt{student-workload} (no token mount) \\
+PVC mount & \texttt{/home/student} \\
+Node scheduling & Soft affinity (weight 80) for target node + hard \texttt{hydra.student-schedulable=true} \\
+GPU tolerations & All pods tolerate \texttt{nvidia.com/gpu} NoSchedule \\
 \bottomrule
 \end{tabular}
 \end{table}
-
-\subsection{JWT Session Duration}
-
-\begin{table}[H]
-\centering
-\begin{tabular}{ll}
-\toprule
-\textbf{Setting} & \textbf{Value} \\
-\midrule
-Default JWT TTL & 900 seconds (15 minutes) \\
-Production JWT TTL & 2,592,000 seconds (30 days) \\
-Algorithm & RS256 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-Configured via \texttt{JWT\_TTL\_SECONDS} in \texttt{.env}. JWKS endpoint: \texttt{/.well-known/jwks.json}.
 
 \section{SSH Access via SSHPiper}
-
-Students access containers via SSH through the SSHPiper proxy:
 
 \begin{lstlisting}[style=bash]
 # Connect to your container
 ssh -p 2222 student@hydra.newpaltz.edu
-
-# Port 2222 is forwarded through the router to the sshpiper K8s pod
 \end{lstlisting}
 
 \begin{itemize}[nosep]
@@ -690,20 +706,8 @@ ssh -p 2222 student@hydra.newpaltz.edu
     \item Key-based auth supported (\texttt{\~{}/.ssh/authorized\_keys})
 \end{itemize}
 
-\section{Container Labels and Routing}
-
-Common labels on student containers:
-\begin{itemize}[nosep]
-    \item \texttt{hydra.managed\_by=hydra-saml-auth}
-    \item \texttt{hydra.owner=<username>}
-    \item \texttt{hydra.project=<project>}
-    \item \texttt{hydra.basePath=/students/<user>/<project>}
-\end{itemize}
-
-Traefik routes requests at \texttt{/students/<user>/<project>} to the corresponding container using StripPrefix middleware (except Jupyter, which uses \texttt{base\_url}).
-
 %% ============================================================
-%% PART V: NETWORKING
+%% PART VI: NETWORKING
 %% ============================================================
 \newpage
 \part{Networking}
@@ -715,7 +719,6 @@ Traefik routes requests at \texttt{/students/<user>/<project>} to the correspond
 22/tcp          ALLOW  Anywhere        # SSH
 80/tcp          ALLOW  Anywhere        # HTTP
 443             ALLOW  Anywhere        # HTTPS
-6969            ALLOW  172.17.0.0/16, 172.24.0.0/16  # Auth (Docker)
 51820/udp       ALLOW  Anywhere        # WireGuard
 6443/tcp        ALLOW  192.168.1.0/24  # K8s API
 9345/tcp        ALLOW  192.168.1.0/24  # RKE2 supervisor
@@ -727,22 +730,12 @@ Traefik routes requests at \texttt{/students/<user>/<project>} to the correspond
 8472/udp        ALLOW  192.168.1.0/24  # Flannel VXLAN
 \end{lstlisting}
 
-\subsection{Chimera (GPU Worker)}
+\subsection{Workers (Chimera / Cerberus)}
 \begin{lstlisting}[style=bash]
 22/tcp          ALLOW  Anywhere        # SSH
-7070/tcp        ALLOW  192.168.1.148   # OpenWebUI middleman
-9100            ALLOW  192.168.1.0/24  # Metrics
 8472/udp        ALLOW  192.168.1.0/24  # Flannel VXLAN
 10250/tcp       ALLOW  192.168.1.0/24  # Kubelet
-\end{lstlisting}
-
-\subsection{Cerberus (GPU Worker)}
-\begin{lstlisting}[style=bash]
-22/tcp          ALLOW  Anywhere        # SSH
-9100            ALLOW  192.168.1.160   # Metrics from Hydra
-2376            ALLOW  192.168.1.160   # Docker from Hydra
-8472/udp        ALLOW  192.168.1.0/24  # Flannel VXLAN
-10250/tcp       ALLOW  192.168.1.0/24  # Kubelet
+9100            ALLOW  192.168.1.0/24  # Node metrics
 \end{lstlisting}
 
 \section{Router Port Forwarding}
@@ -761,7 +754,7 @@ Traefik routes requests at \texttt{/students/<user>/<project>} to the correspond
 \end{tabular}
 \end{table}
 
-\section{DNS}
+\section{DNS and TLS}
 
 \begin{itemize}[nosep]
     \item \texttt{hydra.newpaltz.edu} --- Main domain, points to campus public IP
@@ -769,260 +762,13 @@ Traefik routes requests at \texttt{/students/<user>/<project>} to the correspond
     \item \texttt{n8n.hydra.newpaltz.edu} --- n8n subdomain
 \end{itemize}
 
-TLS certificates managed by Let's Encrypt via Traefik ACME.
+TLS certificates managed by Let's Encrypt via Traefik ACME (renewed weekly via certbot cron).
 
 %% ============================================================
-%% PART VI: DEPLOYMENT AND OPERATIONS
-%% ============================================================
-\newpage
-\part{Deployment and Operations}
-
-\section{Ansible Playbooks}
-
-The cluster can be deployed from scratch using Ansible playbooks in \texttt{ansible/}:
-
-\begin{lstlisting}[style=bash]
-cd /home/infra/hydra-saml-auth/ansible
-ansible-playbook -i inventory.yml playbooks/site.yml
-\end{lstlisting}
-
-\subsection{Playbook Execution Order}
-
-\begin{enumerate}
-    \item \texttt{00-preflight-backup.yml} --- Create backups before changes
-    \item \texttt{01-prepare-nodes.yml} --- Install packages, configure kernel
-    \item \texttt{02-rke2-server.yml} --- Setup RKE2 control plane on Hydra
-    \item \texttt{03-rke2-agents.yml} --- Join Chimera and Cerberus to cluster
-    \item \texttt{04-gpu-setup.yml} --- Configure NVIDIA drivers and GPU Operator
-    \item \texttt{05-deploy-hydra.yml} --- Deploy all K8s manifests
-\end{enumerate}
-
-\subsection{What 05-deploy-hydra.yml Deploys}
-
-In order:
-\begin{enumerate}[nosep]
-    \item Namespaces and RBAC
-    \item Storage classes
-    \item Traefik CRDs and deployment
-    \item Hydra Auth deployment
-    \item CS Lab website (backend + DB)
-    \item Hackathons, Java Executor, Git Learning
-    \item SSHPiper
-    \item n8n (app + Postgres + user manager)
-    \item KubeAI + vLLM model servers
-    \item OpenWebUI (with middleman sidecar)
-\end{enumerate}
-
-\section{CS Lab Website Deployment}
-
-\begin{lstlisting}[style=bash]
-# 1. Build the image
-cd /home/infra/NewPaltz-CS-Lab-Website
-docker build --no-cache -t newpaltz-cs-lab-website-backend:latest .
-
-# 2. Export to tarball
-docker save newpaltz-cs-lab-website-backend:latest \
-  -o /data/containers/images/newpaltz-cs-lab-website-backend-latest.tar
-
-# 3. Import into RKE2's containerd
-sudo ctr --address /run/k3s/containerd/containerd.sock \
-  -n k8s.io images import \
-  /data/containers/images/newpaltz-cs-lab-website-backend-latest.tar
-
-# 4. Restart the pod
-kubectl delete pod -l app.kubernetes.io/component=backend -n hydra-system
-\end{lstlisting}
-
-\begin{warningbox}
-\textbf{Docker vs RKE2 Containerd:} Docker and RKE2 use separate containerd instances with separate image stores. Docker builds go to Docker's containerd. You must explicitly import images into RKE2's containerd at \texttt{/run/k3s/containerd/containerd.sock}.
-\end{warningbox}
-
-\section{Image Management}
-
-\begin{itemize}[nosep]
-    \item Image tarballs stored at \texttt{/data/containers/images/}
-    \item Use \texttt{imagePullPolicy: Never} for locally-imported images
-    \item Use unique tags (e.g., \texttt{v20260206144528}) to force pod recreation
-\end{itemize}
-
-\section{Backup System}
-
-\subsection{Daily Cluster Backups}
-
-\begin{table}[H]
-\centering
-\begin{tabular}{ll}
-\toprule
-\textbf{Setting} & \textbf{Value} \\
-\midrule
-Backup Location & \texttt{/mnt/sdh4/backups/} \\
-Schedule & Daily at 1:00 AM (crontab) \\
-Method & rsync with compression \\
-Script & \texttt{/home/infra/backup-cluster.sh} \\
-Log File & \texttt{/var/log/cluster-backup.log} \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\subsection{etcd Snapshots}
-
-Automatic every 12 hours via RKE2. Stored in \texttt{/var/lib/rancher/rke2/server/db/snapshots/}.
-
-\subsection{Backup Exclusions}
-
-\texttt{/dev/*}, \texttt{/proc/*}, \texttt{/sys/*}, \texttt{/run/*}, \texttt{/tmp/*}, \texttt{/var/tmp/*}, \texttt{/var/cache/*}, \texttt{/mnt/*}, \texttt{/var/lib/docker/*}, \texttt{/var/lib/rancher/*}
-
-\section{Automation and Scheduled Tasks}
-
-All recurring automation is documented here for operational reference.
-
-\subsection{System Cron Jobs}
-
-\begin{table}[H]
-\centering
-\begin{tabular}{lllp{5.5cm}}
-\toprule
-\textbf{Schedule} & \textbf{Component} & \textbf{Script} & \textbf{Purpose} \\
-\midrule
-Daily 1:00 AM & Root crontab & \texttt{/usr/local/bin/backup-cluster.sh} & rsync backup of all 3 nodes to \texttt{/mnt/sdh4/backups/} \\
-Weekly Sat 2:45 AM & Root crontab & \texttt{certbot renew} & Let's Encrypt SSL certificate renewal \\
-1st Sunday/month & \texttt{/etc/cron.d/zfsutils} & \texttt{/usr/lib/zfs-linux/trim} & ZFS TRIM \\
-2nd Sunday/month & \texttt{/etc/cron.d/zfsutils} & \texttt{/usr/lib/zfs-linux/scrub} & ZFS scrub integrity check \\
-Every 12 hours & RKE2 built-in & etcd auto-snapshot & Stored at \texttt{/var/lib/rancher/rke2/server/db/snapshots/} \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\subsection{Application Background Services}
-
-These services run inside the \texttt{hydra-auth} Node.js process (started in \texttt{index.js} lines 906--958):
-
-\begin{table}[H]
-\centering
-\begin{tabular}{lllp{5cm}}
-\toprule
-\textbf{Service} & \textbf{Interval} & \textbf{File} & \textbf{Purpose} \\
-\midrule
-Metrics collector & 30 seconds & \texttt{services/metrics-collector.js} & Collects CPU/RAM/disk from all 3 nodes (Chimera/Cerberus via port 9100) \\
-Security monitor & 5 minutes & \texttt{services/security-monitor.js} & Mining detection (18 known miners), CPU/RAM threshold alerts \\
-Resource expiry & 1 hour & \texttt{services/resource-expiry.js} & Migrates expired GPU containers back to Hydra, resets to defaults \\
-Container reminders & 24 hours & \texttt{services/container-reminder.js} & Monthly email reminders to students about their containers \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\subsection{Security Monitor Thresholds}
-
-\begin{table}[H]
-\centering
-\begin{tabular}{lll}
-\toprule
-\textbf{Metric} & \textbf{Warning} & \textbf{Critical} \\
-\midrule
-CPU usage & 80\% & 95\% \\
-Memory usage & 85\% & 95\% \\
-Mining detected & --- & Auto-pause container \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-Mining enforcement is controlled by \texttt{MINING\_ENFORCEMENT\_ENABLED} in \texttt{.env} (default: \texttt{true}). Detects: xmrig, ethminer, cgminer, nicehash, etc. (18 process names).
-
-\textbf{Config:} \texttt{SECURITY\_STATS\_INTERVAL} env var (default 300000ms = 5 min, set to 0 to disable).
-
-\subsection{Resource Expiry Behavior}
-
-When a student's GPU resource allocation expires:
-\begin{enumerate}[nosep]
-    \item Resource expiry checker detects \texttt{resources\_expire\_at} has passed (hourly check)
-    \item Container is migrated from GPU node (Chimera/Cerberus) back to Hydra
-    \item Resource config reset to defaults: 4 GB memory, 2 CPUs, 0 GPUs
-    \item Email notification sent to student
-    \item Database updated via \texttt{resetContainerConfigToDefaults()}
-\end{enumerate}
-
-\subsection{Dynamic Route Management}
-
-Traefik IngressRoutes and SSHPiper configs are managed dynamically:
-
-\begin{table}[H]
-\centering
-\begin{tabular}{llp{6cm}}
-\toprule
-\textbf{Event} & \textbf{Action} & \textbf{Details} \\
-\midrule
-Pod init & Create routes & \texttt{k8sClient.createIngressRoute()} creates 3 routes (vscode, jupyter, jenkins) + ForwardAuth + StripPrefix middleware \\
-Pod init & Update SSHPiper & Writes \texttt{sshpiper/config/\{user\}/sshpiper\_upstream} with pod IP \\
-Pod start & Update SSHPiper & Refreshes SSHPiper config with new pod IP \\
-Pod destroy & Delete routes & \texttt{k8sClient.deleteIngressRoute()} and \texttt{deleteMiddleware()} \\
-Pod destroy & Delete SSHPiper & Removes SSHPiper config directory for user \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\textbf{Key files:}
-\begin{itemize}[nosep]
-    \item Route creation: \texttt{services/k8s-containers.js} lines 245--323 (\texttt{buildIngressRouteSpec}, \texttt{buildMiddlewareSpec})
-    \item SSHPiper update: \texttt{services/k8s-containers.js} lines 415--431 (\texttt{updateSshPiperConfig})
-    \item Route recovery on boot: \texttt{scripts/fix-k8s-routes.sh} (systemd one-shot service)
-\end{itemize}
-
-\subsection{Environment Variables for Automation}
-
-\begin{table}[H]
-\centering
-\begin{tabular}{llp{5cm}}
-\toprule
-\textbf{Variable} & \textbf{Default} & \textbf{Purpose} \\
-\midrule
-\texttt{SECURITY\_STATS\_INTERVAL} & 300000 & Security check interval (ms), 0 to disable \\
-\texttt{MINING\_ENFORCEMENT\_ENABLED} & true & Auto-pause containers running miners \\
-\texttt{JWT\_TTL\_SECONDS} & 900 & JWT token lifetime (production: 2592000) \\
-\texttt{MAIL\_METHOD} & --- & Email backend: \texttt{graph} or \texttt{smtp} \\
-\texttt{MS\_TENANT\_ID} & --- & Azure AD tenant for Graph email API \\
-\texttt{MS\_CLIENT\_ID} & --- & Azure AD client ID \\
-\texttt{MS\_CLIENT\_SECRET} & --- & Azure AD client secret \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\section{Common Operations}
-
-\subsection{Kubectl Shortcuts}
-
-Sourced from \texttt{\~{}/.hydra-aliases}:
-\begin{lstlisting}[style=bash]
-k          # kubectl
-kgp        # kubectl get pods -A
-kgs        # kubectl get svc -A
-students   # list student pods
-hydra-health  # quick cluster health check
-gpu-check     # GPU availability per node
-\end{lstlisting}
-
-\subsection{Service Management}
-
-\begin{lstlisting}[style=bash]
-# View all pods
-kubectl get pods -A
-
-# Restart a deployment
-kubectl rollout restart deployment/<name> -n <namespace>
-
-# View logs
-kubectl logs -f deployment/<name> -n <namespace>
-
-# Execute shell in pod
-kubectl exec -it <pod-name> -n <namespace> -- /bin/bash
-\end{lstlisting}
-
-%% ============================================================
-%% WEB SERVICES AND ROUTE MAP
+%% PART VII: WEB SERVICES AND ROUTE MAP
 %% ============================================================
 \newpage
 \part{Web Services and Route Map}
-
-This section documents every web-facing service, its URL, source code location, and how to update it.
 
 \section{Complete Site Inventory}
 
@@ -1031,8 +777,8 @@ This section documents every web-facing service, its URL, source code location, 
 \textbf{Service} & \textbf{URL} & \textbf{Port} & \textbf{Source Code} \\
 \midrule
 \endhead
-Hydra Auth (Dashboard) & \texttt{/dashboard}, \texttt{/login}, \texttt{/auth}, \texttt{/servers} & 6969 & \texttt{\~{}/hydra-saml-auth/} \\
-CS Lab Website & \texttt{/} (catch-all), \texttt{/courses}, \texttt{/events}, \texttt{/faculty} & 5001 & \texttt{\~{}/NewPaltz-CS-Lab-Website/} \\
+Hydra Auth & \texttt{/dashboard}, \texttt{/login}, \texttt{/auth}, \texttt{/servers} & 6969 & \texttt{\~{}/hydra-saml-auth/} \\
+CS Lab Website & \texttt{/} (catch-all), \texttt{/courses}, \texttt{/events} & 5001 & \texttt{\~{}/NewPaltz-CS-Lab-Website/} \\
 Hackathons & \texttt{/hackathons} & 45821 & \texttt{\~{}/Hackaton-Voting/} \\
 Git Learning & \texttt{/git} & 38765 & \texttt{\~{}/GG-git-learning/} \\
 FLAPJS & \texttt{/jflap} & 8080 & \texttt{\~{}/FLAPJS-WebApp/} \\
@@ -1047,60 +793,48 @@ Student Jenkins & \texttt{/students/\{user\}/jenkins/} & 8080 & In student conta
 
 \section{Traefik Route Priority Table}
 
-Higher priority number wins when multiple routes match. This table shows how Traefik resolves conflicting paths:
+Higher priority number wins when multiple routes match:
 
 \begin{longtable}{lllp{3cm}}
 \toprule
 \textbf{Priority} & \textbf{Path / Host} & \textbf{Service} & \textbf{IngressRoute} \\
 \midrule
 \endhead
+100 & \texttt{/students/\{user\}/*} & per-student svc & \texttt{student-\{user\}} \\
 100 & \texttt{/hackathons} & hackathons:45821 & \texttt{hackathons} \\
 25 & \texttt{/api/events} & hydra-auth:6969 & \texttt{hydra-main} \\
-20 & \texttt{/api/courses}, \texttt{/api/faculty}, etc. & cs-lab-backend:5001 & \texttt{cs-lab-website} \\
+20 & \texttt{/api/courses}, \texttt{/api/faculty} & cs-lab:5001 & \texttt{cs-lab-website} \\
 15 & \texttt{/api/servers}, \texttt{/api/webui} & hydra-auth:6969 & \texttt{hydra-main} \\
-15 & \texttt{/java} & java-executor:3000 & \texttt{java-executor} \\
-15 & \texttt{/jflap} & flapjs:8080 & \texttt{flapjs} \\
-15 & \texttt{/git} & git-learning:38765 & \texttt{git-learning} \\
+15 & \texttt{/java}, \texttt{/jflap}, \texttt{/git} & respective svc & respective IR \\
 15 & \texttt{n8n.hydra.newpaltz.edu} & n8n:5678 & \texttt{n8n} \\
 15 & \texttt{gpt.hydra.newpaltz.edu} & open-webui:3000 & \texttt{openwebui} \\
-10 & \texttt{/dashboard}, \texttt{/login}, \texttt{/auth}, etc. & hydra-auth:6969 & \texttt{hydra-main} \\
-10 & \texttt{/courses}, \texttt{/events}, \texttt{/admin}, etc. & cs-lab-backend:5001 & \texttt{cs-lab-website} \\
-5 & \texttt{/css}, \texttt{/js}, \texttt{/static}, \texttt{/SUNYCAT} & hydra-auth:6969 & \texttt{hydra-main} \\
-1 & \texttt{/} (catch-all, no path) & cs-lab-backend:5001 & \texttt{hydra-default} \\
+10 & \texttt{/dashboard}, \texttt{/login}, \texttt{/auth} & hydra-auth:6969 & \texttt{hydra-main} \\
+5 & \texttt{/css}, \texttt{/js}, \texttt{/static} & hydra-auth:6969 & \texttt{hydra-main} \\
+1 & \texttt{/} (catch-all) & cs-lab:5001 & \texttt{hydra-default} \\
 \bottomrule
 \end{longtable}
 
 \begin{warningbox}
-\textbf{Route conflicts:} If a new API path overlaps with an existing route (e.g., both hydra-auth and cs-lab use \texttt{/api/events}), the higher-priority route wins. Always check existing routes before adding new ones: \texttt{kubectl get ingressroute -A -o wide}.
+\textbf{Route conflicts:} If a new API path overlaps with an existing route, the higher-priority route wins. Always check existing routes before adding new ones: \texttt{kubectl get ingressroute -A -o wide}.
 \end{warningbox}
 
 \section{How to Update Each Service}
 
+All services use \texttt{buildah} for image builds (Docker daemon is disabled).
+
 \subsection{Hydra Auth (Dashboard)}
 
 \begin{lstlisting}[style=bash]
-# Build and deploy using the build-deploy script:
 cd ~/hydra-saml-auth
 ./scripts/build-deploy.sh auth
-
-# Or manually:
-sudo buildah bud -t ndg8743/hydra-saml-auth:vNEW .
-sudo buildah push ndg8743/hydra-saml-auth:vNEW \
-  docker-archive:/tmp/hydra-auth.tar:docker.io/ndg8743/hydra-saml-auth:vNEW
-sudo ctr --address /run/k3s/containerd/containerd.sock \
-  -n k8s.io images import /tmp/hydra-auth.tar
-kubectl -n hydra-system set image deploy/hydra-auth \
-  hydra-auth=docker.io/ndg8743/hydra-saml-auth:vNEW
+# Builds image, imports into containerd, updates deployment
 \end{lstlisting}
-
-\textbf{Key files:} \texttt{index.js} (auth), \texttt{routes/containers.js} (container API), \texttt{views/dashboard.ejs} (frontend), \texttt{config/resources.js} (presets).
 
 \subsection{CS Lab Website}
 
 \begin{lstlisting}[style=bash]
 cd ~/NewPaltz-CS-Lab-Website
 sudo buildah bud -t newpaltz-cs-lab-website-backend:latest .
-sudo rm -f /tmp/cs-lab.tar
 sudo buildah push newpaltz-cs-lab-website-backend:latest \
   docker-archive:/tmp/cs-lab.tar:docker.io/newpaltz-cs-lab-website-backend:latest
 sudo ctr --address /run/k3s/containerd/containerd.sock \
@@ -1108,104 +842,40 @@ sudo ctr --address /run/k3s/containerd/containerd.sock \
 kubectl -n hydra-system rollout restart deploy/cs-lab
 \end{lstlisting}
 
-\textbf{Stack:} Node.js + Express backend, Vue.js/Vite frontend. Database: SQLite.
-
-\subsection{Hackathons}
+\subsection{Other Custom Services}
 
 \begin{lstlisting}[style=bash]
-cd ~/Hackaton-Voting
-sudo buildah bud -t hackaton-voting-app:latest .
-# Export, import, restart same as above
-kubectl -n hydra-infra rollout restart deploy/hackathons
+# Pattern: buildah build -> push to archive -> ctr import -> rollout restart
+cd ~/Hackaton-Voting     && sudo buildah bud -t hackaton-voting-app:latest .
+cd ~/GG-git-learning     && sudo buildah bud -t gg-git-learning-app:latest .
+cd ~/FLAPJS-WebApp       && sudo buildah bud -t flapjs-webapp:latest .
+cd ~/java-executor       && sudo buildah bud -t docker-java-executor:latest .
+# Then: buildah push -> ctr import -> kubectl rollout restart
 \end{lstlisting}
-
-\textbf{Stack:} Vue.js frontend, Express backend, SQLite.
-
-\subsection{FLAPJS}
-
-\begin{lstlisting}[style=bash]
-cd ~/FLAPJS-WebApp
-sudo buildah bud -t flapjs-webapp:latest .
-# Export, import, restart
-kubectl -n hydra-infra rollout restart deploy/flapjs
-\end{lstlisting}
-
-\textbf{Stack:} React SPA built with webpack, served by Nginx. Uses \texttt{sub\_filter} to inject \texttt{<base href="/jflap/">} for subpath routing.
-
-\subsection{Git Learning}
-
-\begin{lstlisting}[style=bash]
-cd ~/GG-git-learning
-sudo buildah bud -t gg-git-learning-app:latest .
-kubectl -n hydra-infra rollout restart deploy/git-learning
-\end{lstlisting}
-
-\textbf{Stack:} Node.js with PM2 runtime.
-
-\subsection{Java Executor}
-
-\begin{lstlisting}[style=bash]
-cd ~/java-executor
-sudo buildah bud -t docker-java-executor-java-executor:latest .
-kubectl -n hydra-infra rollout restart deploy/java-executor
-\end{lstlisting}
-
-\textbf{Note:} Mounts host Docker socket for container-based Java compilation.
 
 \subsection{Student Container Image}
 
 \begin{lstlisting}[style=bash]
 cd ~/hydra-saml-auth
 ./scripts/build-deploy.sh student
-
-# This builds the student-container image and notes that
-# existing student pods need restart to use the new image.
-# Update STUDENT_IMAGE in .env if using a versioned tag.
+# Builds student image, distributes to Chimera and Cerberus via scp + ctr import
 \end{lstlisting}
 
-\subsection{OpenWebUI and n8n}
-
-These use upstream pre-built images. To update:
+\subsection{Upstream Images (OpenWebUI, n8n)}
 
 \begin{lstlisting}[style=bash]
-# OpenWebUI: Update image tag in deployment spec
 kubectl -n hydra-infra set image deploy/open-webui \
   open-webui=ghcr.io/open-webui/open-webui:vNEW
-
-# n8n: Update image tag in deployment spec
 kubectl -n hydra-infra set image deploy/n8n \
   n8n=docker.n8n.io/n8nio/n8n:NEW_VERSION
 \end{lstlisting}
 
-\section{K8s Manifests Location}
-
-All K8s deployment manifests live in \texttt{\~{}/hydra-saml-auth/k8s/}:
-
-\begin{table}[H]
-\centering
-\begin{tabular}{ll}
-\toprule
-\textbf{Service} & \textbf{Manifest Path} \\
-\midrule
-Namespaces, RBAC, storage & \texttt{k8s/base/} \\
-Hydra Auth & \texttt{k8s/components/hydra-auth/} \\
-CS Lab & \texttt{k8s/components/cs-lab/} \\
-Traefik & \texttt{k8s/components/traefik/} \\
-Hackathons & \texttt{k8s/components/hackathons/} \\
-Git Learning & \texttt{k8s/components/git-learning/} \\
-FLAPJS & \texttt{k8s/components/flapjs/} \\
-Java Executor & \texttt{k8s/components/java-executor/} \\
-n8n & \texttt{k8s/components/n8n/} \\
-OpenWebUI & \texttt{k8s/components/openwebui/} \\
-KubeAI & \texttt{k8s/components/kubeai/} \\
-Student Pods & \texttt{k8s/components/student-pods/} \\
-SSHPiper & \texttt{k8s/components/sshpiper/} \\
-\bottomrule
-\end{tabular}
-\end{table}
+\begin{warningbox}
+\textbf{Docker vs RKE2 Containerd:} Docker and RKE2 use separate containerd instances with separate image stores. You must explicitly import images into RKE2's containerd at \texttt{/run/k3s/containerd/containerd.sock} namespace \texttt{k8s.io}.
+\end{warningbox}
 
 %% ============================================================
-%% OPENWEBUI API ACCESS
+%% PART VIII: OPENWEBUI API
 %% ============================================================
 \newpage
 \part{OpenWebUI API Integration}
@@ -1223,7 +893,6 @@ SSHPiper & \texttt{k8s/components/sshpiper/} \\
 
 \begin{lstlisting}[style=bash]
 ENDPOINT=https://gpt.hydra.newpaltz.edu/api/chat/completions
-MODEL=gemma3:12b
 API_KEY=sk-your-api-key-here
 \end{lstlisting}
 
@@ -1234,20 +903,24 @@ curl https://gpt.hydra.newpaltz.edu/api/chat/completions \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer sk-your-api-key-here" \
   -d '{
-    "model": "gemma3:12b",
+    "model": "qwen-2.5-72b-instruct",
     "messages": [{"role": "user", "content": "Hello!"}]
   }'
 \end{lstlisting}
 
 \section{Python Example}
 
-\begin{lstlisting}[style=bash]
-import openai, os
-openai.api_base = "https://gpt.hydra.newpaltz.edu/api"
-openai.api_key = os.getenv("HYDRA_API_KEY")
+\begin{lstlisting}[style=js]
+from openai import OpenAI
+import os
 
-response = openai.ChatCompletion.create(
-    model="gemma3:12b",
+client = OpenAI(
+    base_url="https://gpt.hydra.newpaltz.edu/api",
+    api_key=os.getenv("HYDRA_API_KEY")
+)
+
+response = client.chat.completions.create(
+    model="qwen-2.5-72b-instruct",
     messages=[{"role": "user", "content": "Hello!"}]
 )
 print(response.choices[0].message.content)
@@ -1255,7 +928,7 @@ print(response.choices[0].message.content)
 
 \section{JavaScript Example}
 
-\begin{lstlisting}[style=bash]
+\begin{lstlisting}[style=js]
 const response = await fetch(
   'https://gpt.hydra.newpaltz.edu/api/chat/completions',
   {
@@ -1265,7 +938,7 @@ const response = await fetch(
       'Authorization': 'Bearer ' + API_KEY
     },
     body: JSON.stringify({
-      model: 'gemma3:12b',
+      model: 'qwen-2.5-72b-instruct',
       messages: [{role: 'user', content: 'Hello!'}]
     })
   }
@@ -1274,40 +947,33 @@ const data = await response.json();
 console.log(data.choices[0].message.content);
 \end{lstlisting}
 
-\begin{infobox}
-Additional language examples (PHP, Java, C\#, Ruby, Go, Rust) are available in the full API access guide at \texttt{docs/access.md}.
-\end{infobox}
-
 %% ============================================================
-%% PART VIII: SECURITY
+%% PART IX: SECURITY
 %% ============================================================
 \newpage
 \part{Security}
 
-\section{Security Architecture Layers}
+\section{Security Architecture}
 
-\begin{enumerate}
-    \item \textbf{Network:} UFW firewall, TLS encryption, CORS policy
-    \item \textbf{Authentication:} SAML 2.0, JWT tokens, API keys
-    \item \textbf{Authorization:} Role-based access, container ownership labels
-    \item \textbf{Runtime:} Container isolation, resource limits, seccomp profiles
-\end{enumerate}
+\begin{center}
+\begin{tikzpicture}[
+    layer/.style={rectangle, draw, thick, minimum width=11cm, minimum height=0.9cm, align=center, font=\small, rounded corners=2pt},
+]
+\node[layer, fill=red!10]    at (0,0)   {Network: UFW firewall, TLS everywhere, CORS, WireGuard VPN};
+\node[layer, fill=orange!10] at (0,1.2) {Authentication: SAML 2.0, JWT (RS256), API keys (timing-safe)};
+\node[layer, fill=yellow!10] at (0,2.4) {Authorization: Role-based access, container ownership labels, ForwardAuth};
+\node[layer, fill=green!10]  at (0,3.6) {Runtime: Drop-all capabilities, seccomp, resource limits, mining detection};
+\end{tikzpicture}
+\end{center}
 
 \section{Known Vulnerabilities}
 
 \begin{dangerbox}
-\textbf{Critical:}
-\begin{itemize}[nosep]
-    \item \textbf{Privileged containers} in Docker mode grant full host access
-    \item \textbf{Docker socket mount} in student containers is equivalent to root on host
-\end{itemize}
-
 \textbf{High:}
 \begin{itemize}[nosep]
-    \item Passwordless sudo for student user in container images
-    \item Supervisor web interface (port 9001) without authentication
-    \item Mining detection without automatic enforcement
-    \item K8s pod security context missing \texttt{runAsNonRoot}, \texttt{allowPrivilegeEscalation: false}
+    \item Passwordless sudo for student user inside containers
+    \item Supervisor web interface (port 9001) without authentication (not exposed externally)
+    \item K8s pod security set to Privileged at namespace level (lab environment tradeoff)
 \end{itemize}
 
 \textbf{Medium:}
@@ -1318,27 +984,32 @@ Additional language examples (PHP, Java, C\#, Ruby, Go, Rust) are available in t
 \end{itemize}
 \end{dangerbox}
 
-See \texttt{docs/SECURITY\_VULNERABILITIES.md} for full details and remediation steps.
+\section{Mining Detection}
 
-\section{Security Best Practices for Students}
+The security monitor runs every 5 minutes and scans student containers for known cryptocurrency miners (18 process names including xmrig, ethminer, cgminer, nicehash).
 
-\begin{itemize}[nosep]
-    \item Never share API keys publicly or commit to version control
-    \item Use environment variables for sensitive configuration
-    \item Rotate API keys regularly
-    \item Use HTTPS only for all API communications
-    \item Validate and sanitize user inputs before sending to API
-\end{itemize}
+\begin{table}[H]
+\centering
+\begin{tabular}{lll}
+\toprule
+\textbf{Metric} & \textbf{Warning} & \textbf{Critical} \\
+\midrule
+CPU usage & 80\% & 95\% \\
+Memory usage & 85\% & 95\% \\
+Mining detected & --- & Auto-pause container \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Enforcement controlled by \texttt{MINING\_ENFORCEMENT\_ENABLED} in \texttt{.env} (default: \texttt{true}).
 
 %% ============================================================
-%% PART IX: RDMA AND GPUDIRECT
+%% PART X: RDMA AND GPUDIRECT
 %% ============================================================
 \newpage
 \part{RDMA and GPUDirect}
 
 \section{Overview}
-
-The cluster supports RDMA networking for high-performance GPU-to-GPU communication:
 
 \begin{table}[H]
 \centering
@@ -1366,37 +1037,100 @@ Cerberus & ConnectX & 2x RTX 5090 & Hardware RoCE + GPUDirect \\
 If the NVIDIA GPU driver is installed before MLNX\_OFED, the driver must be reinstalled to compile nvidia-peermem with RDMA APIs.
 \end{warningbox}
 
-\section{SoftRoCE Setup}
+%% ============================================================
+%% PART XI: DEPLOYMENT AND OPERATIONS
+%% ============================================================
+\newpage
+\part{Deployment and Operations}
+
+\section{Ansible Playbooks}
 
 \begin{lstlisting}[style=bash]
-# Install prerequisites
-sudo apt install rdma-core ibverbs-utils perftest
-
-# Create SoftRoCE device
-sudo rdma link add rxe0 type rxe netdev eth0
-
-# Verify
-rdma link && ibv_devices
+cd /home/infra/hydra-saml-auth/ansible
+ansible-playbook -i inventory.yml playbooks/site.yml
 \end{lstlisting}
 
-\section{GPUDirect RDMA Verification}
+\textbf{Execution order:}
+\begin{enumerate}[nosep]
+    \item \texttt{00-preflight-backup.yml} --- Backups before changes
+    \item \texttt{01-prepare-nodes.yml} --- Packages, kernel config
+    \item \texttt{02-rke2-server.yml} --- RKE2 control plane on Hydra
+    \item \texttt{03-rke2-agents.yml} --- Join Chimera and Cerberus
+    \item \texttt{04-gpu-setup.yml} --- NVIDIA drivers and GPU Operator
+    \item \texttt{05-deploy-hydra.yml} --- All K8s manifests
+\end{enumerate}
 
+\section{Backup System}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Setting} & \textbf{Value} \\
+\midrule
+Backup location & \texttt{/mnt/sdh4/backups/} \\
+Schedule & Weekly Saturday at 1:00 AM (root crontab) \\
+Method & rsync with compression \\
+Script & \texttt{/usr/local/bin/backup-cluster.sh} \\
+Exclusions & \texttt{/models/*}, \texttt{*.gguf}, \texttt{*.safetensors}, \texttt{/data/rke2/*} \\
+Mount guard & Script checks \texttt{mountpoint -q /mnt/sdh4} before writing \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{etcd snapshots:} Every 6 hours via RKE2 built-in. Stored at \texttt{/data/rke2/server/db/snapshots/}. Retention: 10 snapshots.
+
+\section{Scheduled Tasks}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lllp{5cm}}
+\toprule
+\textbf{Schedule} & \textbf{Component} & \textbf{Script} & \textbf{Purpose} \\
+\midrule
+Weekly Sat 1:00 AM & Root crontab & \texttt{backup-cluster.sh} & rsync backup of all 3 nodes \\
+Weekly Sat 2:45 AM & Root crontab & \texttt{certbot renew} & SSL certificate renewal \\
+1st Sunday/month & \texttt{/etc/cron.d/zfsutils} & \texttt{zfs-linux/trim} & ZFS TRIM \\
+2nd Sunday/month & \texttt{/etc/cron.d/zfsutils} & \texttt{zfs-linux/scrub} & ZFS scrub integrity \\
+Every 6 hours & RKE2 built-in & etcd snapshot & Stored at \texttt{/data/rke2/.../snapshots/} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Application Background Services}
+
+These run inside the \texttt{hydra-auth} Node.js process:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lllp{4.5cm}}
+\toprule
+\textbf{Service} & \textbf{Interval} & \textbf{File} & \textbf{Purpose} \\
+\midrule
+Metrics collector & 30 sec & \texttt{services/metrics-collector.js} & CPU/RAM/disk from all 3 nodes \\
+Security monitor & 5 min & \texttt{services/security-monitor.js} & Mining detection, threshold alerts \\
+Resource expiry & 1 hour & \texttt{services/resource-expiry.js} & Migrate expired GPU containers to Hydra \\
+Container reminders & 24 hours & \texttt{services/container-reminder.js} & Monthly email to students \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Common Operations}
+
+\subsection{Kubectl Shortcuts}
+
+Sourced from \texttt{\~{}/.hydra-aliases}:
 \begin{lstlisting}[style=bash]
-# Load nvidia-peermem
-sudo modprobe nvidia-peermem
-
-# Make persistent
-echo "nvidia-peermem" | sudo tee /etc/modules-load.d/nvidia-peermem.conf
-
-# Test bandwidth (two nodes)
-# Server: ib_write_bw -d mlx5_0 --use_cuda=0
-# Client: ib_write_bw -d mlx5_0 --use_cuda=0 <server_ip>
+k          # kubectl
+kgp        # kubectl get pods -A
+kgs        # kubectl get svc -A
+students   # list student pods
+hydra-health  # quick cluster health check
+gpu-check     # GPU availability per node
 \end{lstlisting}
-
-See \texttt{docs/rdma-gpudirect-setup.md} for complete SR-IOV, DOCA, and KVM passthrough configuration.
 
 %% ============================================================
-%% PART X: TROUBLESHOOTING
+%% PART XII: TROUBLESHOOTING
 %% ============================================================
 \newpage
 \part{Troubleshooting}
@@ -1424,10 +1158,10 @@ JWT verification fails & Check JWKS endpoint accessible, verify key rotation \\
 \toprule
 \textbf{Symptom} & \textbf{Solution} \\
 \midrule
-Container won't start & Verify student container image exists in RKE2 containerd \\
-Container 404 & Check Traefik is running, container has correct labels \\
-VS Code not loading & Check code-server process, ForwardAuth middleware \\
-Jupyter issues & Verify \texttt{base\_url} setting matches path \\
+Container won't start & Verify student image exists in RKE2 containerd on target node \\
+Container 404 & Check IngressRoute exists: \texttt{kubectl get ingressroute.traefik.io student-\{user\} -n hydra-students} \\
+VS Code not loading & Check code-server supervisor status, ForwardAuth middleware \\
+Jupyter issues & Verify approval flag set and \texttt{base\_url} matches path \\
 SSH not working & Check SSHPiper pod, verify port 2222 routing \\
 Files not persisting & Only \texttt{/home/student/} is persisted via PVC \\
 \bottomrule
@@ -1444,8 +1178,7 @@ Files not persisting & Only \texttt{/home/student/} is persisted via PVC \\
 \midrule
 GPU not detected & Run \texttt{nvidia-smi} on host, check NVIDIA drivers \\
 GPU pod pending & Check GPU operator pods in gpu-operator namespace \\
-KubeAI model won't start & Check vLLM pod logs, verify GPU allocation and model config \\
-GPU training pod pending & Check NVIDIA device plugin on Cerberus, verify node labels \\
+KubeAI model won't start & Check vLLM pod logs in kubeai namespace, verify GPU allocation \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -1460,107 +1193,73 @@ GPU training pod pending & Check NVIDIA device plugin on Cerberus, verify node l
 \midrule
 Service unreachable & Check pod is Running, service exists, IngressRoute matches \\
 502 Bad Gateway & Backend pod crashed or port mismatch \\
-TLS certificate error & Check Traefik ACME, run \texttt{certbot renew --dry-run} \\
+TLS certificate error & Run \texttt{certbot renew --dry-run}, check Traefik ACME \\
 NFS mount failed & Verify NFS server running on Hydra, firewall allows 2049 \\
-Cross-node pod issue & Check Flannel VXLAN (8472/udp) allowed between nodes \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\section{Traefik Deployment Issues}
-
 \begin{warningbox}
-\textbf{Stuck Rolling Update:} Traefik uses \texttt{hostPort} which means only one pod can bind ports 80/443 at a time. The deployment MUST use \texttt{strategy: Recreate} (not \texttt{RollingUpdate}). If stuck:
-\begin{lstlisting}[style=bash]
-kubectl rollout undo deployment/traefik -n hydra-system
-\end{lstlisting}
+\textbf{Stuck Traefik Rolling Update:} Traefik uses \texttt{hostPort} --- only one pod can bind ports 80/443. The deployment MUST use \texttt{strategy: Recreate}. If stuck: \texttt{kubectl rollout undo deployment/traefik -n hydra-system}
 \end{warningbox}
 
-\section{CS Lab Website Catch-All Route}
-
-The Express server has a catch-all that serves \texttt{index.html} for SPA routes. Backend API paths are excluded:
-
-\begin{lstlisting}[style=bash]
-# Paths excluded from SPA catch-all (served by backend):
-/api/*, /faq, /faculty, /uploads, /scripts, /tech-blog,
-/student-resources, /student-highlights, /admins, /auth,
-/school-calendar, /sd-forms
-
-# Paths explicitly allowed through for SPA routing:
-/student-forms, /submit-*
-\end{lstlisting}
-
-\begin{infobox}
-If adding new frontend routes starting with \texttt{/student}, update the catch-all in \texttt{server.js}.
-\end{infobox}
-
 %% ============================================================
-%% PART XI: REPOSITORY STRUCTURE
+%% PART XIII: REPOSITORY STRUCTURE
 %% ============================================================
 \newpage
 \part{Repository Structure}
-
-\section{hydra-saml-auth}
 
 \begin{lstlisting}[style=bash]
 hydra-saml-auth/
 |-- index.js                    # SAML auth, JWT, routes, WebSocket
 |-- routes/
-|   |-- containers.js           # Container lifecycle
+|   |-- containers.js           # Container lifecycle API
 |   |-- resource-requests.js    # Resource allocations
 |   |-- webui-api.js            # OpenWebUI proxy
 |   |-- n8n-api.js              # n8n account management
-|   |-- servers-api.js          # Cluster status
+|   |-- servers-api.js          # Cluster status API
 |   |-- admin.js                # Admin panel
 |-- services/
-|   |-- db-init.js              # Database init
-|   |-- resource-expiry.js      # Resource expiry checker
-|   |-- security-monitor.js     # Process monitoring
+|   |-- k8s-containers.js       # K8s pod/svc/IngressRoute CRUD
+|   |-- db-init.js              # Database schema and migrations
+|   |-- resource-expiry.js      # GPU resource expiry checker
+|   |-- security-monitor.js     # Mining detection
+|   |-- metrics-collector.js    # Node metrics
 |-- config/
-|   |-- resources.js            # Presets and node config
-|   |-- runtime.js              # Docker/K8s switcher
+|   |-- resources.js            # Presets, node config, approval rules
+|   |-- runtime.js              # Docker/K8s orchestrator switch
 |-- k8s/
-|   |-- base/                   # Namespace, RBAC, storage
+|   |-- base/                   # Namespace, RBAC, storage classes
 |   |-- components/
-|   |   |-- traefik/            # Reverse proxy
+|   |   |-- traefik/            # Reverse proxy + PDB + PriorityClass
 |   |   |-- hydra-auth/         # Auth service
 |   |   |-- cs-lab/             # CS Lab website
-|   |   |-- ollama/             # LLM inference
-|   |   |-- openwebui/          # AI chat + middleman
-|   |   |-- n8n/                # Workflows + user manager
-|   |   |-- ray/                # Distributed computing
-|   |   |-- hackathons/         # Hackathon app
+|   |   |-- openwebui/          # AI chat + middleman sidecar
+|   |   |-- kubeai/             # KubeAI + vLLM model configs
+|   |   |-- n8n/                # Workflows + Postgres + user manager
+|   |   |-- hackathons/         # Hackathon voting app
+|   |   |-- flapjs/             # FLAPJS web app
 |   |   |-- java-executor/      # Code execution
 |   |   |-- git-learning/       # Git learning
 |   |   |-- sshpiper/           # SSH proxy
 |   |   |-- student-pods/       # Pod templates
-|   |-- gpu/                    # GPU operator config
+|   |-- gpu/                    # GPU operator config, node labels
 |-- ansible/
 |   |-- inventory.yml           # Node definitions
-|   |-- playbooks/              # Deployment scripts
+|   |-- playbooks/              # Deployment playbooks
 |-- student-container/
-|   |-- Dockerfile              # Student image
-|   |-- supervisord.conf        # Process manager
-|-- docs/                       # This document + sources
-|-- docker-compose.yaml         # Legacy Docker deployment
+|   |-- Dockerfile              # Student container image
+|   |-- supervisord.conf        # Process manager config
+|   |-- jupyter-gate.sh         # CLI gate wrapper
+|   |-- entrypoint.sh           # Container init script
+|-- scripts/
+|   |-- build-deploy.sh         # Build + distribute + deploy
+|-- docs/
+|   |-- templates/              # LaTeX template (hydra-doc.sty)
 \end{lstlisting}
 
-\section{Other Repositories}
-
-\begin{table}[H]
-\centering
-\begin{tabular}{llp{5cm}}
-\toprule
-\textbf{Repo} & \textbf{Path} & \textbf{Description} \\
-\midrule
-NewPaltz-CS-Lab-Website & \texttt{\~{}/NewPaltz-CS-Lab-Website/} & React + Express CS Lab homepage \\
-Hackaton-Voting & \texttt{\~{}/Hackaton-Voting/} & Vue.js hackathon app \\
-\bottomrule
-\end{tabular}
-\end{table}
-
 %% ============================================================
-%% PART XII: ENVIRONMENT CONFIGURATION
+%% PART XIV: ENVIRONMENT CONFIGURATION
 %% ============================================================
 \newpage
 \part{Environment Configuration}
@@ -1573,25 +1272,22 @@ Hackaton-Voting & \texttt{\~{}/Hackaton-Voting/} & Vue.js hackathon app \\
 \toprule
 \textbf{Variable} & \textbf{Description} \\
 \midrule
-\texttt{BASE\_URL} & https://hydra.newpaltz.edu \\
+\texttt{BASE\_URL} & \texttt{https://hydra.newpaltz.edu} \\
 \texttt{METADATA\_URL} & Azure AD federation metadata URL \\
-\texttt{SAML\_SP\_ENTITY\_ID} & SP Entity ID (must match Azure) \\
-\texttt{COOKIE\_DOMAIN} & .newpaltz.edu \\
+\texttt{SAML\_SP\_ENTITY\_ID} & SP Entity ID (must match Azure config) \\
+\texttt{COOKIE\_DOMAIN} & \texttt{.newpaltz.edu} \\
 \texttt{PORT} & Service port (default: 6969) \\
-\texttt{DB\_PATH} & SQLite path (/app/data/hydra.db) \\
-\texttt{JWT\_TTL\_SECONDS} & Token lifetime (default: 86400) \\
+\texttt{DB\_PATH} & SQLite path (\texttt{/app/data/hydra.db}) \\
+\texttt{JWT\_TTL\_SECONDS} & Token lifetime (default: 900, production: 2592000) \\
+\texttt{MINING\_ENFORCEMENT\_ENABLED} & Auto-pause mining containers (default: true) \\
+\texttt{SECURITY\_STATS\_INTERVAL} & Security check interval ms (default: 300000, 0 to disable) \\
+\texttt{MAIL\_METHOD} & Email backend: \texttt{graph} or \texttt{smtp} \\
+\texttt{MS\_TENANT\_ID} & Azure AD tenant for Graph email API \\
+\texttt{MS\_CLIENT\_ID} & Azure AD application client ID \\
+\texttt{MS\_CLIENT\_SECRET} & Azure AD client secret \\
 \bottomrule
 \end{tabular}
 \end{table}
-
-\section{Ansible Inventory Variables}
-
-\begin{lstlisting}[style=bash]
-rke2_version: "v1.28.4+rke2r1"
-cluster_domain: hydra.newpaltz.edu
-nfs_server: "192.168.1.160"
-nfs_path: "/srv/hydra-nfs"
-\end{lstlisting}
 
 %% ============================================================
 %% APPENDIX
@@ -1601,91 +1297,48 @@ nfs_path: "/srv/hydra-nfs"
 \part*{Appendices}
 \addcontentsline{toc}{part}{Appendices}
 
-\section{Cleanup History (February 2026)}
-
-A comprehensive infrastructure cleanup was performed February 4--7, 2026:
-
-\begin{table}[H]
-\centering
-\begin{tabular}{llr}
-\toprule
-\textbf{Node} & \textbf{Action} & \textbf{Reclaimed} \\
-\midrule
-Hydra & Docker system prune & 114.8 GB \\
-Hydra & Remove stale files (\texttt{/opt/local-path-provisioner.bak}, temp files) & 20+ GB \\
-Hydra & Truncate backup log & 389 MB \\
-Chimera & Remove Docker duplicate images + prune & 41.2 GB \\
-Cerberus & Docker system prune & 51.3 GB \\
-\midrule
-\textbf{Total} & & \textbf{$\sim$227 GB} \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-Key cleanup actions:
-\begin{itemize}[nosep]
-    \item Migrated all services from Docker containers to K8s pods
-    \item Archived \texttt{legacy/} directory to \texttt{legacy-archive} git branch
-    \item Relocated middleman sources to \texttt{k8s/components/} directories
-    \item Removed stale Apache configs, scripts, temp files across all nodes
-    \item Cleaned orphaned Docker networks, volumes, and images
-    \item Fixed Traefik stuck rolling update (added \texttt{strategy: Recreate})
-    \item Fixed Ray cluster (removed GPU request from head, deployed properly)
-    \item Verified all middleman APIs operational
-    \item Cloned hydra-saml-auth repo to all 3 nodes
-\end{itemize}
-
 \section{Migration History}
 
 The infrastructure evolved through several phases:
 \begin{enumerate}[nosep]
-    \item \textbf{Bare metal} --- Apache web server, manual user management
-    \item \textbf{Docker Compose} --- Containerized services, Nginx reverse proxy
-    \item \textbf{K3s} --- Initial Kubernetes, migrated from Docker Compose
-    \item \textbf{RKE2} --- Current production cluster (January 2026), Traefik ingress
-    \item \textbf{Infrastructure Overhaul} --- February 9, 2026 (see below)
+    \item \textbf{Bare metal} (pre-2025) --- Apache web server, manual user management
+    \item \textbf{Docker Compose} (2025) --- Containerized services, Nginx reverse proxy
+    \item \textbf{K3s} (late 2025) --- Initial Kubernetes, migrated from Docker Compose
+    \item \textbf{RKE2} (January 2026) --- Current production cluster, Traefik ingress
+    \item \textbf{Infrastructure Overhaul} (February 9, 2026) --- OOM fix, Docker removal, data migration to ZFS
+    \item \textbf{KubeAI Migration} (February 2026) --- Replaced Ollama with KubeAI/vLLM for scale-to-zero GPU inference
 \end{enumerate}
 
-\section{February 9, 2026 --- Infrastructure Overhaul}
+\section{February 2026 Changelog Summary}
 
-Following a 5-hour OOM death spiral that made the server unresponsive, the following changes were applied:
-
-\begin{enumerate}[nosep]
-    \item \textbf{Phase 1: Docker cleanup} --- Pruned 11.86 GB orphaned Docker volumes, stopped and disabled Docker daemon on all nodes. Build tool changed to \texttt{buildah} (daemonless).
-    \item \textbf{Phase 2: Networking} --- Removed nginx (conflicted with Traefik on port 80), fixed SUNYCAT.png route, fixed OpenWebUI cross-namespace reference, corrected OpenWebUI API fallback URL.
-    \item \textbf{Phase 3: CS Lab consolidation} --- Removed MariaDB pod (app uses SQLite). Went from 2 pods (backend + MariaDB) to 1 pod (cs-lab). Removed \texttt{mariadb} npm dependency.
-    \item \textbf{Phase 4: RKE2 data migration} --- Moved \texttt{/var/lib/rancher/rke2} (40 GB) to RAID at \texttt{/data/rke2}. Symlinked old path for backward compatibility. Config updated: \texttt{data-dir: /data/rke2}.
-    \item \textbf{Phase 5: OOM prevention} --- Added 32 GB swap on RAID (\texttt{vm.swappiness=10}), kubelet eviction thresholds (\texttt{memory.available<2Gi} hard, \texttt{4Gi} soft), \texttt{system-reserved=4Gi}, \texttt{kube-reserved=2Gi}. Applied \texttt{ResourceQuota} and \texttt{LimitRange} to \texttt{hydra-students} namespace (default 2Gi/1CPU per container, max 48Gi/16CPU). Enabled auto-reboot after kernel updates at 04:00.
-\end{enumerate}
-
-\textbf{Build tools after overhaul:}
+\subsection{Feb 4--7: Initial Cleanup}
 \begin{itemize}[nosep]
-    \item \texttt{buildah} --- Daemonless OCI image builder (primary)
-    \item \texttt{nerdctl} --- Docker-compatible CLI for containerd (\texttt{/usr/local/bin/nerdctl})
-    \item Docker daemon is \textbf{disabled} (\texttt{systemctl disable docker})
+    \item Migrated all services from Docker to K8s pods; reclaimed 227 GB across all nodes
+    \item Archived legacy directory, cleaned orphaned Docker resources
+    \item Fixed Traefik stuck rolling update (\texttt{strategy: Recreate})
 \end{itemize}
 
-\section{February 9, 2026 --- Jenkins Service + Jupyter Gating + Repo Cleanup}
+\subsection{Feb 9: Infrastructure Overhaul}
+\begin{itemize}[nosep]
+    \item \textbf{OOM prevention:} 32 GB swap, kubelet eviction thresholds, system/kube reserved resources, ResourceQuota + LimitRange on student namespace
+    \item \textbf{Docker removal:} Disabled Docker daemon, switched to buildah for image builds
+    \item \textbf{RKE2 data migration:} Moved \texttt{/var/lib/rancher/rke2} to ZFS at \texttt{/data/rke2}
+    \item \textbf{CS Lab consolidation:} Removed MariaDB pod (app uses SQLite)
+    \item \textbf{Jenkins service:} Added as 3rd managed service in student containers
+    \item \textbf{Jupyter gating:} Admin approval flow with CLI gate wrapper
+    \item \textbf{Security:} Removed plaintext secrets from git, scrubbed history
+    \item \textbf{Build system:} Versioned image tags (\texttt{v20260209-HHMMSS}), \texttt{scripts/build-deploy.sh}
+\end{itemize}
 
-\begin{enumerate}[nosep]
-    \item \textbf{Jupyter execution gating} --- Supervisor \texttt{autostart=false}, CLI gate wrapper (\texttt{jupyter-gate.sh}), API approval endpoints, \texttt{JUPYTER\_APPROVED} env var marker. Students cannot run Jupyter until admin approves.
-    \item \textbf{Jenkins CI/CD service} --- Added as 3rd managed service inside student containers. Supervisor config (port 8080, \texttt{autostart=false}), K8s pod/service/IngressRoute/strip-prefix routing, DB schema (\texttt{jenkins\_execution\_approved}), admin approval flow, dashboard UI card with Start/Stop/Open buttons.
-    \item \textbf{Repo cleanup} --- Removed 12 dead Docker-era files (deploy scripts, old Python metrics agent, Apache config, SSHPiper Docker Compose, student-mvp, Ray reference compose files). Scrubbed plaintext secret files from git history. Added \texttt{.example} templates for K8s secrets.
-    \item \textbf{K8s template updates} --- Added Jenkins port 8080 to pod template, Jenkins route/middleware/service port to IngressRoute template, flapjs deployment.
-    \item \textbf{Security} --- Removed \texttt{cs-lab/secret.yaml} and \texttt{n8n/secret.yaml} from git tracking (contained plaintext credentials). Added to \texttt{.gitignore}. Credentials should be rotated.
-\end{enumerate}
-
-\section{February 9, 2026 --- Route Fixes + Pod Restart + Documentation}
-
-\begin{enumerate}[nosep]
-    \item \textbf{FLAPJS fix} --- Dockerfile wasn't copying \texttt{index.html} from project root (webpack outputs it outside \texttt{dist/}). Fixed Dockerfile + added nginx \texttt{sub\_filter} for \texttt{<base href="/jflap/">} injection.
-    \item \textbf{Hydra-auth deployment} --- Containerd `:latest` tag was resolving to stale Docker Hub image. Switched to unique versioned tags (\texttt{v20260209-HHMMSS}) with \texttt{imagePullPolicy: Never}. Created \texttt{scripts/build-deploy.sh} for reliable single-path builds.
-    \item \textbf{Jenkins ungated} --- Removed approval requirement for Jenkins. All students can now Start/Stop Jenkins from dashboard without admin approval.
-    \item \textbf{Traefik route conflict} --- \texttt{/api/events} was being intercepted by cs-lab-website (priority 20) instead of hydra-auth (priority 15). Bumped hydra-auth's route to priority 25.
-    \item \textbf{Pod batch restart} --- All 26 student pods restarted from Completed state. PVC data preserved. Code-server started on all pods via supervisorctl batch command.
-    \item \textbf{Temp cleanup} --- Freed 2.6 GB on Hydra (\texttt{/tmp} build artifacts), cleaned audit exports on Chimera and Cerberus.
-    \item \textbf{Documentation} --- Added Pod Timing \& Lifecycle section, Automation \& Scheduled Tasks section, Web Services \& Route Map with rebuild instructions for all services.
-\end{enumerate}
+\subsection{Feb 12--13: Reliability and Scheduling}
+\begin{itemize}[nosep]
+    \item \textbf{Traefik HA:} Health probes, PDB, PriorityClass (\texttt{infra-critical})
+    \item \textbf{Cross-node scheduling:} Soft affinity, GPU tolerations, NFS storage class for pod mobility
+    \item \textbf{Backup restoration:} Freed 163 GB model weights from backup disk, added exclusions, mount guard, fstab entry
+    \item \textbf{etcd snapshots:} Every 6 hours, retain 10
+    \item \textbf{Service fixes:} KILL capability for supervisor, XML status parsing fix, Jenkins strip-prefix removal, CSS routing fix (duplicate IngressRoute deletion)
+    \item \textbf{Image distribution:} \texttt{build-deploy.sh} now scp + ctr import to all nodes
+\end{itemize}
 
 \section{References}
 
@@ -1696,71 +1349,8 @@ Following a 5-hour OOM death spiral that made the server unresponsive, the follo
     \item Azure AD SAML: \url{https://learn.microsoft.com/en-us/entra/identity/}
     \item NVIDIA GPU Operator: \url{https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/}
     \item OpenWebUI: \url{https://docs.openwebui.com}
+    \item KubeAI: \url{https://www.kubeai.org/}
     \item n8n: \url{https://docs.n8n.io/}
-\end{itemize}
-
-\section{February 12--13, 2026 --- Reliability, Scheduling, and Service Fixes}
-
-\subsection{Traefik HA and Eviction Protection}
-
-\begin{enumerate}[nosep]
-    \item \textbf{Health probes} --- Added \texttt{--ping=true} entrypoint on port 8082 with liveness probe (10s period, 3 failures) and readiness probe (5s period, 2 failures). Traefik now auto-restarts on hang.
-    \item \textbf{PodDisruptionBudget} --- Created \texttt{k8s/components/traefik/pdb.yaml} with \texttt{minAvailable: 1} to prevent voluntary eviction during node drains.
-    \item \textbf{PriorityClass} --- Created \texttt{infra-critical} (value 1000000) in \texttt{k8s/components/traefik/priority.yaml}. Applied to all 12 Hydra infrastructure services (traefik, hydra-auth, sshpiper, cs-lab, ollama, open-webui, n8n, flapjs, hackathons, git-learning, java-executor, n8n-user-manager). Student pods use default priority and are evicted first under memory pressure.
-    \item \textbf{Resource bump} --- Traefik CPU request 100m$\to$200m, limit 500m$\to$1000m. Memory request 64Mi$\to$128Mi, limit 256Mi$\to$512Mi.
-\end{enumerate}
-
-\subsection{Backup System Restoration}
-
-\begin{enumerate}[nosep]
-    \item \textbf{Backup disk full} --- \texttt{/mnt/sdh4} was at 100\% due to model weight backups from Chimera/Cerberus (163 GB of \texttt{.gguf} and \texttt{.safetensors} files). Deleted model backups, freed space to 84\%.
-    \item \textbf{Model exclusions} --- Updated \texttt{/usr/local/bin/backup-cluster.sh} to exclude \texttt{/models/*}, \texttt{*.gguf}, \texttt{*.safetensors}, and \texttt{/data/rke2/*} from Chimera/Cerberus backups.
-    \item \textbf{Mount guard} --- Added \texttt{mountpoint -q /mnt/sdh4} check at top of backup script to prevent writing to unmounted path.
-    \item \textbf{Cron re-enabled} --- Uncommented backup cron (Saturday 1:00 AM) and certbot renewal (Saturday 2:45 AM) in root crontab.
-    \item \textbf{fstab entry} --- Added \texttt{/dev/sdh4 /mnt/sdh4 ext4 defaults,nofail 0 2} for auto-mount on boot.
-    \item \textbf{etcd snapshots} --- Added \texttt{etcd-snapshot-schedule-cron: "0 */6 * * *"} and \texttt{etcd-snapshot-retention: 10} to \texttt{/etc/rancher/rke2/config.yaml}.
-\end{enumerate}
-
-\subsection{Cross-Node Pod Scheduling}
-
-\begin{enumerate}[nosep]
-    \item \textbf{Soft affinity} --- Changed student pod scheduling from hard \texttt{nodeSelector} to soft \texttt{preferredDuringSchedulingIgnoredDuringExecution} (weight 80). Pods prefer their target node but spill over to other nodes under pressure.
-    \item \textbf{Node labels} --- Added \texttt{hydra.student-schedulable=true} to all 3 nodes. Hard \texttt{nodeSelector} requires this label so pods only land on labeled nodes.
-    \item \textbf{GPU tolerations} --- All student pods now tolerate \texttt{nvidia.com/gpu} NoSchedule taint so they can schedule on Chimera/Cerberus when Hydra is overloaded.
-    \item \textbf{NFS storage} --- Switched student PVC storage class from \texttt{hydra-local} to \texttt{hydra-nfs} so volumes are accessible from any node.
-    \item \textbf{Image distribution} --- Updated \texttt{scripts/build-deploy.sh} to automatically \texttt{scp} and \texttt{ctr import} student container images to Chimera and Cerberus after build.
-\end{enumerate}
-
-\subsection{Service Start/Stop/Status Fixes}
-
-\begin{enumerate}[nosep]
-    \item \textbf{KILL capability} --- Container security context was missing \texttt{KILL} in the capabilities list. Supervisor (running as root inside the container) could not send SIGTERM to stop managed processes (code-server, jupyter, jenkins). Added \texttt{KILL} to \texttt{capabilities.add} in \texttt{buildPodSpec()}. All 27 student pods rolling-restarted to pick up the fix.
-    \item \textbf{XML status parsing} --- The \texttt{getServiceStatus()} function used a regex that failed on multiline XML from supervisor's \texttt{getAllProcessInfo} API. It fell through to a broken fallback that used \texttt{xmlResponse.includes('STOPPED')} on the entire response --- if ANY service was stopped, ALL services showed as stopped on the dashboard. Replaced with per-struct-block parsing that correctly extracts each process's state independently.
-\end{enumerate}
-
-\subsection{Jenkins Routing Fix}
-
-\begin{enumerate}[nosep]
-    \item \textbf{Strip-prefix conflict} --- Jenkins is started with \texttt{--prefix=/students/\{user\}/jenkins} (handles its own path prefix). But the Traefik IngressRoute applied \texttt{strip-prefix} middleware, stripping the prefix before forwarding --- so Jenkins received \texttt{/} and returned 404.
-    \item \textbf{Fix} --- Removed \texttt{strip-prefix} middleware from Jenkins routes in \texttt{buildIngressRouteSpec()}, matching the existing Jupyter pattern (which also handles its own \texttt{base\_url}). Patched all 32 live student IngressRoutes (28 were missing Jenkins routes entirely, 2 had the strip-prefix bug).
-\end{enumerate}
-
-\subsection{CSS Routing Fix}
-
-\begin{enumerate}[nosep]
-    \item \textbf{Duplicate IngressRoute} --- Two \texttt{hydra-main} IngressRoutes existed: one using \texttt{traefik.containo.us/v1alpha1} (production, with \texttt{/css} route at priority 5) and one using \texttt{traefik.io/v1alpha1} (from \texttt{fix-k8s-routes.sh}, missing \texttt{/css} route). The \texttt{traefik.io} catch-all intercepted CSS requests and returned \texttt{text/html} instead of \texttt{text/css}.
-    \item \textbf{Fix} --- Deleted the \texttt{traefik.io} duplicate: \texttt{kubectl delete ingressroute.traefik.io hydra-main -n hydra-system}. CSS now served correctly with proper content-type.
-\end{enumerate}
-
-\textbf{Files modified:}
-\begin{itemize}[nosep]
-    \item \texttt{services/k8s-containers.js} --- Soft affinity, KILL capability, XML parsing, Jenkins strip-prefix removal
-    \item \texttt{scripts/build-deploy.sh} --- Image distribution to all cluster nodes
-    \item \texttt{k8s/components/traefik/deployment.yaml} --- Health probes, resources, priorityClassName
-    \item \texttt{k8s/components/traefik/pdb.yaml} --- New PodDisruptionBudget
-    \item \texttt{k8s/components/traefik/priority.yaml} --- New PriorityClass
-    \item \texttt{/usr/local/bin/backup-cluster.sh} --- Model exclusions, mount guard
-    \item \texttt{/etc/rancher/rke2/config.yaml} --- etcd snapshot schedule
 \end{itemize}
 
 \end{document}
