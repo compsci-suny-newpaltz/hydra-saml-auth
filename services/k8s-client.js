@@ -67,7 +67,7 @@ class K8sClient {
     }
   }
 
-  // List pods by label selector
+  // List pods by label selector in a namespace
   async listPods(labelSelector, namespace = this.namespace) {
     this.init();
     const response = await this.coreApi.listNamespacedPod(
@@ -76,6 +76,18 @@ class K8sClient {
       undefined, // allowWatchBookmarks
       undefined, // continue
       undefined, // fieldSelector
+      labelSelector
+    );
+    return response.body.items;
+  }
+
+  // List pods across all namespaces, optionally filtered by field selector
+  async listPodsAllNamespaces(fieldSelector, labelSelector) {
+    this.init();
+    const response = await this.coreApi.listPodForAllNamespaces(
+      undefined, // allowWatchBookmarks
+      undefined, // continue
+      fieldSelector,
       labelSelector
     );
     return response.body.items;

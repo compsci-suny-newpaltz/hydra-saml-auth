@@ -603,3 +603,77 @@ a.service-card:hover {
 .service-path {
   color: var(--text-dim);
 }
+
+/* Admin-hoverable storage cubes */
+.storage-grid .cube.admin-hoverable {
+  cursor: pointer;
+  border: 1px solid rgba(255,255,255,0.15);
+}
+
+.storage-grid .cube.admin-hoverable:hover {
+  transform: scale(1.5);
+  border-color: var(--text-cyan);
+  box-shadow: 0 0 6px var(--text-cyan);
+  z-index: 20;
+}
+
+/* Pod detail popover */
+.pod-popover {
+  position: fixed;
+  z-index: 1000;
+  background: #111;
+  border: 1px solid var(--text-cyan);
+  padding: 0;
+  min-width: 180px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+  pointer-events: auto;
+}
+
+.pod-popover.pinned {
+  border-color: var(--text-amber);
+  box-shadow: 0 4px 20px rgba(255, 176, 0, 0.2);
+}
+
+.pod-popover-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  background: #1a1a1a;
+  border-bottom: 1px solid var(--border-dim);
+}
+
+.pod-popover-user {
+  color: var(--text-cyan);
+  font-weight: bold;
+  font-size: 12px;
+}
+
+.pod-popover-status {
+  font-size: 10px;
+  font-weight: bold;
+}
+
+.pod-popover-rows {
+  padding: 6px 10px;
+}
+
+.pod-popover-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+}
+
+.pop-label {
+  color: var(--text-green-dim);
+  margin-right: 12px;
+}
+
+.pop-value {
+  color: var(--text-white);
+  text-align: right;
+}

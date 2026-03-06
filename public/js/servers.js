@@ -298,20 +298,25 @@ function renderStorageCluster(data, showPodDetails = false) {
     const cube = document.createElement('div');
     cube.className = 'cube';
 
-    // Simple colors based on pod status
+    // Colors based on pod status
     if (student.pod_status === 'running') {
       cube.style.backgroundColor = '#10b981'; // green
     } else if (student.pod_status === 'pending') {
       cube.style.backgroundColor = '#f59e0b'; // yellow
+    } else if (student.pod_status === 'offline') {
+      cube.style.backgroundColor = '#555'; // grey — has storage but no pod
     } else {
-      cube.style.backgroundColor = '#ef4444'; // red
+      cube.style.backgroundColor = '#ef4444'; // red — error/stopped
     }
 
-    // Tooltip with student info - only show details for admin/faculty
+    // Admin: hover + click cubes with detail popover
     if (showPodDetails && student.username) {
-      cube.title = `${student.username} | ${student.pod_status} | ${student.node} | ${student.pod_ip || '-'}`;
+      cube.classList.add('admin-hoverable');
+      cube.addEventListener('mouseenter', () => showPodPopover(cube, student, false));
+      cube.addEventListener('mouseleave', schedulePodPopoverClose);
+      cube.addEventListener('click', (e) => { e.stopPropagation(); showPodPopover(cube, student, true); });
     } else {
-      cube.title = student.pod_status; // Just show status for non-admins
+      cube.title = student.pod_status;
     }
     grid.appendChild(cube);
   });
@@ -324,6 +329,96 @@ function renderStorageCluster(data, showPodDetails = false) {
   totalEl.textContent = `${totalPods} / ${maxCapacity} pods`;
   usedEl.textContent = `${runningCount} running`;
   availEl.textContent = `${emptySlots} available`;
+}
+
+// Pod detail popover for admin hover/click
+let popoverCloseTimer = null;
+let popoverPinned = false;
+
+function showPodPopover(cubeEl, student, pinned = false) {
+  // Cancel any pending close
+  if (popoverCloseTimer) { clearTimeout(popoverCloseTimer); popoverCloseTimer = null; }
+
+  // If pinned popover is already showing for same student, close it (toggle)
+  const existing = document.getElementById('pod-popover');
+  if (pinned && existing && existing.dataset.user === student.username) {
+    closePodPopover(); return;
+  }
+
+  // Remove any existing popover
+  closePodPopover();
+  popoverPinned = pinned;
+
+  const popover = document.createElement('div');
+  popover.className = 'pod-popover';
+  popover.id = 'pod-popover';
+
+  const statusColor = student.pod_status === 'running' ? '#10b981' :
+                       student.pod_status === 'pending' ? '#f59e0b' : '#ef4444';
+
+  popover.innerHTML = `
+    <div class="pod-popover-header">
+      <span class="pod-popover-user">${student.username}</span>
+      <span class="pod-popover-status" style="color:${statusColor}">${(student.pod_status || '').toUpperCase()}</span>
+    </div>
+    <div class="pod-popover-rows">
+      <div class="pod-popover-row"><span class="pop-label">IP:</span><span class="pop-value">${student.pod_ip || 'none'}</span></div>
+      <div class="pod-popover-row"><span class="pop-label">NODE:</span><span class="pop-value">${student.node || '-'}</span></div>
+      <div class="pod-popover-row"><span class="pop-label">CPU:</span><span class="pop-value">${student.cpu_request || '-'}</span></div>
+      <div class="pod-popover-row"><span class="pop-label">MEM:</span><span class="pop-value">${student.used_gb ? student.used_gb.toFixed(1) + ' GB' : '-'}</span></div>
+      <div class="pod-popover-row"><span class="pop-label">PHASE:</span><span class="pop-value">${student.phase || '-'}</span></div>
+    </div>
+  `;
+
+  // Keep popover open when hovering over it
+  popover.addEventListener('mouseenter', () => {
+    if (popoverCloseTimer) { clearTimeout(popoverCloseTimer); popoverCloseTimer = null; }
+  });
+  popover.addEventListener('mouseleave', schedulePodPopoverClose);
+
+  popover.dataset.user = student.username;
+
+  // Close pinned popover on outside click
+  if (pinned) {
+    popover.classList.add('pinned');
+    setTimeout(() => {
+      document.addEventListener('click', closePodPopover, { once: true });
+    }, 0);
+  }
+
+  document.body.appendChild(popover);
+
+  // Position relative to the cube
+  const rect = cubeEl.getBoundingClientRect();
+  const popRect = popover.getBoundingClientRect();
+
+  let top = rect.bottom + 6;
+  let left = rect.left + rect.width / 2 - popRect.width / 2;
+
+  // Keep within viewport
+  if (left < 8) left = 8;
+  if (left + popRect.width > window.innerWidth - 8) left = window.innerWidth - popRect.width - 8;
+  if (top + popRect.height > window.innerHeight - 8) {
+    top = rect.top - popRect.height - 6; // flip above
+  }
+
+  popover.style.top = top + 'px';
+  popover.style.left = left + 'px';
+  popover.style.opacity = '1';
+}
+
+function schedulePodPopoverClose() {
+  // Don't auto-close if pinned (clicked)
+  if (popoverPinned) return;
+  if (popoverCloseTimer) clearTimeout(popoverCloseTimer);
+  popoverCloseTimer = setTimeout(closePodPopover, 200);
+}
+
+function closePodPopover() {
+  const existing = document.getElementById('pod-popover');
+  if (existing) existing.remove();
+  popoverCloseTimer = null;
+  popoverPinned = false;
 }
 
 // Hosted Services

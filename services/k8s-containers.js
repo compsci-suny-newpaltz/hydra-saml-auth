@@ -102,6 +102,7 @@ function buildPodSpec(username, email, config) {
           { name: 'HOME', value: '/home/student' },
           { name: 'JUPYTER_APPROVED', value: config.jupyter_approved ? 'true' : 'false' },
           { name: 'JENKINS_APPROVED', value: config.jenkins_approved ? 'true' : 'false' },
+          { name: 'DOCKER_HOST', value: 'unix:///var/run/docker/docker.sock' },
           {
             name: 'PASSWORD',
             valueFrom: {
@@ -129,7 +130,8 @@ function buildPodSpec(username, email, config) {
           }
         },
         volumeMounts: [
-          { name: 'home', mountPath: '/home/student' }
+          { name: 'home', mountPath: '/home/student' },
+          { name: 'docker-socket', mountPath: '/var/run/docker', readOnly: false }
         ],
         // Container runs as root initially, then drops to user 1000 via entrypoint
         // Security hardening: prevent privilege escalation and drop all capabilities
@@ -155,6 +157,33 @@ function buildPodSpec(username, email, config) {
             }
           }
         }
+      },
+      // Docker-in-Docker sidecar — isolated Docker daemon per student
+      {
+        name: 'dind',
+        image: 'docker:27-dind',
+        imagePullPolicy: 'IfNotPresent',
+        securityContext: {
+          privileged: true
+        },
+        args: ['--host', 'unix:///var/run/docker/docker.sock'],
+        env: [
+          { name: 'DOCKER_TLS_CERTDIR', value: '' }
+        ],
+        volumeMounts: [
+          { name: 'docker-socket', mountPath: '/var/run/docker' },
+          { name: 'dind-storage', mountPath: '/var/lib/docker' }
+        ],
+        resources: {
+          requests: {
+            memory: '256Mi',
+            cpu: '100m'
+          },
+          limits: {
+            memory: '1Gi',
+            cpu: '1'
+          }
+        }
       }],
       volumes: [
         {
@@ -162,6 +191,14 @@ function buildPodSpec(username, email, config) {
           persistentVolumeClaim: {
             claimName: `hydra-vol-${username}`
           }
+        },
+        {
+          name: 'docker-socket',
+          emptyDir: {}
+        },
+        {
+          name: 'dind-storage',
+          emptyDir: {}
         }
       ],
       restartPolicy: 'Always',

@@ -119,7 +119,7 @@ The platform runs on RKE2 (Rancher Kubernetes Engine 2) with orchestration mode 
 |------|-----|------|------------|-----------|
 | **Hydra** | 192.168.1.160 | Control plane, student containers | `hydra.node-role=control-plane` | 256GB RAM, 64 cores, 21TB ZFS |
 | **Chimera** | 192.168.1.150 | AI inference (OpenWebUI + Ollama) | `hydra.node-role=inference`, `hydra.gpu-enabled=true` | 3× RTX 3090 (72GB VRAM) |
-| **Cerberus** | 192.168.1.233 | GPU training workloads | `hydra.node-role=training`, `hydra.gpu-enabled=true` | 2× RTX 5090 (64GB VRAM) |
+| **Cerberus** | 192.168.1.242 | GPU training workloads | `hydra.node-role=training`, `hydra.gpu-enabled=true` | 2× RTX 5090 (64GB VRAM) |
 
 ### Storage Classes
 
@@ -158,7 +158,7 @@ graph TD
         OpenWebUI --> Ollama
     end
 
-    subgraph Cerberus["Cerberus (192.168.1.233) — Training"]
+    subgraph Cerberus["Cerberus (192.168.1.242) — Training"]
         Ray["Ray Worker\n2x RTX 5090 · 64GB VRAM"]
     end
 
@@ -293,7 +293,7 @@ gpu_nodes:
       ansible_host: 192.168.1.150
       node_role: inference
     cerberus:
-      ansible_host: 192.168.1.233
+      ansible_host: 192.168.1.242
       node_role: training
 ```
 

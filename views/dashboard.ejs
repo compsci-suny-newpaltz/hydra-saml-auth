@@ -1002,9 +1002,9 @@
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Resource Preset</label>
                 <select id="resource-preset" class="w-full rounded border border-gray-300 px-3 py-2">
-                  <option value="conservative">Conservative (4GB RAM, 2 CPU) - Auto-approved</option>
-                  <option value="standard">Standard (8GB RAM, 4 CPU)</option>
-                  <option value="enhanced">Enhanced (16GB RAM, 8 CPU)</option>
+                  <option value="conservative">Conservative (1.5GB RAM, 1 CPU) - Auto-approved</option>
+                  <option value="standard">Standard (2GB RAM, 1 CPU) - Auto-approved</option>
+                  <option value="enhanced">Enhanced (4GB RAM, 2 CPU) - Auto-approved</option>
                   <option value="gpu_inference">GPU Inference (32GB RAM, 8 CPU, 1 GPU)</option>
                   <option value="gpu_training">GPU Training (48GB RAM, 16 CPU, 2 GPU)</option>
                 </select>
@@ -2741,7 +2741,7 @@
           document.getElementById('chimera-capacity-bar').style.width = usedPercent + '%';
           document.getElementById('chimera-capacity-bar').className = 'h-full transition-all ' + getCapacityColor(usedPercent);
           document.getElementById('chimera-slots').textContent = capacity.availableSlots || 0;
-          document.getElementById('chimera-gpu-util').textContent = c.gpu ? (c.gpu.utilization || 0) : 0;
+          document.getElementById('chimera-gpu-util').textContent = c.gpu ? (c.gpu.avgUtilization || 0) : 0;
           document.getElementById('chimera-status-dot').className = 'w-2 h-2 rounded-full ' + (c.online && !c.maintenance ? 'bg-green-500' : 'bg-red-500');
         }
 
@@ -2754,7 +2754,7 @@
           document.getElementById('cerberus-capacity-bar').style.width = usedPercent + '%';
           document.getElementById('cerberus-capacity-bar').className = 'h-full transition-all ' + getCapacityColor(usedPercent);
           document.getElementById('cerberus-slots').textContent = capacity.availableSlots || 0;
-          document.getElementById('cerberus-gpu-util').textContent = cb.gpu ? (cb.gpu.utilization || 0) : 0;
+          document.getElementById('cerberus-gpu-util').textContent = cb.gpu ? (cb.gpu.avgUtilization || 0) : 0;
           document.getElementById('cerberus-status-dot').className = 'w-2 h-2 rounded-full ' + (cb.online ? (cb.maintenance ? 'bg-yellow-500' : 'bg-green-500') : 'bg-red-500');
         }
       }
@@ -2887,10 +2887,13 @@
 
         // Check if this requires approval
         // GPU nodes require approval, but returning to hydra is auto-approved
+        // Match backend logic: auto-approve on Hydra for conservative/standard/enhanced
+        // with storage <= 40GB and duration <= 30 days
+        const autoApprovePresets = ['conservative', 'standard', 'enhanced'];
         const needsApproval = (
           targetNode !== 'hydra' ||
-          preset !== 'conservative' ||
-          storage > 50 ||
+          !autoApprovePresets.includes(preset) ||
+          storage > 40 ||
           durationDays > 30
         );
 

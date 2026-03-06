@@ -115,11 +115,14 @@ function collectHydraMetrics() {
     // Ignore errors, use defaults
   }
 
-  // Container count - try docker ps
+  // Container count - use kubectl for K8s pod count on this node
   let containersRunning = 0;
   try {
-    const dockerOutput = execSync('docker ps -q 2>/dev/null | wc -l', { encoding: 'utf8', timeout: 5000 });
-    containersRunning = parseInt(dockerOutput.trim()) || 0;
+    const kubectlOutput = execSync(
+      "KUBECONFIG=/etc/rancher/rke2/rke2.yaml /var/lib/rancher/rke2/bin/kubectl get pods -A --field-selector=spec.nodeName=hydra,status.phase=Running --no-headers 2>/dev/null | wc -l",
+      { encoding: 'utf8', timeout: 10000 }
+    );
+    containersRunning = parseInt(kubectlOutput.trim()) || 0;
   } catch (e) {
     // Ignore errors
   }

@@ -82,9 +82,13 @@ async function getNodeMetrics() {
                 ? Math.round(gpus.reduce((sum, g) => sum + (g.memory_used_gb || g.vram_used || 0), 0) / gpus.length)
                 : 0;
 
+            // Subtract reserved GPUs (e.g., Chimera reserves 1 for OpenWebUI)
+            const reservedGpus = nodeConfig.openwebuiGpuReserved || 0;
+            const studentFacingGpus = totalGpus - reservedGpus;
+
             gpuMetrics = {
-                total: totalGpus,
-                available: Math.max(0, totalGpus - gpuSlotsUsed),
+                total: studentFacingGpus,
+                available: Math.max(0, studentFacingGpus - gpuSlotsUsed),
                 avgUtilization: avgUtil,
                 avgVramUsedGb: avgVramUsed,
                 vramPerCardGb: nodeConfig.gpuVramPerCard,

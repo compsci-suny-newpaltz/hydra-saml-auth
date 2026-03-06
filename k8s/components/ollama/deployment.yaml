@@ -23,6 +23,7 @@ spec:
         - key: nvidia.com/gpu
           operator: Exists
           effect: NoSchedule
+      runtimeClassName: nvidia
       containers:
         - name: ollama
           image: ollama/ollama:latest
@@ -34,19 +35,19 @@ spec:
             - name: OLLAMA_HOST
               value: "0.0.0.0:11434"
             - name: OLLAMA_KEEP_ALIVE
-              value: "-1"
+              value: "5m"
             - name: OLLAMA_FLASH_ATTENTION
               value: "1"
             - name: OLLAMA_MAX_LOADED_MODELS
               value: "6"
             - name: OLLAMA_GPU_OVERHEAD
-              value: "0.10"
+              value: "0"
             - name: OLLAMA_NUM_PARALLEL
               value: "4"
             - name: OLLAMA_NUM_GPU
-              value: "3"
+              value: "1"
             - name: NVIDIA_VISIBLE_DEVICES
-              value: "0,1,2"
+              value: "all"
           volumeMounts:
             - name: models
               mountPath: /root/.ollama
@@ -54,11 +55,11 @@ spec:
             requests:
               memory: "16Gi"
               cpu: "4000m"
-              nvidia.com/gpu: "3"
+              nvidia.com/gpu: "1"
             limits:
-              memory: "64Gi"
-              cpu: "16000m"
-              nvidia.com/gpu: "3"
+              memory: "32Gi"
+              cpu: "8000m"
+              nvidia.com/gpu: "1"
           livenessProbe:
             httpGet:
               path: /api/tags

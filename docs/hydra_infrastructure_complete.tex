@@ -80,7 +80,7 @@ Servers & \texttt{https://hydra.newpaltz.edu/servers} & Cluster status \\
 \midrule
 Hydra & 192.168.1.160 & Control plane, etcd, student pods & Ubuntu 22.04.5 & 64 cores, 256 GB RAM, 21 TB RAID-10 \\
 Chimera & 192.168.1.150 & GPU inference & Ubuntu 24.04.2 & 48 cores, 256 GB RAM, 3x RTX 3090 (72 GB VRAM) \\
-Cerberus & 192.168.1.233 & GPU training & Ubuntu 24.04.3 & 48 cores, 64 GB RAM, 2x RTX 5090 (64 GB VRAM) \\
+Cerberus & 192.168.1.242 & GPU training & Ubuntu 24.04.3 & 48 cores, 64 GB RAM, 2x RTX 5090 (64 GB VRAM) \\
 \bottomrule
 \end{tabular}
 \caption{All nodes run RKE2 v1.28.4+rke2r1 with containerd 1.7.7.}
@@ -127,7 +127,7 @@ Cerberus & 192.168.1.233 & GPU training & Ubuntu 24.04.3 & 48 cores, 64 GB RAM, 
 %% --- Cerberus ---
 \node[gpu, right=0.6cm of chimera] (cerberus) {};
 \node[font=\small\bfseries, anchor=north] at (cerberus.north) {Cerberus (GPU Training)};
-\node[font=\scriptsize, anchor=north] at ([yshift=-0.3cm]cerberus.north) {192.168.1.233 --- 2x RTX 5090};
+\node[font=\scriptsize, anchor=north] at ([yshift=-0.3cm]cerberus.north) {192.168.1.242 --- 2x RTX 5090};
 \node[svc] at ([yshift=0.1cm]cerberus.center) (train) {Training workloads};
 \node[pod, below=0.15cm of train] (gpustu2) {GPU student pods};
 

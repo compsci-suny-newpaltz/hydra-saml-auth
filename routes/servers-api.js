@@ -7,7 +7,7 @@ let metricsCollector;
 try {
   metricsCollector = require('../services/metrics-collector');
 } catch (e) {
-  console.warn('[servers-api] Metrics collector not available, using mock data');
+  console.warn('[servers-api] Metrics collector not available');
 }
 
 // Import K8s client for pod status
@@ -15,7 +15,7 @@ let k8sClient;
 try {
   k8sClient = require('../services/k8s-client');
 } catch (e) {
-  console.warn('[servers-api] K8s client not available, using mock data for pods');
+  console.warn('[servers-api] K8s client not available');
 }
 
 // For disk stats
@@ -54,8 +54,8 @@ async function isAdminRequest(req) {
     const affiliation = (payload.affiliation || '').toLowerCase();
     const isFaculty = affiliation === 'faculty';
 
-    // Check admin whitelist
-    const adminWhitelist = (process.env.ADMIN_WHITELIST || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+    // Check admin whitelist (ADMIN_USERS env var from configmap)
+    const adminWhitelist = (process.env.ADMIN_USERS || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
     const email = (payload.email || '').toLowerCase();
     const isWhitelisted = adminWhitelist.includes(email);
 
@@ -107,9 +107,21 @@ router.get('/status', async (req, res) => {
       }
     }
 
-    // Fallback to mock data if no real metrics
+    // If no real metrics available, return empty state
     if (!serverData) {
-      serverData = await generateMockServerData(showPodDetails);
+      serverData = {};
+    }
+
+    // Inject admin-only node details (IPs, hardware)
+    if (showPodDetails && serverData) {
+      const nodeDetails = {
+        hydra: { ip: '192.168.1.160', cores: 64, hardware: '256GB RAM, 64 cores, 21TB ZFS RAID-10' },
+        chimera: { ip: '192.168.1.150', cores: 48, hardware: '251GB RAM, 48 cores, 3x RTX 3090 (72GB VRAM)', ip_10g: '10.0.0.1' },
+        cerberus: { ip: '192.168.1.242', cores: 48, hardware: '64GB RAM, 48 cores, 2x RTX 5090 (64GB VRAM)', ip_10g: '10.0.0.2' }
+      };
+      for (const [name, details] of Object.entries(nodeDetails)) {
+        if (serverData[name]) serverData[name].admin_details = details;
+      }
     }
 
     res.json({
@@ -125,47 +137,102 @@ router.get('/status', async (req, res) => {
 
 /**
  * GET /api/servers/gpu-queue
- * Returns GPU queue information for authenticated user
- * Shows their queue position and estimated wait times
+ * Returns real GPU node workload: pods on Chimera/Cerberus, resource usage, pending pods
  */
-router.get('/gpu-queue', (req, res) => {
-  // Check authentication via np_access cookie
+router.get('/gpu-queue', async (req, res) => {
   const token = req.cookies?.np_access;
   if (!token) {
     return res.status(401).json({ error: 'Authentication required' });
   }
 
-  // TODO: Get user from token and lookup their queue position
-  // For now, return mock queue data
-  const mockQueueData = {
-    user_requests: [
-      // Example: user has one pending request
-      // {
-      //   id: 42,
-      //   queue_position: 3,
-      //   target_node: 'chimera',
-      //   job_type: 'inference',
-      //   status: 'pending',
-      //   estimated_wait_minutes: 45,
-      //   created_at: new Date().toISOString()
-      // }
-    ],
-    queue_summary: {
-      chimera: {
-        queue_length: 3,
-        avg_wait_minutes: 30,
-        current_utilization: 72
-      },
-      cerberus: {
-        queue_length: 1,
-        current_job: 'fine-tuning-llama3',
-        job_progress: 62,
-        busy_until: null
-      }
+  try {
+    if (!k8sClient) {
+      return res.status(503).json({ error: 'K8s client unavailable' });
     }
-  };
 
-  res.json(mockQueueData);
+    const isAdmin = await isAdminRequest(req);
+
+    // GPU node definitions
+    const gpuNodes = {
+      chimera: { total_gpus: 3, gpu_model: 'RTX 3090', vram_per_gpu: 24 },
+      cerberus: { total_gpus: 2, gpu_model: 'RTX 5090', vram_per_gpu: 32 }
+    };
+
+    const queue_summary = {};
+
+    for (const [nodeName, nodeInfo] of Object.entries(gpuNodes)) {
+      // Get pods on this specific node (field selector is efficient — server-side filter)
+      const allNodePods = await k8sClient.listPodsAllNamespaces(`spec.nodeName=${nodeName}`);
+      const nodePods = allNodePods.filter(p =>
+        p.metadata?.namespace !== 'kube-system' &&
+        p.metadata?.namespace !== 'gpu-operator' &&
+        p.status?.phase !== 'Succeeded'
+      );
+
+      // Categorize pods
+      const workloads = [];
+      let gpusAllocated = 0;
+
+      for (const pod of nodePods) {
+        const ns = pod.metadata?.namespace || '';
+        const name = pod.metadata?.name || '';
+        const phase = pod.status?.phase || 'Unknown';
+        const ready = pod.status?.containerStatuses?.some(c => c.ready) || false;
+
+        // Count GPU requests across all containers
+        let podGpus = 0;
+        for (const container of (pod.spec?.containers || [])) {
+          const gpuReq = container.resources?.requests?.['nvidia.com/gpu'] ||
+                         container.resources?.limits?.['nvidia.com/gpu'] || '0';
+          podGpus += parseInt(gpuReq) || 0;
+        }
+        gpusAllocated += podGpus;
+
+        // Determine workload type
+        let type = 'other';
+        if (name.startsWith('student-')) type = 'student';
+        else if (name.startsWith('model-') || ns === 'kubeai') type = 'model';
+        else if (name.includes('ollama')) type = 'ollama';
+        else if (name.includes('ray-')) type = 'ray';
+        else if (name.includes('open-webui')) type = 'webui';
+
+        const entry = {
+          type,
+          namespace: ns,
+          status: ready ? 'running' : phase.toLowerCase(),
+          gpus: podGpus
+        };
+
+        // Show pod name/details only for admins
+        if (isAdmin) {
+          entry.name = name;
+          entry.pod_ip = pod.status?.podIP || null;
+        }
+
+        workloads.push(entry);
+      }
+
+      // Count pending pods on this node (already in nodePods from field selector,
+      // plus pods that want this node but haven't been scheduled yet)
+      const pendingOnNode = nodePods.filter(p => p.status?.phase === 'Pending');
+      const pendingPods = pendingOnNode;
+
+      queue_summary[nodeName] = {
+        gpu_model: nodeInfo.gpu_model,
+        total_gpus: nodeInfo.total_gpus,
+        gpus_allocated: gpusAllocated,
+        gpus_available: nodeInfo.total_gpus - gpusAllocated,
+        workloads,
+        pending_count: pendingPods.length,
+        total_pods: nodePods.length
+      };
+    }
+
+    res.json({ queue_summary, checked_at: new Date().toISOString() });
+  } catch (error) {
+    console.error('[servers-api] Failed to get GPU queue:', error);
+    res.status(500).json({ error: 'Failed to retrieve GPU queue data' });
+  }
 });
 
 /**
@@ -180,9 +247,14 @@ router.get('/:name/metrics', async (req, res) => {
   }
 
   try {
-    // TODO: Get real metrics from collector
-    const mockData = generateMockServerData();
-    const serverData = mockData[name];
+    let serverData = null;
+    if (metricsCollector) {
+      const metrics = metricsCollector.getMetrics();
+      if (metrics && metrics[name]) {
+        const formatted = await formatCollectedMetrics(metrics, false);
+        serverData = formatted[name];
+      }
+    }
 
     if (!serverData) {
       return res.status(404).json({ error: 'Server metrics not available' });
@@ -285,110 +357,7 @@ async function formatCollectedMetrics(metrics, showPodDetails = false) {
 }
 
 /**
- * Generate realistic mock server data
- * This will be replaced by real metrics collection
- */
-async function generateMockServerData(showPodDetails = false) {
-  // Add some randomization to make it look realistic
-  const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
-  const randFloat = (min, max) => (Math.random() * (max - min) + min).toFixed(1);
-
-  // Get real RAID usage
-  const raidStats = await getRaidUsage();
-
-  return {
-    hydra: {
-      status: 'online',
-      role: 'control-plane',
-      cpu_percent: rand(15, 55),
-      ram_used_gb: rand(60, 120),
-      ram_total_gb: 251,
-      disk_used_gb: 254,
-      disk_total_gb: 1000,
-      raid_used_gb: raidStats.used_gb,
-      raid_total_gb: raidStats.total_gb,
-      containers_running: rand(35, 55),
-      zfs_status: 'ONLINE',
-      storage_cluster: await generateStorageClusterData(showPodDetails),
-      last_updated: new Date().toISOString()
-    },
-    chimera: {
-      status: 'online',
-      role: 'inference',
-      gpus: [
-        {
-          index: 0,
-          name: 'RTX 3090',
-          util: rand(40, 95),
-          vram_used: rand(12, 23),
-          vram_total: 24,
-          temp: rand(62, 78)
-        },
-        {
-          index: 1,
-          name: 'RTX 3090',
-          util: rand(20, 70),
-          vram_used: rand(8, 18),
-          vram_total: 24,
-          temp: rand(58, 72)
-        },
-        {
-          index: 2,
-          name: 'RTX 3090',
-          util: rand(60, 98),
-          vram_used: rand(18, 24),
-          vram_total: 24,
-          temp: rand(68, 82)
-        }
-      ],
-      cpu_percent: rand(20, 60),
-      ram_used_gb: rand(80, 180),
-      ram_total_gb: 251,
-      disk_used_gb: rand(400, 800),
-      disk_total_gb: 2000,
-      containers_running: rand(5, 12),
-      queue_depth: rand(1, 6),
-      avg_wait_minutes: rand(15, 60),
-      last_updated: new Date().toISOString()
-    },
-    cerberus: {
-      status: 'online',
-      role: 'training',
-      gpus: [
-        {
-          index: 0,
-          name: 'RTX 5090',
-          util: rand(85, 100),
-          vram_used: rand(28, 32),
-          vram_total: 32,
-          temp: rand(70, 82)
-        },
-        {
-          index: 1,
-          name: 'RTX 5090',
-          util: rand(85, 100),
-          vram_used: rand(26, 32),
-          vram_total: 32,
-          temp: rand(68, 80)
-        }
-      ],
-      cpu_percent: rand(40, 80),
-      ram_used_gb: rand(40, 58),
-      ram_total_gb: 64,
-      disk_used_gb: rand(200, 400),
-      disk_total_gb: 1000,
-      containers_running: rand(1, 4),
-      queue_depth: rand(0, 3),
-      training_job: Math.random() > 0.3 ? 'fine-tuning-llama3' : null,
-      job_progress: rand(20, 85),
-      job_eta: `~${rand(1, 4)}h ${rand(0, 59)}m`,
-      last_updated: new Date().toISOString()
-    }
-  };
-}
-
-/**
- * Generate storage cluster data from K8s pods
+ * Generate storage cluster data from K8s pods and PVCs
  * Shows student pods with their status (running, stopped, etc.)
  *
  * Cluster-wide capacity calculation:
@@ -421,16 +390,20 @@ async function generateStorageClusterData(showPodDetails = false) {
 
   try {
     if (!k8sClient) {
-      console.warn('[servers-api] K8s client not available, using mock data');
-      return generateMockStorageCluster();
+      console.warn('[servers-api] K8s client not available');
+      return { students: [], total_pods: 0, running_count: 0, max_capacity: 0, empty_slots: 0 };
     }
 
-    // Get all student pods from K8s
-    const pods = await k8sClient.listPods('app.kubernetes.io/name=student-container', 'hydra-students');
+    // Get all student pods and PVCs from K8s
+    const [pods, pvcs] = await Promise.all([
+      k8sClient.listPods('app.kubernetes.io/name=student-container', 'hydra-students'),
+      k8sClient.listPVCs(undefined, 'hydra-students').catch(() => [])
+    ]);
 
-    const students = [];
+    // Build a map of pod data by username
+    const podMap = {};
+    let totalCpuRequested = 0;
     let runningCount = 0;
-    let totalCpuRequested = 0; // Track actual CPU reserved by existing pods
 
     for (const pod of pods) {
       const podName = pod.metadata?.name || '';
@@ -439,23 +412,20 @@ async function generateStorageClusterData(showPodDetails = false) {
       const containerReady = pod.status?.containerStatuses?.[0]?.ready || false;
       const node = pod.spec?.nodeName || '-';
 
-      // Determine pod status
-      let pod_status = 'stopped'; // red
+      let pod_status = 'stopped';
       if (phase === 'Running' && containerReady) {
-        pod_status = 'running'; // green
+        pod_status = 'running';
         runningCount++;
       } else if (phase === 'Pending') {
-        pod_status = 'pending'; // yellow
+        pod_status = 'pending';
       } else if (phase === 'Failed' || phase === 'Unknown') {
-        pod_status = 'error'; // red
+        pod_status = 'error';
       }
 
-      // Get resource usage from pod spec
       const resources = pod.spec?.containers?.[0]?.resources || {};
       const memoryRequest = resources.requests?.memory || '512Mi';
       const cpuRequest = resources.requests?.cpu || '500m';
 
-      // Parse CPU request to cores for capacity tracking
       let cpuCores = ACTIVE_CPU_REQUEST;
       if (cpuRequest.endsWith('m')) {
         cpuCores = parseInt(cpuRequest) / 1000;
@@ -464,7 +434,6 @@ async function generateStorageClusterData(showPodDetails = false) {
       }
       totalCpuRequested += cpuCores;
 
-      // Parse memory to GB (rough estimate)
       let memoryGb = 0.5;
       if (memoryRequest.includes('Gi')) {
         memoryGb = parseFloat(memoryRequest);
@@ -472,23 +441,55 @@ async function generateStorageClusterData(showPodDetails = false) {
         memoryGb = parseFloat(memoryRequest) / 1024;
       }
 
-      // Only include sensitive info (username, IP, node) for admins
+      podMap[username] = { pod_status, node, memoryGb, cpuRequest, phase, podIP: pod.status?.podIP || null };
+    }
+
+    // Build student list from PVCs (all users with storage) merged with pod status
+    const students = [];
+    const pvcUsers = new Set();
+
+    for (const pvc of pvcs) {
+      const pvcName = pvc.metadata?.name || '';
+      if (!pvcName.startsWith('hydra-vol-')) continue;
+      const username = pvcName.replace('hydra-vol-', '');
+      pvcUsers.add(username);
+
+      const podData = podMap[username];
+      const pod_status = podData?.pod_status || 'offline';
+      if (pod_status === 'running') { /* already counted */ }
+
       if (showPodDetails) {
         students.push({
           username,
           pod_status,
-          node,
-          used_gb: memoryGb,
+          node: podData?.node || '-',
+          used_gb: podData?.memoryGb || 0,
           quota_gb: BASE_STORAGE_GB,
-          phase,
-          pod_ip: pod.status?.podIP || null,
-          cpu_request: cpuRequest
+          phase: podData?.phase || 'Offline',
+          pod_ip: podData?.podIP || null,
+          cpu_request: podData?.cpuRequest || '-'
         });
       } else {
-        // Redacted info for non-admins - just show status
+        students.push({ pod_status });
+      }
+    }
+
+    // Include any pods that don't have a matching PVC (shouldn't happen, but just in case)
+    for (const [username, podData] of Object.entries(podMap)) {
+      if (pvcUsers.has(username)) continue;
+      if (showPodDetails) {
         students.push({
-          pod_status
+          username,
+          pod_status: podData.pod_status,
+          node: podData.node,
+          used_gb: podData.memoryGb,
+          quota_gb: BASE_STORAGE_GB,
+          phase: podData.phase,
+          pod_ip: podData.podIP,
+          cpu_request: podData.cpuRequest
         });
+      } else {
+        students.push({ pod_status: podData.pod_status });
       }
     }
 
@@ -502,10 +503,10 @@ async function generateStorageClusterData(showPodDetails = false) {
     const additionalPods = Math.max(0, Math.min(additionalPodsByCpu, additionalPodsByMemory, additionalPodsByLimit));
     const MAX_PODS = students.length + additionalPods;
 
-    // Sort by status: running first, then pending, then stopped
+    // Sort by status: running first, then pending, then stopped/error, then offline
     students.sort((a, b) => {
-      const order = { running: 0, pending: 1, stopped: 2, error: 3 };
-      return (order[a.pod_status] || 4) - (order[b.pod_status] || 4);
+      const order = { running: 0, pending: 1, stopped: 2, error: 3, offline: 4 };
+      return (order[a.pod_status] ?? 5) - (order[b.pod_status] ?? 5);
     });
 
     return {
@@ -526,70 +527,8 @@ async function generateStorageClusterData(showPodDetails = false) {
     };
   } catch (err) {
     console.error('[servers-api] Failed to get K8s pod data:', err.message);
-    // Return mock data on error
-    return generateMockStorageCluster(showPodDetails);
+    return { students: [], total_pods: 0, running_count: 0, max_capacity: 0, empty_slots: 0 };
   }
-}
-
-/**
- * Generate mock storage cluster data for testing
- * Includes pod_status for UI compatibility
- */
-function generateMockStorageCluster(showPodDetails = false) {
-  const MAX_PODS = 232; // Cluster-wide: 116 cores / 0.5 = 232
-  const rand = (min, max) => Math.random() * (max - min) + min;
-  const students = [];
-  const usernames = [
-    'gopeen1', 'patelv22', 'easwarac', 'currym6', 'manzim1', 'namc3',
-    'defreitm1', 'fennerj1', 'polij1', 'shusterj1', 'dankwahd1', 'arenellc1',
-    'riordanj2', 'smithj3', 'jonesm4', 'brownk5', 'davisl6', 'wilsonp7'
-  ];
-
-  let totalUsedGb = 0;
-  let runningCount = 0;
-  usernames.forEach((username, i) => {
-    const usedGb = rand(0.1, 9.5);
-    // First 3 are running, rest are stopped (mock)
-    const pod_status = i < 3 ? 'running' : 'stopped';
-    if (pod_status === 'running') runningCount++;
-
-    if (showPodDetails) {
-      students.push({
-        username,
-        pod_status,
-        node: 'hydra',
-        used_gb: usedGb,
-        quota_gb: 10,
-        phase: pod_status === 'running' ? 'Running' : 'Stopped',
-        pod_ip: pod_status === 'running' ? `10.42.0.${100 + i}` : null
-      });
-    } else {
-      students.push({ pod_status });
-    }
-    totalUsedGb += usedGb;
-  });
-
-  return {
-    students,
-    total_pods: students.length,
-    running_count: runningCount,
-    max_capacity: MAX_PODS,
-    empty_slots: MAX_PODS - students.length,
-    capacity_info: {
-      max_by_cpu: 232,
-      max_by_memory: 376,
-      max_by_storage: 2150,
-      k8s_limit: 330,
-      bottleneck: 'cpu',
-      nodes: {
-        hydra: { cpu: 20, memory_gb: 251, pod_limit: 110 },
-        chimera: { cpu: 48, memory_gb: 251, pod_limit: 110 },
-        cerberus: { cpu: 48, memory_gb: 62, pod_limit: 110 }
-      }
-    },
-    total_used_gb: totalUsedGb,
-    available_tb: 21 - (totalUsedGb / 1000)
-  };
 }
 
 /**
