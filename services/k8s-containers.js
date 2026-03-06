@@ -131,11 +131,11 @@ function buildPodSpec(username, email, config) {
         resources: {
           requests: {
             memory: `${Math.round(memoryMb * 0.5)}Mi`,
-            cpu: `${Math.round(cpus * 500)}m`
+            cpu: `${Math.round(cpus * 250)}m`
           },
           limits: {
             memory: `${memoryMb}Mi`,
-            cpu: `${cpus}`
+            cpu: `${Math.max(0.5, cpus * 0.5)}`
           }
         },
         volumeMounts: [

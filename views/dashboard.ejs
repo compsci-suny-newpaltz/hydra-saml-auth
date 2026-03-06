@@ -688,7 +688,7 @@
           </div>
           <!-- Resource Info Display -->
           <div id="container-resources" class="hidden mb-4 p-3 bg-white rounded border">
-            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-3 text-xs sm:text-sm">
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 sm:gap-3 text-xs sm:text-sm">
               <div class="flex items-center gap-2">
                 <i class="fas fa-microchip text-blue-500"></i>
                 <span><strong id="res-cpu">-</strong> CPU</span>
@@ -708,6 +708,10 @@
               <div class="flex items-center gap-2">
                 <i class="fas fa-server text-gray-500"></i>
                 <span>Node: <strong id="res-node">-</strong></span>
+              </div>
+              <div id="res-duration-wrap" class="flex items-center gap-2 hidden">
+                <i class="fas fa-clock text-indigo-500"></i>
+                <span id="res-duration">-</span>
               </div>
             </div>
             <!-- Migration Banner -->
@@ -1144,7 +1148,7 @@
               </div>
             </div>
 
-            <div class="flex items-center justify-between border-t pt-3 mt-3">
+            <div id="jenkins-service-row" class="flex items-center justify-between border-t pt-3 mt-3 hidden">
               <div class="flex items-center gap-3">
                 <i class="fas fa-cogs text-orange-600"></i>
                 <div>
@@ -2016,6 +2020,28 @@
             document.getElementById('res-storage').textContent = data.resources.storage_gb ? data.resources.storage_gb + 'GB' : '-';
             document.getElementById('res-gpu').textContent = data.resources.gpu_count || '0';
             document.getElementById('res-node').textContent = data.resources.node || '-';
+
+            // Show duration / time remaining if set
+            const durationWrap = document.getElementById('res-duration-wrap');
+            const durationEl = document.getElementById('res-duration');
+            if (data.resources.resources_expire_at) {
+              const expiry = new Date(data.resources.resources_expire_at);
+              const now = new Date();
+              const msLeft = expiry - now;
+              const daysTotal = data.resources.duration_days || '?';
+              if (msLeft <= 0) {
+                durationEl.innerHTML = `<strong class="text-red-600">Expired</strong> (was ${daysTotal}d)`;
+              } else {
+                const dLeft = Math.floor(msLeft / 86400000);
+                const hLeft = Math.floor((msLeft % 86400000) / 3600000);
+                const timeStr = dLeft > 0 ? `${dLeft}d ${hLeft}h left` : `${hLeft}h left`;
+                durationEl.innerHTML = `<strong>${timeStr}</strong> of ${daysTotal}d`;
+              }
+              durationWrap.classList.remove('hidden');
+            } else {
+              durationWrap.classList.add('hidden');
+            }
+
             resourcesSection.classList.remove('hidden');
 
             // Show migration banner if approved for GPU node but not yet migrated
@@ -3003,14 +3029,18 @@
             document.getElementById('jupyter-service-status').className = jupyter.running ? 'text-sm text-green-600' : 'text-sm text-gray-500';
           }
 
-          // Update Jenkins status
+          // Update Jenkins status — only show row if container has jenkins
           const jenkins = data.services?.find(s => s.name === 'jenkins');
-          if (jenkins) {
+          const jenkinsRow = document.getElementById('jenkins-service-row');
+          if (jenkins && jenkinsRow) {
+            jenkinsRow.classList.remove('hidden');
             const jenkinsStatus = document.getElementById('jenkins-service-status');
             if (jenkinsStatus) {
               jenkinsStatus.textContent = jenkins.running ? '● Running' : '○ Stopped';
               jenkinsStatus.className = jenkins.running ? 'text-sm text-green-600' : 'text-sm text-gray-500';
             }
+          } else if (jenkinsRow) {
+            jenkinsRow.classList.add('hidden');
           }
         } catch (err) {
           console.error('Failed to load services:', err);

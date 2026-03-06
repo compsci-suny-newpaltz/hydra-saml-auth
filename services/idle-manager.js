@@ -65,10 +65,21 @@ async function getPodCpuUsage() {
 
 /**
  * Reduce a pod to sleep preset (minimal resources)
+ * If pod overflowed to a non-Hydra node (non-GPU preset), migrate it back to Hydra
  */
-async function reducePod(username, email, config) {
+async function reducePod(username, email, config, actualNode) {
   if (!k8sContainers) {
     return { success: false, reason: 'k8s-containers not available' };
+  }
+
+  // Check if this is an overflow pod that should return to Hydra
+  // Overflow = on Chimera/Cerberus but with a non-GPU preset (target was Hydra)
+  const isOverflow = actualNode && actualNode !== 'hydra' &&
+    !['gpu_inference', 'gpu_training'].includes(config.preset_tier || config.preset);
+  const targetNode = isOverflow ? 'hydra' : (config.target_node || config.current_node || 'hydra');
+
+  if (isOverflow) {
+    console.log(`[idle-manager] Migrating ${username} back to Hydra (was overflow on ${actualNode})`);
   }
 
   const sleepConfig = {
@@ -76,12 +87,16 @@ async function reducePod(username, email, config) {
     preset_tier: 'sleep',
     memory_gb: resourceConfig.presets.sleep.memory_gb,
     cpus: resourceConfig.presets.sleep.cpus,
-    gpu_count: 0
+    gpu_count: 0,
+    target_node: targetNode
   };
 
   try {
     const result = await k8sContainers.startContainer(username, email, sleepConfig);
-    return { success: result.success };
+    if (result.success && isOverflow) {
+      await updateContainerConfig(username, { current_node: 'hydra' });
+    }
+    return { success: result.success, migratedToHydra: isOverflow };
   } catch (err) {
     console.error(`[idle-manager] Failed to reduce pod for ${username}:`, err.message);
     return { success: false, reason: err.message };
@@ -180,11 +195,16 @@ async function checkIdlePods() {
         // Pod is idle
         if (sleepState === 'awake' && idleMs >= SHORT_IDLE_MS) {
           // Idle 1+ day, still on normal resources → reduce
-          console.log(`[idle-manager] Reducing ${username} (idle ${Math.round(idleMs / 3600000)}h, CPU: ${cpuMilli}m)`);
-          const result = await reducePod(username, email, config);
+          // Pass actual node name so overflow pods can migrate back to Hydra
+          console.log(`[idle-manager] Reducing ${username} (idle ${Math.round(idleMs / 3600000)}h, CPU: ${cpuMilli}m, node: ${nodeName})`);
+          const result = await reducePod(username, email, config, nodeName);
           if (result.success) {
             await updateContainerConfig(username, { sleep_state: 'reduced' });
-            actions.push({ username, action: 'reduced', idleHours: Math.round(idleMs / 3600000) });
+            if (result.migratedToHydra) {
+              actions.push({ username, action: 'reduced+migrated', from: nodeName, idleHours: Math.round(idleMs / 3600000) });
+            } else {
+              actions.push({ username, action: 'reduced', idleHours: Math.round(idleMs / 3600000) });
+            }
           } else {
             actions.push({ username, action: 'reduce_failed', reason: result.reason });
           }

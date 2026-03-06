@@ -22,6 +22,14 @@ try {
     console.warn('[resource-requests] Metrics collector not available');
 }
 
+// Import k8s client for live pod counts
+let k8sContainers;
+try {
+    k8sContainers = require('../services/k8s-containers');
+} catch (e) {
+    console.warn('[resource-requests] k8s-containers not available');
+}
+
 /**
  * Helper: Extract username from authenticated request
  */
@@ -58,15 +66,30 @@ async function getNodeMetrics() {
         }
     }
 
+    // Get live pod counts per node from K8s
+    let podCountsByNode = {};
+    try {
+        const runtimeConfig = require('../config/runtime');
+        if (runtimeConfig.isKubernetes() && k8sContainers) {
+            const allPods = await k8sContainers.listContainers();
+            for (const pod of allPods) {
+                const node = (pod.node || 'hydra').toLowerCase();
+                podCountsByNode[node] = (podCountsByNode[node] || 0) + 1;
+            }
+        }
+    } catch (e) {
+        console.warn('[resource-requests] Failed to get live pod counts:', e.message);
+    }
+
     for (const [nodeName, nodeConfig] of Object.entries(resourceConfig.nodes)) {
         const dbStatus = await getNodeStatus(nodeName);
 
         // Get real metrics if available
         const realMetrics = collectorMetrics?.[nodeName];
 
-        // Calculate available capacity
+        // Calculate available capacity — prefer live K8s count, then metrics, then DB
         const maxContainers = nodeConfig.maxContainers;
-        const currentContainers = realMetrics?.containers?.running || dbStatus?.current_containers || 0;
+        const currentContainers = podCountsByNode[nodeName] || realMetrics?.containers?.running || dbStatus?.current_containers || 0;
         const availableSlots = Math.max(0, maxContainers - currentContainers);
 
         // GPU availability for GPU nodes

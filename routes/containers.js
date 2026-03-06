@@ -1115,7 +1115,9 @@ router.get('/status', async (req, res) => {
                     gpu_count: containerConfig.gpu_count,
                     node: status.node || containerConfig.current_node,
                     preset: containerConfig.preset_tier,
-                    approved_target_node: approvedTargetNode
+                    approved_target_node: approvedTargetNode,
+                    duration_days: containerConfig.duration_days,
+                    resources_expire_at: containerConfig.resources_expire_at
                 },
                 migration: migrationStatus,
                 k8sMode: true
