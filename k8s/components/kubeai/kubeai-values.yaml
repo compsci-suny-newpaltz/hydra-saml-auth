@@ -1,0 +1,75 @@
+# KubeAI Helm values for Hydra cluster
+# Chimera: 3x RTX 3090 (Ampere), Cerberus: 2x RTX 5090 (Blackwell)
+
+# Disable built-in OpenWebUI — we manage our own deployment
+open-webui:
+  enabled: false
+
+# HuggingFace token for gated models (Llama, etc.)
+# Set this via --set secrets.huggingface.token=<token> at install time
+secrets:
+  huggingface:
+    create: true
+    token: ""
+
+# Per-GPU-unit profiles. In Model CRDs, use "profile-name:count"
+# e.g. resourceProfile: nvidia-rtx-3090:3 = 3x RTX 3090 GPUs on chimera
+resourceProfiles:
+  nvidia-rtx-3090:
+    imageName: "nvidia-gpu"
+    runtimeClassName: "nvidia"
+    requests:
+      nvidia.com/gpu: "1"
+      cpu: "4"
+      memory: "16Gi"
+    limits:
+      nvidia.com/gpu: "1"
+    nodeSelector:
+      kubernetes.io/hostname: chimera
+    tolerations:
+      - key: "nvidia.com/gpu"
+        operator: "Exists"
+        effect: "NoSchedule"
+
+  nvidia-rtx-5090:
+    imageName: "nvidia-gpu"
+    runtimeClassName: "nvidia"
+    requests:
+      nvidia.com/gpu: "1"
+      cpu: "4"
+      memory: "16Gi"
+    limits:
+      nvidia.com/gpu: "1"
+    nodeSelector:
+      kubernetes.io/hostname: cerberus
+    tolerations:
+      - key: "nvidia.com/gpu"
+        operator: "Exists"
+        effect: "NoSchedule"
+
+# Model server pod customizations — hostPath NVMe cache for models
+# Note: /dev/shm is already mounted by KubeAI's default pod template
+modelServerPods:
+  # Lower priority than student-pods (100000) so students preempt models
+  priorityClassName: model-serving
+  securityContext:
+    readOnlyRootFilesystem: false
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+  jsonPatches:
+    # Add hostPath volume for NVMe model cache
+    - op: add
+      path: /spec/volumes/-
+      value:
+        name: model-cache
+        hostPath:
+          path: /models/huggingface
+          type: DirectoryOrCreate
+    # Mount model cache into vLLM container
+    - op: add
+      path: /spec/containers/0/volumeMounts/-
+      value:
+        name: model-cache
+        mountPath: /root/.cache/huggingface

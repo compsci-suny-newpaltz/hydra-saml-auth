@@ -57,6 +57,8 @@ function buildPodSpec(username, email, config) {
     spec: {
       // Use NVIDIA runtime for GPU pods - required for GPU device access
       ...(gpuCount > 0 && { runtimeClassName: 'nvidia' }),
+      // Student pods preempt model-serving pods when GPU resources are needed
+      priorityClassName: 'student-pods',
       serviceAccountName: 'student-workload',
       automountServiceAccountToken: false,
       // Security context - hardened for student containers

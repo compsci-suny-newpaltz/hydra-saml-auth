@@ -1,0 +1,19 @@
+# Priority classes ensure student pods always preempt model-serving pods
+# when GPU resources are contested
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: student-pods
+value: 100000
+preemptionPolicy: PreemptLowerPriority
+globalDefault: false
+description: "Student containers - preempt model serving pods when GPUs needed"
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: model-serving
+value: 10000
+preemptionPolicy: PreemptLowerPriority
+globalDefault: false
+description: "AI model serving - can be preempted by student pods"
