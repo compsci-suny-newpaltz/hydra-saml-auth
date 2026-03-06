@@ -3017,16 +3017,24 @@
           const vscode = services.find(s => s.name === 'code-server');
           const jupyter = services.find(s => s.name === 'jupyter');
 
+          function formatServiceStatus(svc) {
+            if (svc.state === 'STARTING') return { text: '◌ Starting...', cls: 'text-sm text-yellow-600' };
+            if (svc.running) return { text: '● Running', cls: 'text-sm text-green-600' };
+            return { text: '○ Stopped', cls: 'text-sm text-gray-500' };
+          }
+
           // Update VS Code status
           if (vscode) {
-            document.getElementById('vscode-service-status').textContent = vscode.running ? '● Running' : '○ Stopped';
-            document.getElementById('vscode-service-status').className = vscode.running ? 'text-sm text-green-600' : 'text-sm text-gray-500';
+            const s = formatServiceStatus(vscode);
+            document.getElementById('vscode-service-status').textContent = s.text;
+            document.getElementById('vscode-service-status').className = s.cls;
           }
 
           // Update Jupyter status
           if (jupyter) {
-            document.getElementById('jupyter-service-status').textContent = jupyter.running ? '● Running' : '○ Stopped';
-            document.getElementById('jupyter-service-status').className = jupyter.running ? 'text-sm text-green-600' : 'text-sm text-gray-500';
+            const s = formatServiceStatus(jupyter);
+            document.getElementById('jupyter-service-status').textContent = s.text;
+            document.getElementById('jupyter-service-status').className = s.cls;
           }
 
           // Update Jenkins status — only show row if container has jenkins
@@ -3036,8 +3044,9 @@
             jenkinsRow.classList.remove('hidden');
             const jenkinsStatus = document.getElementById('jenkins-service-status');
             if (jenkinsStatus) {
-              jenkinsStatus.textContent = jenkins.running ? '● Running' : '○ Stopped';
-              jenkinsStatus.className = jenkins.running ? 'text-sm text-green-600' : 'text-sm text-gray-500';
+              const s = formatServiceStatus(jenkins);
+              jenkinsStatus.textContent = s.text;
+              jenkinsStatus.className = s.cls;
             }
           } else if (jenkinsRow) {
             jenkinsRow.classList.add('hidden');

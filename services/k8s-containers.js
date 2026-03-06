@@ -1118,6 +1118,24 @@ async function getServiceStatus(username) {
     });
   };
 
+  // Quick HTTP probe to check if a service port is actually responding
+  const probePort = (port) => {
+    return new Promise((resolve) => {
+      const req = http.request({
+        hostname: podIP,
+        port,
+        path: '/',
+        method: 'HEAD',
+        timeout: 1500
+      }, () => resolve(true));
+      req.on('error', () => resolve(false));
+      req.on('timeout', () => { req.destroy(); resolve(false); });
+      req.end();
+    });
+  };
+
+  const servicePorts = { 'code-server': 8443, 'jupyter': 8888, 'jenkins': 8080 };
+
   try {
     const xmlResponse = await supervisorRequest('supervisor.getAllProcessInfo');
 
@@ -1138,11 +1156,24 @@ async function getServiceStatus(username) {
       if (nameMatch && stateMatch && knownServices.includes(nameMatch[1])) {
         services.push({
           name: nameMatch[1],
+          supervisorState: stateMatch[1],
           running: stateMatch[1] === 'RUNNING',
           state: stateMatch[1]
         });
       }
     }
+
+    // For services supervisor says are RUNNING, verify HTTP is actually responding
+    const probePromises = services.map(async (svc) => {
+      if (svc.running && servicePorts[svc.name]) {
+        const ready = await probePort(servicePorts[svc.name]);
+        if (!ready) {
+          svc.running = false;
+          svc.state = 'STARTING';
+        }
+      }
+    });
+    await Promise.all(probePromises);
 
     return {
       services,
