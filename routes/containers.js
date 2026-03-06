@@ -1473,19 +1473,6 @@ router.post('/services/:service/start', async (req, res) => {
 
         const username = String(req.user.email).split('@')[0];
 
-        // Check Jupyter execution approval before starting
-        if (serviceName === 'jupyter') {
-            const { getOrCreateUserQuota } = require('../services/db-init');
-            const quota = await getOrCreateUserQuota(username, req.user.email);
-            if (!quota.jupyter_execution_approved) {
-                return res.status(403).json({
-                    success: false,
-                    message: 'Jupyter execution requires approval. Please request access from the dashboard Manage Resources menu.',
-                    requires_approval: true
-                });
-            }
-        }
-
         // ========== KUBERNETES MODE ==========
         if (runtimeConfig.isKubernetes()) {
             try {
