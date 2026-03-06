@@ -2219,8 +2219,10 @@
 
       // Migration polling state
       let migrationPollInterval = null;
+      let migrationStartTime = null;
+      let migrationElapsedInterval = null;
 
-      // Show migration in progress UI — uses server-reported progress only
+      // Show migration in progress UI — renders once, then updates elements in place
       function showMigrationProgress(targetNode, startTime = null) {
         const msg = document.getElementById('container-message');
         const migrateBtn = document.getElementById('migrate-btn');
@@ -2234,31 +2236,37 @@
           migrationBanner.classList.remove('hidden');
         }
 
-        // Show initial waiting state — real progress comes from server polling
-        msg.innerHTML = `
-          <div class="text-blue-600 bg-blue-50 border border-blue-200 rounded p-4">
-            <div class="flex items-center mb-3">
-              <i class="fas fa-sync fa-spin mr-2"></i>
-              <span>Migrating container to <strong>${targetNode || 'GPU node'}</strong>...</span>
-            </div>
-            <div class="mb-2">
-              <div class="flex justify-between text-sm mb-1">
-                <span id="migration-status-text">Initiating migration...</span>
-                <span id="migration-elapsed"></span>
-              </div>
-              <div class="w-full bg-blue-200 rounded-full h-2.5">
-                <div id="migration-progress-bar" class="bg-blue-600 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
-              </div>
-            </div>
-            <p class="text-xs text-blue-500 mt-2">
-              <i class="fas fa-info-circle mr-1"></i>
-              Your files will be preserved. Please do not close this page.
-            </p>
-          </div>
-        `;
+        migrationStartTime = startTime || Date.now();
 
-        // Start polling for real progress from server
-        startMigrationPolling(startTime || Date.now());
+        // Only render the migration UI if it's not already showing
+        if (!document.getElementById('migration-progress-container')) {
+          msg.innerHTML = `
+            <div id="migration-progress-container" class="text-blue-600 bg-blue-50 border border-blue-200 rounded p-4">
+              <div class="flex items-center mb-3">
+                <span id="migration-icon" class="text-xl mr-2"><i class="fas fa-sync fa-spin"></i></span>
+                <span>Migrating container to <strong>${targetNode || 'GPU node'}</strong>...</span>
+              </div>
+              <div class="mb-2">
+                <div class="flex justify-between text-sm mb-1">
+                  <span id="migration-status-text">Initiating migration...</span>
+                  <span id="migration-elapsed">0:00 elapsed</span>
+                </div>
+                <div class="w-full bg-blue-200 rounded-full h-2.5">
+                  <div id="migration-progress-bar" class="bg-blue-600 h-2.5 rounded-full transition-all duration-500" style="width: 5%"></div>
+                </div>
+              </div>
+              <p class="text-xs text-blue-500 mt-2">
+                <i class="fas fa-info-circle mr-1"></i>
+                Your files will be preserved. Please do not close this page.
+              </p>
+            </div>
+          `;
+        }
+
+        // Start elapsed time counter (updates every second, no flashing)
+        startElapsedTimer();
+        // Start polling server for real progress (updates elements in place)
+        startMigrationPolling();
       }
 
       // Format seconds into mm:ss format
@@ -2268,29 +2276,49 @@
         return `${mins}:${secs.toString().padStart(2, '0')}`;
       }
 
-      // Poll container status for real migration progress from backend
-      function startMigrationPolling(startTime) {
-        if (migrationPollInterval) {
-          clearInterval(migrationPollInterval);
-        }
+      // Update elapsed time display every second (lightweight, no innerHTML replace)
+      function startElapsedTimer() {
+        if (migrationElapsedInterval) clearInterval(migrationElapsedInterval);
+        migrationElapsedInterval = setInterval(() => {
+          const el = document.getElementById('migration-elapsed');
+          if (el && migrationStartTime) {
+            const elapsed = Math.floor((Date.now() - migrationStartTime) / 1000);
+            el.textContent = formatMigrationTime(elapsed) + ' elapsed';
+          }
+        }, 1000);
+      }
+
+      // Poll server for real migration progress — updates elements in place, never replaces innerHTML
+      function startMigrationPolling() {
+        if (migrationPollInterval) clearInterval(migrationPollInterval);
 
         migrationPollInterval = setInterval(async () => {
-          // Update elapsed time display
-          const elapsedEl = document.getElementById('migration-elapsed');
-          if (elapsedEl) {
-            const elapsed = Math.floor((Date.now() - startTime) / 1000);
-            elapsedEl.textContent = formatMigrationTime(elapsed) + ' elapsed';
-          }
-
-          // Poll for real status
           try {
             const res = await fetch('/dashboard/api/containers/status');
             if (!res.ok) return;
             const data = await res.json();
 
             if (data.migration && data.migration.inProgress) {
-              // Server is reporting real progress — use it
-              showRealMigrationProgress(data.migration);
+              // Update progress bar and status text in place
+              const statusText = document.getElementById('migration-status-text');
+              const progressBar = document.getElementById('migration-progress-bar');
+              const icon = document.getElementById('migration-icon');
+              if (statusText) statusText.textContent = data.migration.stepLabel;
+              if (progressBar) progressBar.style.width = data.migration.progressPercent + '%';
+              if (icon) icon.textContent = data.migration.stepIcon;
+            } else if (data.exists && data.running) {
+              // Migration finished — container is running
+              stopMigrationPolling();
+              clearMigrationProgress();
+              const msg = document.getElementById('container-message');
+              if (msg) {
+                msg.innerHTML = `
+                  <p class="text-green-700 bg-green-100 border border-green-200 rounded p-2">
+                    <i class="fas fa-check-circle mr-2"></i>
+                    Container migration complete!
+                  </p>`;
+                setTimeout(() => { msg.innerHTML = ''; location.reload(); }, 3000);
+              }
             }
           } catch (err) {
             // Polling error — keep showing current state
@@ -2298,11 +2326,19 @@
         }, 2000);
       }
 
-      // Stop migration polling
+      // Stop all migration polling and timers
       function stopMigrationPolling() {
         if (migrationPollInterval) {
           clearInterval(migrationPollInterval);
           migrationPollInterval = null;
+        }
+        if (migrationElapsedInterval) {
+          clearInterval(migrationElapsedInterval);
+          migrationElapsedInterval = null;
+        }
+        if (window.migrationPollInterval) {
+          clearInterval(window.migrationPollInterval);
+          window.migrationPollInterval = null;
         }
       }
 
@@ -2349,69 +2385,20 @@
         return true;
       }
 
-      // Show real-time migration progress from server
+      // Show real-time migration progress from server — updates elements in place
       function showRealMigrationProgress(migration) {
-        const msg = document.getElementById('container-message');
-        const migrationBanner = document.getElementById('migration-banner');
-
-        // Hide the migrate banner if showing
-        if (migrationBanner) {
-          migrationBanner.classList.add('hidden');
+        // If migration UI isn't rendered yet, render it first
+        if (!document.getElementById('migration-progress-container')) {
+          showMigrationProgress(migration.toNode || 'GPU node');
         }
 
-        // Stop any timer-based progress
-        stopMigrationPolling();
-
-        msg.innerHTML = `
-          <div class="text-blue-600 bg-blue-50 border border-blue-200 rounded p-4">
-            <div class="flex items-center mb-3">
-              <span class="text-xl mr-2">${migration.stepIcon}</span>
-              <span>Migrating container to <strong>${migration.toNode || 'GPU node'}</strong></span>
-            </div>
-            <div class="mb-2">
-              <div class="flex justify-between text-sm mb-1">
-                <span id="migration-status-text">${migration.stepLabel}</span>
-                <span id="migration-progress-percent">${migration.progressPercent}%</span>
-              </div>
-              <div class="w-full bg-blue-200 rounded-full h-2.5">
-                <div id="migration-progress-bar" class="bg-blue-600 h-2.5 rounded-full transition-all duration-500" style="width: ${migration.progressPercent}%"></div>
-              </div>
-            </div>
-            <p class="text-xs text-blue-500 mt-2">
-              <i class="fas fa-info-circle mr-1"></i>
-              Your files will be preserved. Page will refresh when complete.
-            </p>
-          </div>
-        `;
-
-        // Set up polling for migration status
-        if (!window.migrationPollInterval) {
-          window.migrationPollInterval = setInterval(async () => {
-            try {
-              const res = await fetch('/dashboard/api/containers/status');
-              if (res.ok) {
-                const data = await res.json();
-                if (data.migration && data.migration.inProgress) {
-                  // Update progress bar and status
-                  const statusText = document.getElementById('migration-status-text');
-                  const progressPercent = document.getElementById('migration-progress-percent');
-                  const progressBar = document.getElementById('migration-progress-bar');
-                  if (statusText) statusText.textContent = data.migration.stepLabel;
-                  if (progressPercent) progressPercent.textContent = data.migration.progressPercent + '%';
-                  if (progressBar) progressBar.style.width = data.migration.progressPercent + '%';
-                } else {
-                  // Migration complete - refresh the page
-                  clearInterval(window.migrationPollInterval);
-                  window.migrationPollInterval = null;
-                  clearMigrationProgress();
-                  location.reload();
-                }
-              }
-            } catch (err) {
-              console.error('Migration poll error:', err);
-            }
-          }, 2000); // Poll every 2 seconds
-        }
+        // Update elements in place — no innerHTML replacement, no flashing
+        const statusText = document.getElementById('migration-status-text');
+        const progressBar = document.getElementById('migration-progress-bar');
+        const icon = document.getElementById('migration-icon');
+        if (statusText) statusText.textContent = migration.stepLabel;
+        if (progressBar) progressBar.style.width = migration.progressPercent + '%';
+        if (icon) icon.textContent = migration.stepIcon;
       }
 
       window.migrateContainer = async function() {
