@@ -24,15 +24,17 @@ spec:
           ports:
             - name: http
               containerPort: 8080
-            - name: https
-              containerPort: 8443
           env:
             - name: SIMPLESAMLPHP_SP_ENTITY_ID
               value: "hydra.local"
             - name: SIMPLESAMLPHP_SP_ASSERTION_CONSUMER_SERVICE
-              value: "http://hydra.local:6969/login/callback"
+              value: "http://localhost:6969/login/callback"
             - name: SIMPLESAMLPHP_BASEURLPATH
-              value: "http://localhost:8080/simplesaml/"
+              value: "http://mock-saml-idp:8080/simplesaml/"
+          volumeMounts:
+            - name: saml-users
+              mountPath: /var/www/simplesamlphp/config/authsources.php
+              subPath: authsources.php
           resources:
             requests:
               memory: "128Mi"
@@ -40,6 +42,43 @@ spec:
             limits:
               memory: "256Mi"
               cpu: "200m"
+      volumes:
+        - name: saml-users
+          configMap:
+            name: mock-saml-users
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mock-saml-users
+  namespace: hydra-system
+data:
+  authsources.php: |
+    <?php
+    $config = [
+        'admin' => [
+            'core:AdminPassword',
+        ],
+        'example-userpass' => [
+            'exampleauth:UserPass',
+            'admin:password' => [
+                'uid' => ['admin'],
+                'email' => ['admin@example.com'],
+                'givenName' => ['Admin'],
+                'sn' => ['User'],
+                'displayName' => ['Admin User'],
+                'groups' => ['faculty', 'staff'],
+            ],
+            'student:password' => [
+                'uid' => ['student'],
+                'email' => ['student@example.com'],
+                'givenName' => ['Test'],
+                'sn' => ['Student'],
+                'displayName' => ['Test Student'],
+                'groups' => ['students'],
+            ],
+        ],
+    ];
 ---
 apiVersion: v1
 kind: Service
@@ -54,8 +93,5 @@ spec:
     - name: http
       port: 8080
       targetPort: 8080
-    - name: https
-      port: 8443
-      targetPort: 8443
   selector:
     app.kubernetes.io/name: mock-saml-idp

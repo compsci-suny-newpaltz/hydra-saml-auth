@@ -1,0 +1,17 @@
+# Dev-only: expose hydra-auth directly as NodePort for easy local access
+# In production, Traefik handles routing; in dev, we expose both
+apiVersion: v1
+kind: Service
+metadata:
+  name: hydra-auth-direct
+  namespace: hydra-system
+spec:
+  type: NodePort
+  ports:
+    - name: http
+      port: 6969
+      targetPort: 6969
+      nodePort: 30969
+  selector:
+    app.kubernetes.io/name: hydra
+    app.kubernetes.io/component: auth

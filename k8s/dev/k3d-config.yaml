@@ -1,5 +1,5 @@
 # k3d cluster configuration for Hydra development
-# Mirrors production RKE2 v1.28.4+rke2r1 cluster topology
+# Mirrors production 3-node RKE2 cluster topology
 # Usage: k3d cluster create --config k3d-config.yaml
 apiVersion: k3d.io/v1alpha5
 kind: Simple
@@ -10,24 +10,20 @@ agents: 2
 # Match production RKE2 version (k3s is the upstream of RKE2)
 image: rancher/k3s:v1.28.4-k3s1
 ports:
-  # HTTP traffic (offset by 8000 to avoid Docker Compose dev env)
+  # Hydra auth (NodePort 30969)
+  - port: 6969:30969
+    nodeFilters:
+      - loadbalancer
+  # HTTP traffic (Traefik)
   - port: 8090:80
-    nodeFilters:
-      - loadbalancer
-  # HTTPS traffic
-  - port: 8443:443
-    nodeFilters:
-      - loadbalancer
-  # Hydra auth service (k8s version)
-  - port: 6970:6969
     nodeFilters:
       - loadbalancer
   # Traefik dashboard
   - port: 8091:8080
     nodeFilters:
       - loadbalancer
-  # Kubernetes API (for external access)
-  - port: 6444:6443
+  # Mock SAML IdP (NodePort 30080)
+  - port: 8080:30080
     nodeFilters:
       - loadbalancer
 registries:
@@ -35,9 +31,7 @@ registries:
     name: hydra-registry.localhost
     host: "0.0.0.0"
     hostPort: "5050"
-# Persistent volumes for production-like storage testing
 volumes:
-  # Simulated student volumes (maps to host directory)
   - volume: hydra-student-data:/var/lib/rancher/k3s/storage
     nodeFilters:
       - server:*
@@ -50,41 +44,44 @@ options:
     extraArgs:
       # Match production cluster CIDRs
       - arg: --cluster-cidr=10.42.0.0/16
-        nodeFilters:
-          - server:*
+        nodeFilters: [server:*]
       - arg: --service-cidr=10.43.0.0/16
-        nodeFilters:
-          - server:*
-      # Disable built-in traefik (we deploy our own)
+        nodeFilters: [server:*]
+      # Disable built-in traefik and servicelb (we deploy our own)
       - arg: --disable=traefik
-        nodeFilters:
-          - server:*
-      # Disable servicelb (use our ingress)
+        nodeFilters: [server:*]
       - arg: --disable=servicelb
-        nodeFilters:
-          - server:*
-      # Enable local-path-provisioner for PVs (simulates ZFS)
-      - arg: --kubelet-arg=eviction-hard=nodefs.available<1%
-        nodeFilters:
-          - server:*
-          - agent:*
-      # Node labels for server (control-plane like hydra)
+        nodeFilters: [server:*]
+
+      # --- Node labels (mirrors production RKE2 cluster) ---
+
+      # Server = Hydra (control-plane)
       - arg: --node-label=hydra.node-role=control-plane
-        nodeFilters:
-          - server:*
-      # Node labels for agents (GPU nodes simulation)
+        nodeFilters: [server:*]
+      - arg: --node-label=hydra.student-schedulable=true
+        nodeFilters: [server:*]
+      - arg: --node-label=kubernetes.io/hostname=hydra
+        nodeFilters: [server:*]
+
+      # Agent 0 = Chimera (GPU inference, 3x RTX 3090)
       - arg: --node-label=hydra.node-role=inference
-        nodeFilters:
-          - agent:0
+        nodeFilters: [agent:0]
       - arg: --node-label=hydra.gpu-enabled=true
-        nodeFilters:
-          - agent:0
+        nodeFilters: [agent:0]
+      - arg: --node-label=hydra.student-schedulable=true
+        nodeFilters: [agent:0]
+      - arg: --node-label=kubernetes.io/hostname=chimera
+        nodeFilters: [agent:0]
+
+      # Agent 1 = Cerberus (GPU training, 2x RTX 5090)
       - arg: --node-label=hydra.node-role=training
-        nodeFilters:
-          - agent:1
+        nodeFilters: [agent:1]
       - arg: --node-label=hydra.gpu-enabled=true
-        nodeFilters:
-          - agent:1
+        nodeFilters: [agent:1]
+      - arg: --node-label=hydra.student-schedulable=true
+        nodeFilters: [agent:1]
+      - arg: --node-label=kubernetes.io/hostname=cerberus
+        nodeFilters: [agent:1]
   kubeconfig:
     updateDefaultKubeconfig: true
     switchCurrentContext: true

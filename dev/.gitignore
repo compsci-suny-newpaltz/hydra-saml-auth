@@ -1,46 +1,36 @@
-# Development Environment .gitignore
-
-# JWT Keys (generated locally)
+# Generated JWT keys
 jwt-keys/
 *.pem
 
-# Environment files with secrets
+# Local env overrides
 .env
 .env.local
 
-# Docker volumes
-volumes/
-
-# IDE files
+# IDE
 .vscode/
 .idea/
 *.swp
-*.swo
 
-# OS files
+# OS
 .DS_Store
-Thumbs.db
 
-# Logs
+# Logs & temp
 *.log
-logs/
-
-# Temporary files
 tmp/
-temp/
 
-# Mock user documentation (generated)
-mock-users.md
-
-# Local SQLite databases
+# Local databases
 *.db
-*.sqlite
-*.sqlite3
 
 # Node modules (if accidentally installed here)
 node_modules/
 
-# Traefik dynamic configs (auto-generated)
+# Traefik dynamic configs (auto-generated at runtime)
 traefik-dynamic/*.yaml
 traefik-dynamic/*.yml
 !traefik-dynamic/.gitkeep
+
+# LaTeX build artifacts
+docs/*.aux
+docs/*.out
+docs/*.toc
+docs/*.log

@@ -1,0 +1,16 @@
+# Dev PVC — uses k3d's local-path instead of production's hydra-local (ZFS)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hydra-auth-data
+  namespace: hydra-system
+  labels:
+    app.kubernetes.io/name: hydra
+    app.kubernetes.io/component: auth
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi
