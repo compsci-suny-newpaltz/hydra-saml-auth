@@ -70,18 +70,25 @@ function buildPodSpec(username, email, config) {
           type: 'RuntimeDefault'
         }
       },
-      // Node selection — prefer target node but allow spillover to other nodes
-      // Hard requirement: node must be labeled hydra.student-schedulable=true
-      // Soft preference: schedule on the requested target node when possible
+      // Node selection — GPU nodes use hard requirement, Hydra uses soft preference
+      // This ensures approved GPU migrations land on the correct node
       nodeSelector: { 'hydra.student-schedulable': 'true' },
       affinity: {
-        nodeAffinity: {
+        nodeAffinity: targetNode !== 'hydra' ? {
+          // GPU nodes: HARD requirement — pod MUST land on the approved node
+          requiredDuringSchedulingIgnoredDuringExecution: {
+            nodeSelectorTerms: [{
+              matchExpressions: Object.entries(
+                nodeConfig?.k8s?.nodeSelector || {}
+              ).map(([key, value]) => ({ key, operator: 'In', values: [value] }))
+            }]
+          }
+        } : {
+          // Hydra: soft preference — allow scheduling on any schedulable node
           preferredDuringSchedulingIgnoredDuringExecution: [{
             weight: 80,
             preference: {
-              matchExpressions: Object.entries(
-                nodeConfig?.k8s?.nodeSelector || { 'hydra.node-role': 'control-plane' }
-              ).map(([key, value]) => ({ key, operator: 'In', values: [value] }))
+              matchExpressions: [{ key: 'hydra.node-role', operator: 'In', values: ['control-plane'] }]
             }
           }]
         }

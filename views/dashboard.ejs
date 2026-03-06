@@ -2217,11 +2217,10 @@
         return null;
       }
 
-      // Migration timer state
-      let migrationTimerInterval = null;
-      const MIGRATION_ESTIMATED_SECONDS = 120; // 2 minutes estimated migration time
+      // Migration polling state
+      let migrationPollInterval = null;
 
-      // Show migration in progress UI with countdown timer and progress bar
+      // Show migration in progress UI — uses server-reported progress only
       function showMigrationProgress(targetNode, startTime = null) {
         const msg = document.getElementById('container-message');
         const migrateBtn = document.getElementById('migrate-btn');
@@ -2235,10 +2234,7 @@
           migrationBanner.classList.remove('hidden');
         }
 
-        // Calculate elapsed time if startTime provided
-        const elapsed = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0;
-        const remaining = Math.max(0, MIGRATION_ESTIMATED_SECONDS - elapsed);
-
+        // Show initial waiting state — real progress comes from server polling
         msg.innerHTML = `
           <div class="text-blue-600 bg-blue-50 border border-blue-200 rounded p-4">
             <div class="flex items-center mb-3">
@@ -2247,11 +2243,11 @@
             </div>
             <div class="mb-2">
               <div class="flex justify-between text-sm mb-1">
-                <span id="migration-status-text">Preparing migration...</span>
-                <span id="migration-timer">${formatMigrationTime(remaining)} remaining</span>
+                <span id="migration-status-text">Initiating migration...</span>
+                <span id="migration-elapsed"></span>
               </div>
               <div class="w-full bg-blue-200 rounded-full h-2.5">
-                <div id="migration-progress-bar" class="bg-blue-600 h-2.5 rounded-full transition-all duration-1000" style="width: ${Math.min(100, (elapsed / MIGRATION_ESTIMATED_SECONDS) * 100)}%"></div>
+                <div id="migration-progress-bar" class="bg-blue-600 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
               </div>
             </div>
             <p class="text-xs text-blue-500 mt-2">
@@ -2261,8 +2257,8 @@
           </div>
         `;
 
-        // Start or continue the timer
-        startMigrationTimer(startTime || Date.now());
+        // Start polling for real progress from server
+        startMigrationPolling(startTime || Date.now());
       }
 
       // Format seconds into mm:ss format
@@ -2272,65 +2268,48 @@
         return `${mins}:${secs.toString().padStart(2, '0')}`;
       }
 
-      // Start the migration countdown timer
-      function startMigrationTimer(startTime) {
-        // Clear any existing timer
-        if (migrationTimerInterval) {
-          clearInterval(migrationTimerInterval);
+      // Poll container status for real migration progress from backend
+      function startMigrationPolling(startTime) {
+        if (migrationPollInterval) {
+          clearInterval(migrationPollInterval);
         }
 
-        migrationTimerInterval = setInterval(() => {
-          const elapsed = Math.floor((Date.now() - startTime) / 1000);
-          const remaining = Math.max(0, MIGRATION_ESTIMATED_SECONDS - elapsed);
-          const progress = Math.min(100, (elapsed / MIGRATION_ESTIMATED_SECONDS) * 100);
+        migrationPollInterval = setInterval(async () => {
+          // Update elapsed time display
+          const elapsedEl = document.getElementById('migration-elapsed');
+          if (elapsedEl) {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            elapsedEl.textContent = formatMigrationTime(elapsed) + ' elapsed';
+          }
 
-          const timerEl = document.getElementById('migration-timer');
-          const progressBar = document.getElementById('migration-progress-bar');
-          const statusText = document.getElementById('migration-status-text');
+          // Poll for real status
+          try {
+            const res = await fetch('/dashboard/api/containers/status');
+            if (!res.ok) return;
+            const data = await res.json();
 
-          if (timerEl) {
-            if (remaining > 0) {
-              timerEl.textContent = `${formatMigrationTime(remaining)} remaining`;
-            } else {
-              timerEl.textContent = 'Finishing up...';
+            if (data.migration && data.migration.inProgress) {
+              // Server is reporting real progress — use it
+              showRealMigrationProgress(data.migration);
             }
+          } catch (err) {
+            // Polling error — keep showing current state
           }
-
-          if (progressBar) {
-            progressBar.style.width = `${progress}%`;
-          }
-
-          // Update status text based on progress
-          if (statusText) {
-            if (elapsed < 10) {
-              statusText.textContent = 'Preparing migration...';
-            } else if (elapsed < 30) {
-              statusText.textContent = 'Stopping current container...';
-            } else if (elapsed < 60) {
-              statusText.textContent = 'Transferring configuration...';
-            } else if (elapsed < 90) {
-              statusText.textContent = 'Creating container on new node...';
-            } else if (elapsed < 110) {
-              statusText.textContent = 'Starting container with GPU access...';
-            } else {
-              statusText.textContent = 'Finalizing migration...';
-            }
-          }
-        }, 1000);
+        }, 2000);
       }
 
-      // Stop the migration timer
-      function stopMigrationTimer() {
-        if (migrationTimerInterval) {
-          clearInterval(migrationTimerInterval);
-          migrationTimerInterval = null;
+      // Stop migration polling
+      function stopMigrationPolling() {
+        if (migrationPollInterval) {
+          clearInterval(migrationPollInterval);
+          migrationPollInterval = null;
         }
       }
 
       // Clear migration progress state and stop the timer
       function clearMigrationProgress() {
         localStorage.removeItem('hydra_migration_in_progress');
-        stopMigrationTimer();
+        stopMigrationPolling();
       }
 
       // Check for migration completion based on container status
@@ -2381,7 +2360,7 @@
         }
 
         // Stop any timer-based progress
-        stopMigrationTimer();
+        stopMigrationPolling();
 
         msg.innerHTML = `
           <div class="text-blue-600 bg-blue-50 border border-blue-200 rounded p-4">
