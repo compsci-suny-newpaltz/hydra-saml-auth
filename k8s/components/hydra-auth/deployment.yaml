@@ -93,5 +93,6 @@ spec:
           secret:
             secretName: hydra-jwt-keys
         - name: data
-          persistentVolumeClaim:
-            claimName: hydra-auth-data
+          hostPath:
+            path: /home/infra/hydra-saml-auth/data
+            type: DirectoryOrCreate

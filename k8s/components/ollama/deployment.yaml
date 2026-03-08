@@ -39,7 +39,7 @@ spec:
             - name: OLLAMA_FLASH_ATTENTION
               value: "1"
             - name: OLLAMA_MAX_LOADED_MODELS
-              value: "6"
+              value: "1"
             - name: OLLAMA_GPU_OVERHEAD
               value: "0"
             - name: OLLAMA_NUM_PARALLEL
@@ -57,7 +57,7 @@ spec:
               cpu: "4000m"
               nvidia.com/gpu: "1"
             limits:
-              memory: "32Gi"
+              memory: "64Gi"
               cpu: "8000m"
               nvidia.com/gpu: "1"
           livenessProbe:

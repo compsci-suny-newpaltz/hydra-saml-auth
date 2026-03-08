@@ -968,7 +968,7 @@ const ensureAuthenticated = (req, res, next) => {
       console.log('[Init] Security monitor started');
 
       // SSE endpoint for container events (admin only)
-      app.get('/api/events/containers', ensureAuthenticated, (req, res) => {
+      app.get('/dashboard/api/events/containers', ensureAuthenticated, (req, res) => {
         // Only admins can subscribe to container events (faculty OR whitelist)
         const isFaculty = (req.user.affiliation || '').toLowerCase() === 'faculty';
         const isWhitelisted = ADMIN_USERS.includes((req.user.email || '').toLowerCase());
@@ -1015,7 +1015,7 @@ const ensureAuthenticated = (req, res, next) => {
     } catch (e) {
       console.warn('[Init] security-monitor service not started:', e?.message || e);
       // Fallback SSE endpoint when security-monitor not available (K8s mode)
-      app.get('/api/events/containers', ensureAuthenticated, (req, res) => {
+      app.get('/dashboard/api/events/containers', ensureAuthenticated, (req, res) => {
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');
         res.setHeader('Connection', 'keep-alive');
