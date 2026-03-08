@@ -193,6 +193,8 @@ RUN mkdir -p /etc/skel/.local/share/code-server/User && \
     cp -r /home/student/.local/share/code-server/extensions /etc/skel/.local/share/code-server/ && \
     # Backup nvm to skel so it persists on mounted volumes
     cp -r /home/student/.nvm /etc/skel/.nvm && \
+    # Copy supervisor.d with README to skel so students get it on fresh volumes
+    cp -r /home/student/supervisor.d /etc/skel/supervisor.d && \
     rm -rf /tmp/*
 
 # Install CUH63 tools (lcc compiler, assembler, examples)

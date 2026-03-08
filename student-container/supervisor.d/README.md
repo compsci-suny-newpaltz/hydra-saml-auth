@@ -91,6 +91,66 @@ stdout_logfile=/var/log/supervisor/worker.log
 stderr_logfile=/var/log/supervisor/worker_err.log
 ```
 
+## Using Docker & Docker Compose
+
+Your container includes a full Docker environment. You can build images, run containers, and use Docker Compose just like on your own machine.
+
+### Quick Start
+
+```bash
+# Verify Docker is working
+docker ps
+
+# Run a container
+docker run --rm hello-world
+
+# Build and run a project with Docker Compose
+cd ~/myproject
+docker compose up -d
+```
+
+### Example: Running a Docker Compose Project
+
+If your project has a `docker-compose.yml`:
+
+```bash
+cd ~/myproject
+docker compose up -d
+```
+
+To expose it on the web, create `~/supervisor.d/myproject.conf`:
+
+```ini
+# hydra.port=3000
+# hydra.endpoint=myproject
+
+[program:myproject]
+command=docker compose up --abort-on-container-exit
+directory=/home/student/myproject
+user=student
+autostart=true
+autorestart=true
+stdout_logfile=/var/log/supervisor/myproject.log
+stderr_logfile=/var/log/supervisor/myproject_err.log
+environment=HOME="/home/student",USER="student",DOCKER_HOST="unix:///var/run/docker/docker.sock"
+```
+
+Then reload and discover:
+```bash
+sudo supervisorctl reread && sudo supervisorctl update
+```
+
+Go to the dashboard > Containers > "Discover Services" to add the route.
+Your app will be at: `https://hydra.newpaltz.edu/students/YOUR_USERNAME/myproject/`
+
+### Docker Tips
+
+- **Images persist** between container restarts (stored in the DinD sidecar volume)
+- **Ports**: Your Docker containers share the pod network. Bind to `0.0.0.0:PORT` inside your Docker container, then expose that port via the dashboard's Port Routing
+- **Compose**: `docker compose` (v2) is installed. Use `docker compose up -d` to run in background
+- **Resources**: Docker containers share your pod's CPU/memory limits, so keep it light
+- **Cleanup**: Run `docker system prune` periodically to free disk space
+
 ## Important Notes
 
 - Files must end with `.conf`

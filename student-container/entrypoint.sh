@@ -73,6 +73,17 @@ if [ ! -d "/home/student/.nvm" ] && [ -d "/etc/skel/.nvm" ]; then
     echo "Node.js $(cat /home/student/.nvm/alias/default) installed"
 fi
 
+# Copy supervisor.d README/examples if not present (for fresh or old volumes)
+if [ ! -d "/home/student/supervisor.d" ] && [ -d "/etc/skel/supervisor.d" ]; then
+    echo "Copying supervisor.d templates to home directory..."
+    cp -r /etc/skel/supervisor.d /home/student/supervisor.d
+    chown -R student:student /home/student/supervisor.d
+elif [ -d "/home/student/supervisor.d" ] && [ ! -f "/home/student/supervisor.d/README.md" ] && [ -f "/etc/skel/supervisor.d/README.md" ]; then
+    # Directory exists but README missing — copy just the README
+    cp /etc/skel/supervisor.d/README.md /home/student/supervisor.d/README.md
+    chown student:student /home/student/supervisor.d/README.md
+fi
+
 # Create Jupyter approval marker if env var is set
 # This enables the CLI wrapper (jupyter-gate.sh) to allow direct jupyter usage
 if [ "$JUPYTER_APPROVED" = "true" ]; then
@@ -81,6 +92,21 @@ fi
 
 if [ "$JENKINS_APPROVED" = "true" ]; then
     touch /var/run/jenkins-approved
+fi
+
+# Fix Docker socket permissions — DinD sidecar creates it with GID 2375,
+# but student's docker group is GID 1000. Wait for socket then fix group.
+if [ -S /var/run/docker/docker.sock ]; then
+    chgrp docker /var/run/docker/docker.sock 2>/dev/null || true
+elif [ -d /var/run/docker ]; then
+    # Socket not ready yet — fix it in background once DinD starts
+    (for i in $(seq 1 30); do
+        if [ -S /var/run/docker/docker.sock ]; then
+            chgrp docker /var/run/docker/docker.sock 2>/dev/null || true
+            break
+        fi
+        sleep 1
+    done) &
 fi
 
 # Handle graceful shutdown
