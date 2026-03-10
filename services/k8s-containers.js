@@ -143,19 +143,20 @@ function buildPodSpec(username, email, config) {
           { name: 'docker-socket', mountPath: '/var/run/docker', readOnly: false }
         ],
         // Container runs as root initially, then drops to user 1000 via entrypoint
-        // Security hardening: prevent privilege escalation and drop all capabilities
         securityContext: {
-          allowPrivilegeEscalation: false,
+          allowPrivilegeEscalation: true,
           readOnlyRootFilesystem: false,
           capabilities: {
             drop: ['ALL'],
-            // Add back only minimal capabilities needed for container operation
-            // CHOWN: Required for volume permission setup
-            // DAC_OVERRIDE: Required for entrypoint to modify system files
-            // SETUID/SETGID: Required for supervisor to switch to student user (UID 1000)
-            // NET_BIND_SERVICE: Allow binding to ports < 1024 (SSH on 22)
-            // KILL: Required for supervisor to stop/restart managed processes
-            add: ['CHOWN', 'DAC_OVERRIDE', 'SETUID', 'SETGID', 'NET_BIND_SERVICE', 'KILL']
+            add: [
+              'CHOWN',           // Volume permission setup
+              'DAC_OVERRIDE',    // Entrypoint system file modifications
+              'SETUID', 'SETGID', // Supervisor user switching + sudo
+              'NET_BIND_SERVICE', // Ports < 1024 (SSH on 22)
+              'SYS_CHROOT',      // sshd privilege separation
+              'KILL',            // Supervisor process management
+              'FOWNER'           // apt/dpkg file ownership operations
+            ]
           }
         },
         // Disable password auth on startup for security
@@ -274,6 +275,7 @@ function buildServiceSpec(username) {
     spec: {
       type: 'ClusterIP',
       ports: [
+        { name: 'ssh', port: 22, targetPort: 22 },
         { name: 'vscode', port: 8443, targetPort: 'vscode' },
         { name: 'jupyter', port: 8888, targetPort: 'jupyter' },
         { name: 'supervisor', port: 9001, targetPort: 'supervisor' },
@@ -479,14 +481,16 @@ const SSHPIPER_CONFIG_DIR = runtimeConfig.sshpiper?.configPath || '/app/sshpiper
 async function updateSshPiperConfig(username, podIP) {
   const userDir = path.join(SSHPIPER_CONFIG_DIR, username);
   const upstreamFile = path.join(userDir, 'sshpiper_upstream');
+  // Use K8s service FQDN instead of pod IP — survives pod restarts/migrations
+  const upstream = `student-${username}.hydra-students.svc.cluster.local:22`;
 
   try {
     // Ensure directory exists
     await fs.mkdir(userDir, { recursive: true });
 
-    // Write upstream config pointing to pod IP
-    await fs.writeFile(upstreamFile, `${podIP}:22\n`, 'utf8');
-    console.log(`[K8s] Updated SSH piper config for ${username}: ${podIP}:22`);
+    // Write upstream config pointing to stable service DNS
+    await fs.writeFile(upstreamFile, `${upstream}\n`, 'utf8');
+    console.log(`[K8s] Updated SSH piper config for ${username}: ${upstream}`);
     return true;
   } catch (err) {
     console.warn(`[K8s] Failed to update SSH piper config for ${username}:`, err.message);
