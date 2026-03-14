@@ -346,7 +346,8 @@ function buildIngressRouteSpec(username, customRoutes = []) {
           services: [{ name: `student-${username}`, port: 8443 }],
           middlewares: [
             { name: 'hydra-forward-auth', namespace: runtimeConfig.k8s.systemNamespace },
-            { name: `strip-prefix-${username}` }
+            { name: `strip-prefix-${username}` },
+            { name: 'strip-session-cookie', namespace: runtimeConfig.k8s.systemNamespace }
           ]
         },
         {
@@ -355,8 +356,8 @@ function buildIngressRouteSpec(username, customRoutes = []) {
           priority: 100,
           services: [{ name: `student-${username}`, port: 8888 }],
           middlewares: [
-            { name: 'hydra-forward-auth', namespace: runtimeConfig.k8s.systemNamespace }
-            // No strip-prefix: Jupyter is configured with base_url and handles the prefix itself
+            { name: 'hydra-forward-auth', namespace: runtimeConfig.k8s.systemNamespace },
+            { name: 'strip-session-cookie', namespace: runtimeConfig.k8s.systemNamespace }
           ]
         },
         {
@@ -365,8 +366,8 @@ function buildIngressRouteSpec(username, customRoutes = []) {
           priority: 100,
           services: [{ name: `student-${username}`, port: 8080 }],
           middlewares: [
-            { name: 'hydra-forward-auth', namespace: runtimeConfig.k8s.systemNamespace }
-            // No strip-prefix: Jenkins is configured with --prefix and handles the path itself
+            { name: 'hydra-forward-auth', namespace: runtimeConfig.k8s.systemNamespace },
+            { name: 'strip-session-cookie', namespace: runtimeConfig.k8s.systemNamespace }
           ]
         },
         ...customRoutes.map(route => ({
@@ -377,11 +378,13 @@ function buildIngressRouteSpec(username, customRoutes = []) {
           middlewares: route.public === false
             ? [
                 { name: 'hydra-forward-auth', namespace: runtimeConfig.k8s.systemNamespace },
-                { name: `strip-prefix-${username}` }
+                { name: `strip-prefix-${username}` },
+                { name: 'strip-session-cookie', namespace: runtimeConfig.k8s.systemNamespace }
               ]
             : [
-                // Public route — no SSO
-                { name: `strip-prefix-${username}` }
+                // Public route — no SSO, strip prefix + cookies
+                { name: `strip-prefix-${username}` },
+                { name: 'strip-session-cookie', namespace: runtimeConfig.k8s.systemNamespace }
               ]
         }))
       ],
