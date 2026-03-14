@@ -1684,6 +1684,8 @@ router.get('/routes', async (req, res) => {
             const routesWithUrls = routes.map(r => ({
                 endpoint: r.endpoint,
                 port: r.port,
+                public: r.public !== undefined ? r.public : r.default ? false : true,
+                default: r.default || false,
                 url: `${publicBase}/${username}/${r.endpoint}/`
             }));
             return res.json({ success: true, routes: routesWithUrls, k8sMode: true });
@@ -1791,7 +1793,8 @@ router.post('/routes', async (req, res) => {
                 return res.status(400).json({ success: false, message: 'Port already in use by another endpoint' });
             }
 
-            await k8sContainers.addRoute(username, endpoint, port);
+            const isPublic = req.body.public !== false; // default to public
+            await k8sContainers.addRoute(username, endpoint, port, isPublic);
 
             const host = 'hydra.newpaltz.edu';
             const publicBase = (process.env.PUBLIC_STUDENTS_BASE || `https://${host}/students`).replace(/\/$/, '');
@@ -1801,6 +1804,7 @@ router.post('/routes', async (req, res) => {
                 route: {
                     endpoint,
                     port,
+                    public: isPublic,
                     url: `${publicBase}/${username}/${endpoint}/`
                 }
             });
@@ -1883,6 +1887,35 @@ router.post('/routes', async (req, res) => {
 
 // Delete a port route
 // DELETE /dashboard/api/containers/routes/:endpoint
+// Toggle SSO (public/private) for a custom route
+// PATCH /dashboard/api/containers/routes/:endpoint
+router.patch('/routes/:endpoint', async (req, res) => {
+    try {
+        if (!req.isAuthenticated?.() || !req.user?.email) {
+            return res.status(401).json({ success: false, message: 'Not authenticated' });
+        }
+
+        const endpoint = String(req.params.endpoint || '').trim().toLowerCase();
+        const isPublic = req.body.public;
+
+        if (typeof isPublic !== 'boolean') {
+            return res.status(400).json({ success: false, message: 'Missing "public" boolean field' });
+        }
+
+        const username = String(req.user.email).split('@')[0];
+
+        if (runtimeConfig.isKubernetes()) {
+            const result = await k8sContainers.updateRoute(username, endpoint, isPublic);
+            return res.json({ success: true, route: result });
+        }
+
+        return res.status(501).json({ success: false, message: 'Route toggle not supported in Docker mode' });
+    } catch (err) {
+        console.error('[containers] route toggle error:', err);
+        return res.status(500).json({ success: false, message: err.message || 'Failed to update route' });
+    }
+});
+
 router.delete('/routes/:endpoint', async (req, res) => {
     try {
         if (!req.isAuthenticated?.() || !req.user?.email) {

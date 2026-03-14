@@ -374,10 +374,15 @@ function buildIngressRouteSpec(username, customRoutes = []) {
           kind: 'Rule',
           priority: 100,
           services: [{ name: `student-${username}`, port: route.port }],
-          middlewares: [
-            { name: 'hydra-forward-auth', namespace: runtimeConfig.k8s.systemNamespace },
-            { name: `strip-prefix-${username}` }
-          ]
+          middlewares: route.public === false
+            ? [
+                { name: 'hydra-forward-auth', namespace: runtimeConfig.k8s.systemNamespace },
+                { name: `strip-prefix-${username}` }
+              ]
+            : [
+                // Public route — no SSO
+                { name: `strip-prefix-${username}` }
+              ]
         }))
       ],
       tls: {
@@ -431,7 +436,9 @@ async function getCustomRoutes(username) {
     if (match && !defaultEndpoints.includes(match[1])) {
       const port = route.services?.[0]?.port;
       if (port) {
-        customRoutes.push({ endpoint: match[1], port });
+        // Detect if route has forward-auth middleware (SSO enabled)
+        const hasAuth = route.middlewares?.some(m => m.name === 'hydra-forward-auth');
+        customRoutes.push({ endpoint: match[1], port, public: !hasAuth });
       }
     }
   }
@@ -495,8 +502,8 @@ async function writeDockerTraefikConfig(username, customRoutes = null) {
           {
             entryPoints: ['web'],
             rule: `PathPrefix(\`/students/${username}/${route.endpoint}\`)`,
-            service: `k8s-traefik-${username}`,
-            middlewares: [`student-${username}-auth`]
+            service: `k8s-traefik-${username}`
+            // No auth middleware — student sites are public
           }
         ]))
       },
@@ -1090,9 +1097,9 @@ async function listContainers() {
  */
 async function getRoutes(username) {
   const defaultRoutes = [
-    { endpoint: 'vscode', port: 8443, default: true },
-    { endpoint: 'jupyter', port: 8888, default: true },
-    { endpoint: 'jenkins', port: 8080, default: true }
+    { endpoint: 'vscode', port: 8443, default: true, public: false },
+    { endpoint: 'jupyter', port: 8888, default: true, public: false },
+    { endpoint: 'jenkins', port: 8080, default: true, public: false }
   ];
 
   let customRoutes = [];
@@ -1112,7 +1119,7 @@ async function getRoutes(username) {
  * Add a custom route for a student
  * Updates IngressRoute, Middleware, Service, and Docker Traefik config
  */
-async function addRoute(username, endpoint, port) {
+async function addRoute(username, endpoint, port, isPublic = true) {
   const namespace = runtimeConfig.k8s.namespace;
 
   // 1. Get current custom routes and check for duplicates
@@ -1123,7 +1130,7 @@ async function addRoute(username, endpoint, port) {
   if (customRoutes.some(r => r.port === port)) {
     throw new Error(`Port ${port} already in use`);
   }
-  customRoutes.push({ endpoint, port });
+  customRoutes.push({ endpoint, port, public: isPublic });
 
   // 2. Patch Service to add the new port (strategic merge adds by port key)
   await k8sClient.patchService(`student-${username}`, namespace, {
@@ -1151,8 +1158,35 @@ async function addRoute(username, endpoint, port) {
   // 5. Update Docker Traefik config
   await writeDockerTraefikConfig(username, customRoutes);
 
-  console.log(`[K8s] Added route for ${username}: ${endpoint} -> port ${port}`);
-  return { endpoint, port };
+  console.log(`[K8s] Added route for ${username}: ${endpoint} -> port ${port} (public: ${isPublic})`);
+  return { endpoint, port, public: isPublic };
+}
+
+/**
+ * Update a custom route's public/SSO setting
+ */
+async function updateRoute(username, endpoint, isPublic) {
+  const namespace = runtimeConfig.k8s.namespace;
+
+  const customRoutes = await getCustomRoutes(username);
+  const route = customRoutes.find(r => r.endpoint === endpoint);
+  if (!route) {
+    throw new Error(`Route '${endpoint}' not found`);
+  }
+  route.public = isPublic;
+
+  // Replace IngressRoute with updated auth settings
+  await k8sClient.replaceIngressRoute(
+    `student-${username}`,
+    namespace,
+    buildIngressRouteSpec(username, customRoutes)
+  );
+
+  // Update Docker Traefik config
+  await writeDockerTraefikConfig(username, customRoutes);
+
+  console.log(`[K8s] Updated route ${endpoint} for ${username}: public=${isPublic}`);
+  return { endpoint, port: route.port, public: isPublic };
 }
 
 /**
@@ -1529,6 +1563,7 @@ module.exports = {
   listContainers,
   getRoutes,
   addRoute,
+  updateRoute,
   removeRoute,
   generateSSHKeys,
   updateSshPiperConfig,

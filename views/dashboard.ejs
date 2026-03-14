@@ -1271,6 +1271,7 @@
                   <th class="px-3 py-2 text-left">Endpoint</th>
                   <th class="px-3 py-2 text-left">Port</th>
                   <th class="px-3 py-2 text-left">Type</th>
+                  <th class="px-3 py-2 text-left">Access</th>
                   <th class="px-3 py-2 text-left">URL</th>
                   <th class="px-3 py-2 text-left">Actions</th>
                 </tr>
@@ -3189,8 +3190,9 @@
           const routes = data.routes || [];
           routes.forEach(route => {
             const row = document.createElement('tr');
-            const isDefault = route.endpoint === 'vscode' || route.endpoint === 'jupyter';
+            const isDefault = route.default || route.endpoint === 'vscode' || route.endpoint === 'jupyter' || route.endpoint === 'jenkins';
             const routeType = route.source || (isDefault ? 'default' : 'custom');
+            const isPublic = route.public === true;
 
             // Determine badge style based on route type
             let typeBadge = '';
@@ -3202,10 +3204,28 @@
               typeBadge = '<span class="px-2 py-0.5 text-xs rounded bg-green-100 text-green-700 border border-green-200">Custom</span>';
             }
 
+            // Access toggle — only for custom routes
+            let accessCol = '';
+            if (isDefault) {
+              accessCol = '<span class="px-2 py-0.5 text-xs rounded bg-yellow-100 text-yellow-700 border border-yellow-200"><i class="fas fa-lock"></i> SSO</span>';
+            } else {
+              const toggleId = `toggle-${route.endpoint}`;
+              accessCol = `
+                <button id="${toggleId}" onclick="toggleRouteAccess('${route.endpoint}', ${!isPublic})"
+                  class="px-2 py-1 text-xs rounded font-medium ${isPublic
+                    ? 'bg-green-100 hover:bg-green-200 text-green-700 border border-green-300'
+                    : 'bg-yellow-100 hover:bg-yellow-200 text-yellow-700 border border-yellow-300'
+                  }">
+                  <i class="fas ${isPublic ? 'fa-globe' : 'fa-lock'}"></i>
+                  ${isPublic ? 'Public' : 'SSO'}
+                </button>`;
+            }
+
             row.innerHTML = `
               <td class="px-3 py-2 font-mono">${route.endpoint}</td>
               <td class="px-3 py-2">${route.port}</td>
               <td class="px-3 py-2">${typeBadge}</td>
+              <td class="px-3 py-2">${accessCol}</td>
               <td class="px-3 py-2">
                 <a href="${route.url}" target="_blank" class="text-blue-600 underline text-xs">
                   <i class="fas fa-external-link-alt"></i> ${route.url}
@@ -3320,6 +3340,28 @@
           loadRoutes();
         } catch (err) {
           msg.innerHTML = `<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2 text-sm">${err.message || 'Failed to delete route'}</p>`;
+        }
+      };
+
+      window.toggleRouteAccess = async function (endpoint, makePublic) {
+        const msg = document.getElementById('routing-message');
+        const btn = document.getElementById(`toggle-${endpoint}`);
+        if (btn) btn.disabled = true;
+        try {
+          const res = await fetch(`/dashboard/api/containers/routes/${encodeURIComponent(endpoint)}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ public: makePublic })
+          });
+          const data = await res.json();
+          if (!res.ok || !data.success) throw new Error(data.message || 'Failed');
+
+          msg.innerHTML = `<p class="text-green-700 bg-green-100 border border-green-200 rounded p-2 text-sm">${endpoint} is now ${makePublic ? 'public' : 'SSO-protected'}</p>`;
+          setTimeout(() => { msg.innerHTML = ''; }, 3000);
+          loadRoutes();
+        } catch (err) {
+          msg.innerHTML = `<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2 text-sm">${err.message || 'Failed to toggle access'}</p>`;
+          if (btn) btn.disabled = false;
         }
       };
 
