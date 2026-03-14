@@ -5,6 +5,7 @@ const k8sClient = require('./k8s-client');
 const runtimeConfig = require('../config/runtime');
 const resourceConfig = require('../config/resources');
 const crypto = require('crypto');
+const { execSync } = require('child_process');
 const fs = require('fs').promises;
 const path = require('path');
 const yaml = require('js-yaml');
@@ -120,9 +121,20 @@ function buildPodSpec(username, email, config) {
                 key: 'password'
               }
             }
+          },
+          {
+            name: 'SSH_PUBLIC_KEY',
+            valueFrom: {
+              secretKeyRef: {
+                name: `student-${username}-creds`,
+                key: 'ssh_public_key',
+                optional: true
+              }
+            }
           }
         ],
         ports: [
+          { name: 'ssh', containerPort: 22, protocol: 'TCP' },
           { name: 'vscode', containerPort: 8443, protocol: 'TCP' },
           { name: 'jupyter', containerPort: 8888, protocol: 'TCP' },
           { name: 'supervisor', containerPort: 9001, protocol: 'TCP' },
@@ -163,7 +175,7 @@ function buildPodSpec(username, email, config) {
         lifecycle: {
           postStart: {
             exec: {
-              command: ['/bin/sh', '-c', 'sed -i \'s|port=127.0.0.1:9001|port=0.0.0.0:9001|\' /etc/supervisor/conf.d/supervisord.conf; sed -i \'/^username=student/d\' /etc/supervisor/conf.d/supervisord.conf; sed -i \'/^password=%(ENV_PASSWORD)s/d\' /etc/supervisor/conf.d/supervisord.conf; sed -i "s/^PasswordAuthentication yes/PasswordAuthentication no/" /etc/ssh/sshd_config; sed -i "s/^#*AllowUsers/#AllowUsers/" /etc/ssh/sshd_config; true']
+              command: ['/bin/sh', '-c', 'sed -i \'s|port=127.0.0.1:9001|port=0.0.0.0:9001|\' /etc/supervisor/conf.d/supervisord.conf; sed -i \'/^username=student/d\' /etc/supervisor/conf.d/supervisord.conf; sed -i \'/^password=%(ENV_PASSWORD)s/d\' /etc/supervisor/conf.d/supervisord.conf; sed -i "s/^PasswordAuthentication yes/PasswordAuthentication no/" /etc/ssh/sshd_config; sed -i "s/^#*AllowUsers/#AllowUsers/" /etc/ssh/sshd_config; echo "StrictModes no" >> /etc/ssh/sshd_config; true']
             }
           }
         }
@@ -290,7 +302,11 @@ function buildServiceSpec(username) {
 }
 
 // Build Secret specification for credentials
-function buildSecretSpec(username, password) {
+function buildSecretSpec(username, password, sshPublicKey = null) {
+  const stringData = { password };
+  if (sshPublicKey) {
+    stringData.ssh_public_key = sshPublicKey;
+  }
   return {
     apiVersion: 'v1',
     kind: 'Secret',
@@ -302,14 +318,12 @@ function buildSecretSpec(username, password) {
       }
     },
     type: 'Opaque',
-    stringData: {
-      password: password
-    }
+    stringData
   };
 }
 
 // Build IngressRoute specification
-function buildIngressRouteSpec(username) {
+function buildIngressRouteSpec(username, customRoutes = []) {
   return {
     apiVersion: 'traefik.io/v1alpha1',
     kind: 'IngressRoute',
@@ -354,7 +368,17 @@ function buildIngressRouteSpec(username) {
             { name: 'hydra-forward-auth', namespace: runtimeConfig.k8s.systemNamespace }
             // No strip-prefix: Jenkins is configured with --prefix and handles the path itself
           ]
-        }
+        },
+        ...customRoutes.map(route => ({
+          match: `Host(\`hydra.newpaltz.edu\`) && PathPrefix(\`/students/${username}/${route.endpoint}\`)`,
+          kind: 'Rule',
+          priority: 100,
+          services: [{ name: `student-${username}`, port: route.port }],
+          middlewares: [
+            { name: 'hydra-forward-auth', namespace: runtimeConfig.k8s.systemNamespace },
+            { name: `strip-prefix-${username}` }
+          ]
+        }))
       ],
       tls: {
         secretName: 'hydra-tls'
@@ -364,7 +388,7 @@ function buildIngressRouteSpec(username) {
 }
 
 // Build Middleware specification for strip-prefix
-function buildMiddlewareSpec(username) {
+function buildMiddlewareSpec(username, customRoutes = []) {
   return {
     apiVersion: 'traefik.io/v1alpha1',
     kind: 'Middleware',
@@ -381,11 +405,38 @@ function buildMiddlewareSpec(username) {
           `/students/${username}/vscode`,
           `/students/${username}/jupyter`,
           `/students/${username}/supervisor`,
-          `/students/${username}/jenkins`
+          `/students/${username}/jenkins`,
+          ...customRoutes.map(r => `/students/${username}/${r.endpoint}`)
         ]
       }
     }
   };
+}
+
+// ==================== CUSTOM ROUTE HELPERS ====================
+
+/**
+ * Get custom routes from IngressRoute (non-default routes)
+ * Default routes are vscode, jupyter, jenkins
+ */
+async function getCustomRoutes(username) {
+  const ingressRoute = await k8sClient.getIngressRoute(`student-${username}`);
+  if (!ingressRoute?.spec?.routes) return [];
+
+  const defaultEndpoints = ['vscode', 'jupyter', 'jenkins'];
+  const customRoutes = [];
+
+  for (const route of ingressRoute.spec.routes) {
+    const match = route.match?.match(/PathPrefix\(`\/students\/[^/]+\/([^`]+)`\)/);
+    if (match && !defaultEndpoints.includes(match[1])) {
+      const port = route.services?.[0]?.port;
+      if (port) {
+        customRoutes.push({ endpoint: match[1], port });
+      }
+    }
+  }
+
+  return customRoutes;
 }
 
 // ==================== DOCKER TRAEFIK CONFIG ====================
@@ -395,14 +446,25 @@ function buildMiddlewareSpec(username) {
  * This is needed because Apache proxies to Docker Traefik (8082),
  * which then needs to forward K8s student routes to K8s Traefik (30080)
  * Note: This is only needed in hybrid Docker+K8s setups; skipped in pure K8s
+ * @param {string} username
+ * @param {Array|null} customRoutes - Custom routes array, or null to auto-discover from IngressRoute
  */
-async function writeDockerTraefikConfig(username) {
+async function writeDockerTraefikConfig(username, customRoutes = null) {
   // Skip if Traefik dynamic dir doesn't exist (pure K8s mode without Docker Traefik)
   try {
     await fs.access(TRAEFIK_DYNAMIC_DIR);
   } catch {
     // Directory doesn't exist - we're in pure K8s mode, skip Docker Traefik config
     return;
+  }
+
+  // Auto-discover custom routes from IngressRoute if not explicitly provided
+  if (customRoutes === null) {
+    try {
+      customRoutes = await getCustomRoutes(username);
+    } catch (e) {
+      customRoutes = [];
+    }
   }
 
   const filePath = path.join(TRAEFIK_DYNAMIC_DIR, `student-${username}.yaml`);
@@ -427,7 +489,16 @@ async function writeDockerTraefikConfig(username) {
           rule: `PathPrefix(\`/students/${username}/jenkins\`)`,
           service: `k8s-traefik-${username}`,
           middlewares: [`student-${username}-auth`]
-        }
+        },
+        ...Object.fromEntries(customRoutes.map(route => [
+          `student-${username}-${route.endpoint}`,
+          {
+            entryPoints: ['web'],
+            rule: `PathPrefix(\`/students/${username}/${route.endpoint}\`)`,
+            service: `k8s-traefik-${username}`,
+            middlewares: [`student-${username}-auth`]
+          }
+        ]))
       },
       services: {
         [`k8s-traefik-${username}`]: {
@@ -470,6 +541,46 @@ async function deleteDockerTraefikConfig(username) {
   }
 }
 
+// ==================== SSH KEY GENERATION ====================
+
+const SSH_KEYS_DIR = process.env.SSH_KEYS_DIR || '/app/data/ssh-keys';
+
+async function ensureSSHKeysDir() {
+  try {
+    await fs.mkdir(SSH_KEYS_DIR, { recursive: true, mode: 0o700 });
+  } catch (err) {
+    if (err.code !== 'EEXIST') throw err;
+  }
+}
+
+async function generateSSHKeys(username) {
+  await ensureSSHKeysDir();
+
+  const privateKeyPath = path.join(SSH_KEYS_DIR, `${username}_id_ed25519`);
+  const publicKeyPath = `${privateKeyPath}.pub`;
+
+  // Check if keys already exist
+  try {
+    await fs.access(privateKeyPath);
+    const publicKey = await fs.readFile(publicKeyPath, 'utf8');
+    return { publicKey: publicKey.trim(), keyExists: true };
+  } catch {
+    // Keys don't exist, generate new ones
+  }
+
+  try {
+    execSync(`ssh-keygen -t ed25519 -f "${privateKeyPath}" -N "" -C "${username}@hydra.newpaltz.edu"`, {
+      stdio: 'pipe'
+    });
+    const publicKey = await fs.readFile(publicKeyPath, 'utf8');
+    console.log(`[K8s] Generated SSH keys for ${username}`);
+    return { publicKey: publicKey.trim(), keyExists: false };
+  } catch (err) {
+    console.error(`[K8s] Failed to generate SSH keys for ${username}:`, err);
+    throw new Error('Failed to generate SSH keys');
+  }
+}
+
 // ==================== SSH PIPER CONFIG ====================
 
 const SSHPIPER_CONFIG_DIR = runtimeConfig.sshpiper?.configPath || '/app/sshpiper/config';
@@ -481,8 +592,11 @@ const SSHPIPER_CONFIG_DIR = runtimeConfig.sshpiper?.configPath || '/app/sshpiper
 async function updateSshPiperConfig(username, podIP) {
   const userDir = path.join(SSHPIPER_CONFIG_DIR, username);
   const upstreamFile = path.join(userDir, 'sshpiper_upstream');
-  // Use K8s service FQDN instead of pod IP — survives pod restarts/migrations
-  const upstream = `student-${username}.hydra-students.svc.cluster.local:22`;
+  // Use student@ prefix — container SSH user is always 'student'
+  // Use K8s service FQDN — survives pod restarts/migrations
+  const upstream = `student@student-${username}.hydra-students.svc.cluster.local:22`;
+
+  const SSH_KEYS_DIR = runtimeConfig.sshpiper?.keysPath || '/app/data/ssh-keys';
 
   try {
     // Ensure directory exists
@@ -490,6 +604,25 @@ async function updateSshPiperConfig(username, podIP) {
 
     // Write upstream config pointing to stable service DNS
     await fs.writeFile(upstreamFile, `${upstream}\n`, 'utf8');
+
+    // Copy private key as id_rsa — sshpiper workingdir plugin hardcodes this filename
+    const privateKeyPath = path.join(SSH_KEYS_DIR, `${username}_id_ed25519`);
+    try {
+      const privateKey = await fs.readFile(privateKeyPath, 'utf8');
+      await fs.writeFile(path.join(userDir, 'id_rsa'), privateKey, { mode: 0o644 });
+    } catch (err) {
+      console.warn(`[K8s] Could not copy private key for ${username}:`, err.message);
+    }
+
+    // Copy public key as authorized_keys (for user auth to sshpiper)
+    const publicKeyPath = `${privateKeyPath}.pub`;
+    try {
+      const publicKey = await fs.readFile(publicKeyPath, 'utf8');
+      await fs.writeFile(path.join(userDir, 'authorized_keys'), publicKey, { mode: 0o644 });
+    } catch (err) {
+      console.warn(`[K8s] Could not copy public key for ${username}:`, err.message);
+    }
+
     console.log(`[K8s] Updated SSH piper config for ${username}: ${upstream}`);
     return true;
   } catch (err) {
@@ -582,32 +715,52 @@ async function initContainer(username, email, config = {}) {
   const fullConfig = { ...config, email };
 
   try {
-    // 1. Create PVC if not exists
+    // 1. Generate SSH keys (must happen before creating secret and pod)
+    let sshPublicKey = null;
+    try {
+      const { publicKey } = await generateSSHKeys(username);
+      sshPublicKey = publicKey;
+      console.log(`[K8s] SSH keys ready for ${username}`);
+    } catch (err) {
+      console.warn(`[K8s] Could not generate SSH keys for ${username}:`, err.message);
+    }
+
+    // 2. Create PVC if not exists
     const existingPVC = await k8sClient.getPVC(`hydra-vol-${username}`);
     if (!existingPVC) {
       console.log(`[K8s] Creating PVC for ${username} (${storageGb}GB)`);
       await k8sClient.createPVC(buildPVCSpec(username, storageGb, storageClass, fullConfig));
     }
 
-    // 2. Create credentials secret
+    // 3. Create credentials secret (includes SSH public key)
     const existingSecret = await k8sClient.getSecret(`student-${username}-creds`);
     if (!existingSecret) {
       console.log(`[K8s] Creating credentials secret for ${username}`);
-      await k8sClient.createSecret(buildSecretSpec(username, password));
+      await k8sClient.createSecret(buildSecretSpec(username, password, sshPublicKey));
+    } else if (sshPublicKey) {
+      // Secret exists but may not have SSH key — patch it in
+      try {
+        await k8sClient.patchSecret(`student-${username}-creds`, runtimeConfig.k8s.namespace, {
+          stringData: { ssh_public_key: sshPublicKey }
+        });
+        console.log(`[K8s] Patched SSH public key into existing secret for ${username}`);
+      } catch (err) {
+        console.warn(`[K8s] Could not patch SSH key into secret for ${username}:`, err.message);
+      }
     }
 
-    // 3. Create pod
+    // 4. Create pod
     console.log(`[K8s] Creating pod for ${username}`);
     await k8sClient.createPod(buildPodSpec(username, email, config));
 
-    // 4. Create service
+    // 5. Create service
     const existingService = await k8sClient.getService(`student-${username}`);
     if (!existingService) {
       console.log(`[K8s] Creating service for ${username}`);
       await k8sClient.createService(buildServiceSpec(username));
     }
 
-    // 5. Create IngressRoute and Middleware
+    // 6. Create IngressRoute and Middleware
     const existingRoute = await k8sClient.getIngressRoute(`student-${username}`);
     if (!existingRoute) {
       console.log(`[K8s] Creating IngressRoute for ${username}`);
@@ -615,17 +768,17 @@ async function initContainer(username, email, config = {}) {
       await k8sClient.createIngressRoute(buildIngressRouteSpec(username));
     }
 
-    // 6. Create Docker Traefik config (for Apache -> Docker Traefik -> K8s routing)
+    // 7. Create Docker Traefik config (for Apache -> Docker Traefik -> K8s routing)
     await writeDockerTraefikConfig(username);
 
-    // 7. Wait for pod to be ready (up to 60 seconds)
+    // 8. Wait for pod to be ready (up to 60 seconds)
     console.log(`[K8s] Waiting for pod student-${username} to be ready...`);
     const readyStatus = await waitForPodReady(username, 60000);
     if (!readyStatus.ready) {
       console.warn(`[K8s] Pod student-${username} not ready after timeout: ${readyStatus.status}`);
     }
 
-    // 8. Update SSH piper config with pod IP (for SSH access through sshpiper)
+    // 9. Update SSH piper config with keys (for SSH access through sshpiper)
     const pod = await k8sClient.getPod(`student-${username}`);
     if (pod?.status?.podIP) {
       await updateSshPiperConfig(username, pod.status.podIP);
@@ -933,15 +1086,125 @@ async function listContainers() {
 }
 
 /**
- * Get routes for a student
+ * Get all routes for a student (default + custom)
  */
-function getRoutes(username) {
-  return {
-    vscode: `/students/${username}/vscode/`,
-    jupyter: `/students/${username}/jupyter/`,
-    jenkins: `/students/${username}/jenkins/`,
-    supervisor: `/students/${username}/supervisor/`
-  };
+async function getRoutes(username) {
+  const defaultRoutes = [
+    { endpoint: 'vscode', port: 8443, default: true },
+    { endpoint: 'jupyter', port: 8888, default: true },
+    { endpoint: 'jenkins', port: 8080, default: true }
+  ];
+
+  let customRoutes = [];
+  try {
+    customRoutes = await getCustomRoutes(username);
+  } catch (e) {
+    // IngressRoute may not exist yet
+  }
+
+  return [
+    ...defaultRoutes,
+    ...customRoutes.map(r => ({ endpoint: r.endpoint, port: r.port, default: false }))
+  ];
+}
+
+/**
+ * Add a custom route for a student
+ * Updates IngressRoute, Middleware, Service, and Docker Traefik config
+ */
+async function addRoute(username, endpoint, port) {
+  const namespace = runtimeConfig.k8s.namespace;
+
+  // 1. Get current custom routes and check for duplicates
+  const customRoutes = await getCustomRoutes(username);
+  if (customRoutes.some(r => r.endpoint === endpoint)) {
+    throw new Error(`Endpoint '${endpoint}' already exists`);
+  }
+  if (customRoutes.some(r => r.port === port)) {
+    throw new Error(`Port ${port} already in use`);
+  }
+  customRoutes.push({ endpoint, port });
+
+  // 2. Patch Service to add the new port (strategic merge adds by port key)
+  await k8sClient.patchService(`student-${username}`, namespace, {
+    spec: {
+      ports: [
+        { name: `custom-${endpoint}`, port: port, targetPort: port, protocol: 'TCP' }
+      ]
+    }
+  });
+
+  // 3. Replace Middleware with updated strip-prefix paths
+  await k8sClient.replaceMiddleware(
+    `strip-prefix-${username}`,
+    namespace,
+    buildMiddlewareSpec(username, customRoutes)
+  );
+
+  // 4. Replace IngressRoute with new route added
+  await k8sClient.replaceIngressRoute(
+    `student-${username}`,
+    namespace,
+    buildIngressRouteSpec(username, customRoutes)
+  );
+
+  // 5. Update Docker Traefik config
+  await writeDockerTraefikConfig(username, customRoutes);
+
+  console.log(`[K8s] Added route for ${username}: ${endpoint} -> port ${port}`);
+  return { endpoint, port };
+}
+
+/**
+ * Remove a custom route for a student
+ */
+async function removeRoute(username, endpoint) {
+  const namespace = runtimeConfig.k8s.namespace;
+
+  // 1. Get current custom routes and find the one to remove
+  const customRoutes = await getCustomRoutes(username);
+  const index = customRoutes.findIndex(r => r.endpoint === endpoint);
+  if (index === -1) {
+    throw new Error(`Route '${endpoint}' not found`);
+  }
+  const removed = customRoutes[index];
+  customRoutes.splice(index, 1);
+
+  // 2. Replace Middleware with updated strip-prefix paths
+  await k8sClient.replaceMiddleware(
+    `strip-prefix-${username}`,
+    namespace,
+    buildMiddlewareSpec(username, customRoutes)
+  );
+
+  // 3. Replace IngressRoute with route removed
+  await k8sClient.replaceIngressRoute(
+    `student-${username}`,
+    namespace,
+    buildIngressRouteSpec(username, customRoutes)
+  );
+
+  // 4. Remove port from Service (read-modify-write)
+  try {
+    const svc = await k8sClient.getService(`student-${username}`, namespace);
+    if (svc) {
+      const updatedPorts = svc.spec.ports.filter(p => p.name !== `custom-${endpoint}`);
+      if (updatedPorts.length !== svc.spec.ports.length) {
+        // Use strategic merge with all desired ports — rebuild from scratch
+        await k8sClient.patchService(`student-${username}`, namespace, {
+          spec: { ports: updatedPorts }
+        });
+      }
+    }
+  } catch (e) {
+    console.warn(`[K8s] Failed to remove port from service for ${username}:`, e.message);
+  }
+
+  // 5. Update Docker Traefik config
+  await writeDockerTraefikConfig(username, customRoutes);
+
+  console.log(`[K8s] Removed route for ${username}: ${endpoint}`);
+  return { endpoint, port: removed.port };
 }
 
 /**
@@ -1265,6 +1528,10 @@ module.exports = {
   getContainerLogs,
   listContainers,
   getRoutes,
+  addRoute,
+  removeRoute,
+  generateSSHKeys,
+  updateSshPiperConfig,
   // Expose for testing
   buildPodSpec,
   buildPVCSpec,

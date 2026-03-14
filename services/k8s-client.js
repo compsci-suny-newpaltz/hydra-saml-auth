@@ -233,6 +233,26 @@ class K8sClient {
     }
   }
 
+  // Patch a secret (for adding/updating keys)
+  async patchSecret(name, namespace, patch) {
+    this.init();
+    const options = { headers: { 'Content-Type': 'application/strategic-merge-patch+json' } };
+    const response = await this.coreApi.patchNamespacedSecret(
+      name, namespace, patch, undefined, undefined, undefined, undefined, undefined, options
+    );
+    return response.body;
+  }
+
+  // Patch a service (for adding/updating ports)
+  async patchService(name, namespace, patch) {
+    this.init();
+    const options = { headers: { 'Content-Type': 'application/strategic-merge-patch+json' } };
+    const response = await this.coreApi.patchNamespacedService(
+      name, namespace, patch, undefined, undefined, undefined, undefined, undefined, options
+    );
+    return response.body;
+  }
+
   // Delete a secret
   async deleteSecret(name, namespace = this.namespace) {
     this.init();
@@ -324,6 +344,59 @@ class K8sClient {
       return true;
     } catch (err) {
       if (err.statusCode === 404) return false;
+      throw err;
+    }
+  }
+
+  // Get Middleware
+  async getMiddleware(name, namespace = this.namespace) {
+    this.init();
+    try {
+      const response = await this.customApi.getNamespacedCustomObject(
+        'traefik.io',
+        'v1alpha1',
+        namespace,
+        'middlewares',
+        name
+      );
+      return response.body;
+    } catch (err) {
+      if (err.statusCode === 404) return null;
+      throw err;
+    }
+  }
+
+  // Replace IngressRoute (delete + recreate — CRD arrays can't be strategically merged)
+  async replaceIngressRoute(name, namespace, spec) {
+    this.init();
+    const existing = await this.getIngressRoute(name, namespace);
+    await this.deleteIngressRoute(name, namespace);
+    try {
+      return await this.createIngressRoute(spec);
+    } catch (err) {
+      // Attempt to restore old state on failure
+      if (existing) {
+        try { await this.createIngressRoute(existing); } catch (e) {
+          console.error(`[K8s] CRITICAL: Failed to restore IngressRoute ${name}:`, e.message);
+        }
+      }
+      throw err;
+    }
+  }
+
+  // Replace Middleware (delete + recreate)
+  async replaceMiddleware(name, namespace, spec) {
+    this.init();
+    const existing = await this.getMiddleware(name, namespace);
+    await this.deleteMiddleware(name, namespace);
+    try {
+      return await this.createMiddleware(spec);
+    } catch (err) {
+      if (existing) {
+        try { await this.createMiddleware(existing); } catch (e) {
+          console.error(`[K8s] CRITICAL: Failed to restore Middleware ${name}:`, e.message);
+        }
+      }
       throw err;
     }
   }

@@ -727,6 +727,19 @@
                 </button>
               </div>
             </div>
+            <!-- Move to Hydra Banner (shown when on GPU node) -->
+            <div id="move-hydra-banner" class="hidden mt-3 p-3 bg-gradient-to-r from-blue-50 to-green-50 rounded border border-blue-200">
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="font-medium text-blue-800"><i class="fas fa-home mr-2"></i>Running on GPU Node</p>
+                  <p class="text-sm text-blue-600">Move back to <strong>Hydra</strong> to free GPU resources (downgrades to standard preset)</p>
+                </div>
+                <button onclick="moveToHydra()" id="move-hydra-btn"
+                  class="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 font-medium">
+                  <i class="fas fa-arrow-left mr-1"></i> Move to Hydra
+                </button>
+              </div>
+            </div>
           </div>
           <div id="container-not-created" class="hidden">
             <p class="text-gray-600 text-sm mb-3">Your student container has not been created yet.</p>
@@ -2058,6 +2071,15 @@
             } else {
               migrationBanner.classList.add('hidden');
             }
+
+            // Show "Move to Hydra" banner when running on a GPU node
+            const moveHydraBanner = document.getElementById('move-hydra-banner');
+            const currentNode = (data.resources.node || '').toLowerCase();
+            if (currentNode === 'cerberus' || currentNode === 'chimera') {
+              moveHydraBanner.classList.remove('hidden');
+            } else {
+              moveHydraBanner.classList.add('hidden');
+            }
           }
 
           if (!data.exists) {
@@ -2551,6 +2573,59 @@
           }
 
           // Refresh container status and pending requests after error
+          setTimeout(() => {
+            loadContainerStatus();
+            loadPendingRequests();
+          }, 3000);
+        }
+      };
+
+      // Move to Hydra (downgrade from GPU node)
+      window.moveToHydra = async function() {
+        const confirmed = confirm(
+          'This will move your container back to Hydra.\n\n' +
+          'Your GPU resources will be released and your preset will be downgraded to Standard.\n' +
+          'Your files will be preserved.\n\n' +
+          'This may take a few minutes. Continue?'
+        );
+
+        if (!confirmed) return;
+
+        const msg = document.getElementById('container-message');
+        const btn = document.getElementById('move-hydra-btn');
+
+        const startTime = Date.now();
+        localStorage.setItem('hydra_migration_in_progress', JSON.stringify({
+          targetNode: 'hydra',
+          startTime: startTime
+        }));
+
+        showMigrationProgress('hydra', startTime);
+
+        try {
+          const res = await fetch('/dashboard/api/containers/migrate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ target_node: 'hydra' })
+          });
+
+          if (handleAuthError(res)) return;
+          const data = await res.json();
+
+          if (!res.ok || !data.success) {
+            throw new Error(data.message || 'Migration failed');
+          }
+
+          showMigrationComplete(true);
+
+        } catch (err) {
+          showMigrationComplete(false, err.message || 'Failed to move to Hydra');
+
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-arrow-left mr-1"></i> Move to Hydra';
+          }
+
           setTimeout(() => {
             loadContainerStatus();
             loadPendingRequests();

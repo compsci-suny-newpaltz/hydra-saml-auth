@@ -1032,6 +1032,10 @@ const ensureAuthenticated = (req, res, next) => {
       console.log(`Callback URL: ${CALLBACK_URL}`);
       console.log(`SP metadata: ${BASE_URL}/saml/metadata`);
       console.log(`JWT kid: ${JWT_KEY_ID}  TTL(s): ${JWT_TTL_SECONDS}`);
+
+      // Start auto-reschedule service (moves expired GPU pods back to Hydra)
+      const autoReschedule = require('./services/auto-reschedule');
+      autoReschedule.start();
     });
   } catch (e) {
     console.error('Failed to start server:', e);

@@ -36,8 +36,8 @@ const STUDENT_IMAGE = resourceConfig.defaults.image;
 const MAIN_NETWORK = 'hydra_students_net';
 const CODE_SERVER_PORT = 8443;
 const JUPYTER_PORT = 8888;
-const RESERVED_PORTS = [CODE_SERVER_PORT, JUPYTER_PORT];
-const RESERVED_ENDPOINTS = ['vscode', 'jupyter'];
+const RESERVED_PORTS = [22, CODE_SERVER_PORT, JUPYTER_PORT, 8080, 9001];
+const RESERVED_ENDPOINTS = ['vscode', 'jupyter', 'jenkins', 'supervisor'];
 const TRAEFIK_DYNAMIC_DIR = process.env.TRAEFIK_DYNAMIC_DIR || '/etc/traefik/dynamic';
 
 // Shared read-only directory for course materials, downloads, etc.
@@ -200,15 +200,16 @@ async function createSSHPiperConfig(username, node = 'hydra', sshPort = null) {
     const userDir = path.join(SSHPIPER_CONFIG_DIR, username);
 
     // Determine upstream target based on node
+    // Container SSH user is always 'student' — use student@ prefix
     let upstreamTarget;
     if (node === 'hydra' || !node) {
         // Local container - use Docker network name
-        upstreamTarget = `${containerName}:22`;
+        upstreamTarget = `student@${containerName}:22`;
     } else {
         // Remote node - use node hostname and exposed port
         const nodeConfig = resourceConfig.nodes[node];
         const nodeHost = nodeConfig?.host || node;
-        upstreamTarget = `${nodeHost}:${sshPort || 22}`;
+        upstreamTarget = `student@${nodeHost}:${sshPort || 22}`;
     }
 
     try {
@@ -223,12 +224,12 @@ async function createSSHPiperConfig(username, node = 'hydra', sshPort = null) {
         );
         console.log(`[sshpiper] Upstream for ${username}: ${upstreamTarget}`);
 
-        // Copy private key for sshpiper to use when connecting upstream
+        // Copy private key as id_rsa — sshpiper workingdir plugin hardcodes this filename
         const privateKeyPath = path.join(SSH_KEYS_DIR, `${username}_id_ed25519`);
-        const piperKeyPath = path.join(userDir, 'id_ed25519');
+        const piperKeyPath = path.join(userDir, 'id_rsa');
         try {
             const privateKey = await fs.readFile(privateKeyPath, 'utf8');
-            await fs.writeFile(piperKeyPath, privateKey, { mode: 0o600 });
+            await fs.writeFile(piperKeyPath, privateKey, { mode: 0o644 });
         } catch (err) {
             console.warn(`[sshpiper] Could not copy private key for ${username}:`, err.message);
         }
@@ -736,6 +737,36 @@ router.post('/ssh-key/regenerate', async (req, res) => {
         // Generate new keys
         const { publicKey } = await generateSSHKeys(username);
 
+        if (runtimeConfig.isKubernetes()) {
+            // Update sshpiper config with new keys
+            await k8sContainers.updateSshPiperConfig(username);
+
+            // Patch the K8s secret with the new public key
+            try {
+                const k8sClient = require('../services/k8s-client');
+                await k8sClient.patchSecret(`student-${username}-creds`, runtimeConfig.k8s.namespace, {
+                    stringData: { ssh_public_key: publicKey }
+                });
+            } catch (err) {
+                console.warn(`[containers] Could not patch SSH key into K8s secret:`, err.message);
+            }
+
+            // Restart the pod to pick up the new SSH_PUBLIC_KEY env var
+            try {
+                await k8sContainers.stopContainer(username);
+                await k8sContainers.startContainer(username);
+            } catch (err) {
+                console.warn(`[containers] Could not restart pod for SSH key update:`, err.message);
+            }
+
+            return res.json({
+                success: true,
+                message: 'New SSH keys generated and container restarted.',
+                publicKey: publicKey
+            });
+        }
+
+        // Docker mode
         // Update sshpiper config with new keys
         await createSSHPiperConfig(username);
 
@@ -1193,7 +1224,7 @@ router.post('/migrate', async (req, res) => {
         const username = String(req.user.email).split('@')[0];
         const { target_node } = req.body;
 
-        if (!target_node || !['chimera', 'cerberus'].includes(target_node)) {
+        if (!target_node || !['hydra', 'chimera', 'cerberus'].includes(target_node)) {
             return res.status(400).json({ success: false, message: 'Invalid target node' });
         }
 
@@ -1202,7 +1233,8 @@ router.post('/migrate', async (req, res) => {
         const userQuota = await getOrCreateUserQuota(username, req.user.email);
         const containerConfig = await getOrCreateContainerConfig(username, `student-${username}`);
 
-        // Verify user is approved for target node
+        // Moving to Hydra is always allowed (resource downgrade)
+        // GPU nodes require approval
         if (target_node === 'cerberus' && !userQuota.cerberus_approved) {
             return res.status(403).json({ success: false, message: 'Not approved for Cerberus' });
         }
@@ -1220,21 +1252,39 @@ router.post('/migrate', async (req, res) => {
 
         // ========== KUBERNETES MODE ==========
         if (runtimeConfig.isKubernetes()) {
-            // Use K8s migration - deletes pod and recreates on target node
-            const result = await k8sContainers.migrateContainer(username, req.user.email, target_node, {
+            // When moving back to Hydra, downgrade to standard (no GPU) preset
+            const isDowngrade = target_node === 'hydra' && containerConfig.current_node !== 'hydra';
+            const migrateConfig = isDowngrade ? {
+                memory_gb: 2,
+                memory_mb: 2048,
+                cpus: 1,
+                gpu_count: 0,
+                storage_gb: containerConfig.storage_gb,
+                preset: 'standard'
+            } : {
                 memory_gb: containerConfig.memory_gb,
                 memory_mb: containerConfig.memory_gb * 1024,
                 cpus: containerConfig.cpus,
                 gpu_count: containerConfig.gpu_count,
                 storage_gb: containerConfig.storage_gb,
                 preset: containerConfig.preset_tier
-            });
+            };
+
+            // Use K8s migration - deletes pod and recreates on target node
+            const result = await k8sContainers.migrateContainer(username, req.user.email, target_node, migrateConfig);
 
             // Update container config in database
-            await updateContainerConfig(username, {
+            const dbUpdate = {
                 current_node: target_node,
                 last_migration_at: new Date().toISOString()
-            });
+            };
+            if (isDowngrade) {
+                dbUpdate.memory_gb = 2;
+                dbUpdate.cpus = 1;
+                dbUpdate.gpu_count = 0;
+                dbUpdate.preset_tier = 'standard';
+            }
+            await updateContainerConfig(username, dbUpdate);
 
             return res.json({
                 success: true,
@@ -1630,12 +1680,12 @@ router.get('/routes', async (req, res) => {
 
         // ========== KUBERNETES MODE ==========
         if (runtimeConfig.isKubernetes()) {
-            const routes = k8sContainers.getRoutes(username);
-            // Format as array with URLs
-            const routesWithUrls = [
-                { endpoint: 'vscode', port: 8443, url: `${publicBase}/${username}/vscode/` },
-                { endpoint: 'jupyter', port: 8888, url: `${publicBase}/${username}/jupyter/` }
-            ];
+            const routes = await k8sContainers.getRoutes(username);
+            const routesWithUrls = routes.map(r => ({
+                endpoint: r.endpoint,
+                port: r.port,
+                url: `${publicBase}/${username}/${r.endpoint}/`
+            }));
             return res.json({ success: true, routes: routesWithUrls, k8sMode: true });
         }
 
@@ -1725,6 +1775,38 @@ router.post('/routes', async (req, res) => {
         }
 
         const username = String(req.user.email).split('@')[0];
+
+        // ========== KUBERNETES MODE ==========
+        if (runtimeConfig.isKubernetes()) {
+            const status = await k8sContainers.getContainerStatus(username);
+            if (!status.exists) {
+                return res.status(404).json({ success: false, message: 'Container not found' });
+            }
+
+            const existingRoutes = await k8sContainers.getRoutes(username);
+            if (existingRoutes.some(r => r.endpoint === endpoint)) {
+                return res.status(400).json({ success: false, message: 'Endpoint already exists' });
+            }
+            if (existingRoutes.some(r => r.port === port)) {
+                return res.status(400).json({ success: false, message: 'Port already in use by another endpoint' });
+            }
+
+            await k8sContainers.addRoute(username, endpoint, port);
+
+            const host = 'hydra.newpaltz.edu';
+            const publicBase = (process.env.PUBLIC_STUDENTS_BASE || `https://${host}/students`).replace(/\/$/, '');
+
+            return res.json({
+                success: true,
+                route: {
+                    endpoint,
+                    port,
+                    url: `${publicBase}/${username}/${endpoint}/`
+                }
+            });
+        }
+
+        // ========== DOCKER MODE ==========
         const containerName = `student-${username}`;
         const result = await getStudentContainer(username);
 
@@ -1814,6 +1896,21 @@ router.delete('/routes/:endpoint', async (req, res) => {
         }
 
         const username = String(req.user.email).split('@')[0];
+
+        // ========== KUBERNETES MODE ==========
+        if (runtimeConfig.isKubernetes()) {
+            try {
+                await k8sContainers.removeRoute(username, endpoint);
+                return res.json({ success: true });
+            } catch (err) {
+                if (err.message.includes('not found')) {
+                    return res.status(404).json({ success: false, message: 'Endpoint not found' });
+                }
+                throw err;
+            }
+        }
+
+        // ========== DOCKER MODE ==========
         const result = await getStudentContainer(username);
 
         if (!result) {
@@ -2127,11 +2224,20 @@ router.post('/wipe', async (req, res) => {
             // Wipe all data and recreate
             await k8sContainers.wipeContainer(username);
 
-            // Re-initialize container
+            // Read quota for proper resource allocation on recreate
+            const { getOrCreateUserQuota } = require('../services/db-init');
+            const quota = await getOrCreateUserQuota(username, req.user.email);
+
+            // Re-initialize container with quota-based config
             const result = await k8sContainers.initContainer(username, req.user.email, {
                 preset: req.body.preset || 'conservative',
                 target_node: req.body.target_node || 'hydra',
-                storage_gb: req.body.storage_gb || resourceConfig.defaults.storage_gb
+                storage_gb: quota.storage_gb || resourceConfig.defaults.storage_gb,
+                memory_mb: (quota.max_memory_gb || 4) * 1024,
+                cpus: quota.max_cpus || resourceConfig.defaults.cpus,
+                gpu_count: quota.gpu_access_approved ? (req.body.gpu_count || 0) : 0,
+                jupyter_approved: !!quota.jupyter_execution_approved,
+                jenkins_approved: true
             });
 
             const host = process.env.HOSTNAME || 'hydra.newpaltz.edu';
