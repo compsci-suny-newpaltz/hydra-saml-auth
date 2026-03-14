@@ -2001,8 +2001,66 @@ router.post('/discover-services', async (req, res) => {
             return res.status(401).json({ success: false, message: 'Not authenticated' });
         }
 
-        const autoRegister = req.body?.autoRegister === true;
         const username = String(req.user.email).split('@')[0];
+        const host = 'hydra.newpaltz.edu';
+        const publicBase = (process.env.PUBLIC_STUDENTS_BASE || `https://${host}/students`).replace(/\/$/, '');
+
+        // ========== KUBERNETES MODE ==========
+        if (runtimeConfig.isKubernetes()) {
+            const status = await k8sContainers.getContainerStatus(username);
+            if (!status.exists || !status.running) {
+                return res.status(400).json({ success: false, message: 'Container not running' });
+            }
+
+            // Read all supervisor.d conf files via kubectl exec
+            const { execSync } = require('child_process');
+            let output;
+            try {
+                output = execSync(
+                    `KUBECONFIG=/etc/rancher/rke2/rke2.yaml /var/lib/rancher/rke2/bin/kubectl exec student-${username} -n hydra-students -c student -- sh -c 'for f in /home/student/supervisor.d/*.conf; do [ -f "$f" ] && echo "---FILE:$f" && cat "$f"; done'`,
+                    { timeout: 10000, encoding: 'utf8' }
+                );
+            } catch (e) {
+                output = '';
+            }
+
+            // Parse output for hydra comments
+            const discoveredServices = [];
+            const blocks = output.split('---FILE:').filter(Boolean);
+            for (const block of blocks) {
+                const lines = block.split('\n');
+                const file = lines[0].trim();
+                const content = lines.slice(1).join('\n');
+
+                const portMatch = content.match(/^#\s*hydra\.port\s*=\s*(\d+)/m);
+                const endpointMatch = content.match(/^#\s*hydra\.endpoint\s*=\s*(\S+)/m);
+
+                if (portMatch && endpointMatch) {
+                    discoveredServices.push({
+                        file,
+                        endpoint: endpointMatch[1].toLowerCase(),
+                        port: parseInt(portMatch[1], 10)
+                    });
+                }
+            }
+
+            // Check existing routes
+            const existingRoutes = await k8sContainers.getRoutes(username);
+
+            return res.json({
+                success: true,
+                services: discoveredServices.map(s => ({
+                    name: s.file.split('/').pop().replace('.conf', ''),
+                    ...s,
+                    url: `${publicBase}/${username}/${s.endpoint}/`,
+                    alreadyRouted: existingRoutes.some(r => r.endpoint === s.endpoint || r.port === s.port)
+                })),
+                registered: []
+            });
+        }
+
+        // ========== DOCKER MODE ==========
+        const autoRegister = req.body?.autoRegister === true;
         const result = await getStudentContainer(username);
 
         if (!result) {
@@ -2118,9 +2176,6 @@ router.post('/discover-services', async (req, res) => {
                 }
             }
         }
-
-        const host = 'hydra.newpaltz.edu';
-        const publicBase = (process.env.PUBLIC_STUDENTS_BASE || `https://${host}/students`).replace(/\/$/, '');
 
         // Get existing routes to check which services are already routed
         let existingRoutes = [];
