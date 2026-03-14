@@ -929,6 +929,22 @@ async function startContainer(username, email = '', containerConfig = null) {
 
     await k8sClient.createPod(podSpec);
 
+    // Ensure Service exists
+    const existingService = await k8sClient.getService(`student-${username}`);
+    if (!existingService) {
+      console.log(`[K8s] Creating missing service for ${username}`);
+      await k8sClient.createService(buildServiceSpec(username));
+    }
+
+    // Ensure IngressRoute and Middleware exist (may be missing for older containers)
+    const existingRoute = await k8sClient.getIngressRoute(`student-${username}`);
+    if (!existingRoute) {
+      console.log(`[K8s] Creating missing IngressRoute for ${username}`);
+      const customRoutes = await getCustomRoutes(username).catch(() => []);
+      await k8sClient.createMiddleware(buildMiddlewareSpec(username, customRoutes)).catch(() => {});
+      await k8sClient.createIngressRoute(buildIngressRouteSpec(username, customRoutes));
+    }
+
     // Ensure Docker Traefik config exists for routing
     await writeDockerTraefikConfig(username);
 
