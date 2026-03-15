@@ -1661,6 +1661,68 @@
                 <p class="mb-2">Use <code class="bg-gray-100 px-1 rounded">docker build</code> to create images and <code class="bg-gray-100 px-1 rounded">docker run</code> to launch containers. For persistent images, push to the Hydra registry at <code class="bg-gray-100 px-1 rounded">hydra.newpaltz.edu:5000</code>.</p>
               </div>
             </details>
+            <details class="group">
+              <summary class="flex justify-between items-center p-4 cursor-pointer hover:bg-gray-50">
+                <span class="font-medium">What happens to my container when I'm not using it?</span>
+                <i class="fas fa-chevron-down text-gray-400 group-open:rotate-180 transition-transform"></i>
+              </summary>
+              <div class="px-4 pb-4 text-sm text-gray-600">
+                <p class="mb-2">Hydra automatically manages idle containers to keep resources available for everyone:</p>
+                <ul class="list-disc list-inside space-y-1 ml-2 mb-2">
+                  <li><strong>Active</strong> — Your container runs with your chosen resources (CPU, memory, GPU).</li>
+                  <li><strong>Reduced (after 24h idle)</strong> — If your container uses less than 5 millicores of CPU for 24 hours straight, it's automatically scaled down to minimal resources (256MB RAM, 0.25 CPU). It will <strong>auto-wake</strong> to full resources as soon as you use it again.</li>
+                  <li><strong>Stopped (after 30 days idle)</strong> — If your container stays in reduced mode for 30 days with no activity, the pod is stopped. <strong>Your files are always preserved</strong> — just click Start to bring it back.</li>
+                </ul>
+                <p>You can also manually Stop or Start your container at any time from the dashboard buttons.</p>
+              </div>
+            </details>
+            <details class="group">
+              <summary class="flex justify-between items-center p-4 cursor-pointer hover:bg-gray-50">
+                <span class="font-medium">How do I get GPU access?</span>
+                <i class="fas fa-chevron-down text-gray-400 group-open:rotate-180 transition-transform"></i>
+              </summary>
+              <div class="px-4 pb-4 text-sm text-gray-600">
+                <p class="mb-2">Click <strong>Configure</strong> and select a GPU node:</p>
+                <ul class="list-disc list-inside space-y-1 ml-2 mb-2">
+                  <li><strong>Chimera</strong> — 3x NVIDIA RTX 3090 (24GB VRAM each, 72GB total). Shared with the AI chat service.</li>
+                  <li><strong>Cerberus</strong> — 2x NVIDIA RTX 5090 (32GB VRAM each, 64GB total). Recommended for student GPU work.</li>
+                </ul>
+                <p class="mb-2">GPU requests require admin approval. Once approved, a migration banner will appear — click <strong>Migrate Now</strong> to move your container, or <strong>Decline</strong> if you change your mind.</p>
+                <p class="mb-2">GPU access is time-limited (you choose 1 day to 3 months). When the duration expires, your container automatically moves back to Hydra and your files are preserved. You can also move back manually at any time.</p>
+              </div>
+            </details>
+            <details class="group">
+              <summary class="flex justify-between items-center p-4 cursor-pointer hover:bg-gray-50">
+                <span class="font-medium">Are my files backed up?</span>
+                <i class="fas fa-chevron-down text-gray-400 group-open:rotate-180 transition-transform"></i>
+              </summary>
+              <div class="px-4 pb-4 text-sm text-gray-600">
+                <p class="mb-2">Your container's home directory (<code class="bg-gray-100 px-1 rounded">/home/student</code>) is stored on a persistent volume backed by a 21TB RAID-10 array (6 drives with redundancy). This means:</p>
+                <ul class="list-disc list-inside space-y-1 ml-2 mb-2">
+                  <li>Files survive container restarts, stops, and migrations between nodes.</li>
+                  <li>The RAID-10 array can tolerate a drive failure without data loss.</li>
+                  <li>Weekly OS-level backups run on Saturdays to a separate backup drive.</li>
+                  <li>Kubernetes cluster state (etcd) is snapshotted every 6 hours.</li>
+                </ul>
+                <p><strong>However</strong>, there is no per-file version history. If you delete a file, it's gone. Use <code class="bg-gray-100 px-1 rounded">git</code> for version control of your important work.</p>
+              </div>
+            </details>
+            <details class="group">
+              <summary class="flex justify-between items-center p-4 cursor-pointer hover:bg-gray-50">
+                <span class="font-medium">Which node is my container on?</span>
+                <i class="fas fa-chevron-down text-gray-400 group-open:rotate-180 transition-transform"></i>
+              </summary>
+              <div class="px-4 pb-4 text-sm text-gray-600">
+                <p class="mb-2">Check the <strong>Node</strong> field in your container status panel. The cluster has three nodes:</p>
+                <table class="w-full text-xs border-collapse mt-2">
+                  <tr class="border-b"><th class="text-left p-1">Node</th><th class="text-left p-1">Hardware</th><th class="text-left p-1">Best for</th></tr>
+                  <tr class="border-b"><td class="p-1">Hydra</td><td class="p-1">256GB RAM, 64 cores, 21TB RAID</td><td class="p-1">General dev (default)</td></tr>
+                  <tr class="border-b"><td class="p-1">Chimera</td><td class="p-1">3x RTX 3090 (72GB VRAM)</td><td class="p-1">GPU inference</td></tr>
+                  <tr><td class="p-1">Cerberus</td><td class="p-1">2x RTX 5090 (64GB VRAM)</td><td class="p-1">GPU training</td></tr>
+                </table>
+                <p class="mt-2">All students start on Hydra. GPU nodes require approval via Configure.</p>
+              </div>
+            </details>
           </div>
         </div>
       </section>
