@@ -1267,8 +1267,16 @@ async function migrateContainer(username, email, targetNode, config = {}) {
   console.log(`[k8s-containers] Migrating ${username} to ${targetNode}`);
   const migrationProgress = require('./migration-progress');
 
+  // Determine source node for progress tracking
+  const { getOrCreateContainerConfig } = require('./db-init');
+  const currentConfig = await getOrCreateContainerConfig(username, podName);
+  const fromNode = currentConfig.current_node || 'hydra';
+
+  await migrationProgress.startMigration(username, fromNode, targetNode);
+
   // Step 1: Delete current pod if it exists
   try {
+    await migrationProgress.updateProgress(username, 'STOPPING_POD', 'Stopping your container...');
     const existingPod = await k8sClient.getPod(podName);
     if (existingPod) {
       console.log(`[k8s-containers] Deleting existing pod on current node`);
@@ -1281,9 +1289,11 @@ async function migrateContainer(username, email, targetNode, config = {}) {
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
+    await migrationProgress.updateProgress(username, 'POD_STOPPED', 'Container stopped');
   } catch (err) {
     if (err.statusCode !== 404) {
       console.error(`[k8s-containers] Error deleting pod:`, err.message);
+      await migrationProgress.completeMigration(username, false, err.message);
       throw err;
     }
   }
@@ -1310,6 +1320,7 @@ async function migrateContainer(username, email, targetNode, config = {}) {
   if (currentPVC && targetStorageClass === 'hydra-nfs' &&
       currentPVC.spec.storageClassName !== 'hydra-nfs') {
     console.log(`[k8s-containers] Migrating PVC from ${currentPVC.spec.storageClassName} to ${targetStorageClass}`);
+    await migrationProgress.updateProgress(username, 'CREATING_TARGET_STORAGE', `Setting up storage on ${targetNode}...`);
 
     // Delete old PVC (data will be lost - TODO: implement data migration via NFS staging)
     console.log(`[k8s-containers] Deleting old PVC with local storage`);
@@ -1339,6 +1350,7 @@ async function migrateContainer(username, email, targetNode, config = {}) {
       if (pvc && pvc.status.phase === 'Bound') break;
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
+    await migrationProgress.updateProgress(username, 'STORAGE_READY', 'Storage ready');
   }
 
   // Check for cancellation before creating new pod
@@ -1364,6 +1376,7 @@ async function migrateContainer(username, email, targetNode, config = {}) {
   const podSpec = buildPodSpec(username, email, newConfig);
 
   // Step 5: Create the new pod on target node
+  await migrationProgress.updateProgress(username, 'CREATING_POD', `Starting container on ${targetNode}...`);
   console.log(`[k8s-containers] Creating pod on ${targetNode} with ${newConfig.gpu_count} GPUs`);
   await k8sClient.createPod(podSpec);
 
@@ -1384,13 +1397,17 @@ async function migrateContainer(username, email, targetNode, config = {}) {
   if (!ready) {
     console.warn(`[k8s-containers] Pod not ready after migration, but continuing`);
   }
+  await migrationProgress.updateProgress(username, 'POD_READY', 'Container is running');
 
   // Step 7: Update Docker Traefik and SSH piper configs after migration
+  await migrationProgress.updateProgress(username, 'UPDATING_ROUTES', 'Updating routing and SSH...');
   await writeDockerTraefikConfig(username);
   const finalPod = await k8sClient.getPod(podName);
   if (finalPod?.status?.podIP) {
     await updateSshPiperConfig(username, finalPod.status.podIP);
   }
+
+  await migrationProgress.completeMigration(username, true);
 
   return {
     success: true,

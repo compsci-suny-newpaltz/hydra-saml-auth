@@ -1283,6 +1283,8 @@ router.post('/migrate', async (req, res) => {
                 dbUpdate.cpus = 1;
                 dbUpdate.gpu_count = 0;
                 dbUpdate.preset_tier = 'standard';
+                dbUpdate.duration_days = null;
+                dbUpdate.resources_expire_at = null;
             }
             await updateContainerConfig(username, dbUpdate);
 
@@ -1441,10 +1443,14 @@ router.post('/decline-gpu', async (req, res) => {
         }
 
         const username = String(req.user.email).split('@')[0];
-        const { updateUserQuota } = require('../services/db-init');
+        const { updateUserQuota, updateContainerConfig } = require('../services/db-init');
         await updateUserQuota(username, {
             chimera_approved: false,
             cerberus_approved: false
+        });
+        await updateContainerConfig(username, {
+            duration_days: null,
+            resources_expire_at: null
         });
 
         console.log(`[containers] ${username} declined GPU approval`);

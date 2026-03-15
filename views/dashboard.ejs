@@ -2456,9 +2456,26 @@
               const statusText = document.getElementById('migration-status-text');
               const progressBar = document.getElementById('migration-progress-bar');
               const icon = document.getElementById('migration-icon');
+              const hint = document.getElementById('migration-hint');
               if (statusText) statusText.textContent = data.migration.stepLabel;
               if (progressBar) progressBar.style.width = displayedPercent + '%';
               if (icon) icon.textContent = data.migration.stepIcon;
+              // Show step-specific explanation
+              if (hint) {
+                const hints = {
+                  'STOPPING_POD': 'Your container is being gracefully shut down. Running processes will be stopped.',
+                  'POD_STOPPED': 'Container stopped. Preparing to move to the new node.',
+                  'CREATING_TARGET_STORAGE': 'Creating a new storage volume on the target node for your files.',
+                  'STORAGE_READY': 'Storage is ready. Preparing to start your container.',
+                  'COPYING_DATA': 'Copying your files to the new node. This may take a few minutes for large volumes.',
+                  'DATA_COPIED': 'Files transferred successfully.',
+                  'CREATING_POD': 'Starting your container on the new node with GPU access.',
+                  'POD_READY': 'Container is running! Finalizing routing.',
+                  'UPDATING_ROUTES': 'Updating web URLs and SSH routing to point to your new container.'
+                };
+                const stepHint = hints[data.migration.currentStep];
+                if (stepHint) hint.innerHTML = '<i class="fas fa-info-circle mr-1"></i> ' + stepHint;
+              }
             } else if (data.exists && data.running) {
               // Migration done via poll — show success
               showMigrationComplete(true);
