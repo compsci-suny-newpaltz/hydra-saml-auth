@@ -63,6 +63,8 @@ spec:
               readOnly: true
             - name: data
               mountPath: /app/data
+            - name: sshpiper-config
+              mountPath: /app/sshpiper/config
           resources:
             requests:
               memory: "256Mi"
@@ -95,4 +97,8 @@ spec:
         - name: data
           hostPath:
             path: /home/infra/hydra-saml-auth/data
+            type: DirectoryOrCreate
+        - name: sshpiper-config
+          hostPath:
+            path: /home/infra/hydra-saml-auth/sshpiper/config
             type: DirectoryOrCreate

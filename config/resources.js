@@ -25,7 +25,7 @@ module.exports = {
     },
     chimera: {
       role: 'inference',
-      label: 'Chimera (GPU Inference)',
+      label: 'Chimera (3× RTX 3090)',
       description: 'Reserved for OpenWebUI and inference workloads. For GPU training, use Cerberus instead.',
       host: process.env.CHIMERA_HOST || '192.168.1.150',
       dockerSocket: process.env.CHIMERA_DOCKER_SOCKET || 'tcp://192.168.1.150:2376',
@@ -56,7 +56,7 @@ module.exports = {
     },
     cerberus: {
       role: 'training',
-      label: 'Cerberus (GPU Training)',
+      label: 'Cerberus (2× RTX 5090)',
       description: 'Recommended for student GPU work and training. Chimera is reserved for OpenWebUI.',
       host: process.env.CERBERUS_HOST || '192.168.1.242',
       dockerSocket: process.env.CERBERUS_DOCKER_SOCKET || 'tcp://192.168.1.242:2376',
@@ -152,7 +152,7 @@ module.exports = {
     },
     gpu_inference: {
       id: 'gpu_inference',
-      label: 'GPU Inference',
+      label: 'RTX 3090 (Chimera)',
       description: 'Limited availability - Chimera prioritized for OpenWebUI. Consider Cerberus for GPU work.',
       memory_gb: 32,
       cpus: 8,
@@ -164,7 +164,7 @@ module.exports = {
     },
     gpu_training: {
       id: 'gpu_training',
-      label: 'GPU Training (Recommended)',
+      label: 'RTX 5090 (Cerberus)',
       description: 'Cerberus - Recommended for student GPU work. RTX 5090 with 32GB VRAM.',
       memory_gb: 48,
       cpus: 16,

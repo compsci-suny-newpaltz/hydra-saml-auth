@@ -505,8 +505,8 @@ async function writeDockerTraefikConfig(username, customRoutes = null) {
           {
             entryPoints: ['web'],
             rule: `PathPrefix(\`/students/${username}/${route.endpoint}\`)`,
-            service: `k8s-traefik-${username}`
-            // No auth middleware — student sites are public
+            service: `k8s-traefik-${username}`,
+            ...(route.public === false ? { middlewares: [`student-${username}-auth`] } : {})
           }
         ]))
       },
@@ -939,14 +939,10 @@ async function startContainer(username, email = '', containerConfig = null) {
       await k8sClient.createService(buildServiceSpec(username));
     }
 
-    // Ensure IngressRoute and Middleware exist (may be missing for older containers)
-    const existingRoute = await k8sClient.getIngressRoute(`student-${username}`);
-    if (!existingRoute) {
-      console.log(`[K8s] Creating missing IngressRoute for ${username}`);
-      const customRoutes = await getCustomRoutes(username).catch(() => []);
-      await k8sClient.createMiddleware(buildMiddlewareSpec(username, customRoutes)).catch(() => {});
-      await k8sClient.createIngressRoute(buildIngressRouteSpec(username, customRoutes));
-    }
+    // Always replace IngressRoute and Middleware to pick up latest config (strip-session-cookie, etc.)
+    const customRoutes = await getCustomRoutes(username).catch(() => []);
+    await k8sClient.replaceMiddleware(`strip-prefix-${username}`, namespace, buildMiddlewareSpec(username, customRoutes));
+    await k8sClient.replaceIngressRoute(`student-${username}`, namespace, buildIngressRouteSpec(username, customRoutes));
 
     // Ensure Docker Traefik config exists for routing
     await writeDockerTraefikConfig(username);
@@ -1130,7 +1126,7 @@ async function getRoutes(username) {
 
   return [
     ...defaultRoutes,
-    ...customRoutes.map(r => ({ endpoint: r.endpoint, port: r.port, default: false }))
+    ...customRoutes.map(r => ({ endpoint: r.endpoint, port: r.port, public: r.public, default: false }))
   ];
 }
 
@@ -1269,6 +1265,7 @@ async function migrateContainer(username, email, targetNode, config = {}) {
   const pvcName = `hydra-vol-${username}`;
 
   console.log(`[k8s-containers] Migrating ${username} to ${targetNode}`);
+  const migrationProgress = require('./migration-progress');
 
   // Step 1: Delete current pod if it exists
   try {
@@ -1289,6 +1286,15 @@ async function migrateContainer(username, email, targetNode, config = {}) {
       console.error(`[k8s-containers] Error deleting pod:`, err.message);
       throw err;
     }
+  }
+
+  // Check for cancellation
+  if (migrationProgress.isCancelled(username)) {
+    migrationProgress.clearCancellation(username);
+    await migrationProgress.completeMigration(username, false, 'Migration cancelled by user');
+    // Restart pod on original node
+    try { await startContainer(username, email); } catch (e) { console.warn(`[k8s-containers] Could not restart pod after cancel:`, e.message); }
+    return { success: false, error: 'Migration cancelled by user' };
   }
 
   // Step 2: Get node configuration for target node
@@ -1333,6 +1339,15 @@ async function migrateContainer(username, email, targetNode, config = {}) {
       if (pvc && pvc.status.phase === 'Bound') break;
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
+  }
+
+  // Check for cancellation before creating new pod
+  if (migrationProgress.isCancelled(username)) {
+    migrationProgress.clearCancellation(username);
+    await migrationProgress.completeMigration(username, false, 'Migration cancelled by user');
+    // Restart pod on original node
+    try { await startContainer(username, email); } catch (e) { console.warn(`[k8s-containers] Could not restart pod after cancel:`, e.message); }
+    return { success: false, error: 'Migration cancelled by user' };
   }
 
   // Step 4: Build new pod spec with target node's nodeSelector
@@ -1500,16 +1515,20 @@ async function getServiceStatus(username) {
       containerRunning: true
     };
   } catch (err) {
-    console.error(`[K8s] Failed to query supervisor for ${username}:`, err.message);
-    // Return unknown status on error rather than assuming running
+    // ECONNREFUSED means supervisor isn't ready yet (pod still starting)
+    const isStarting = err.message?.includes('ECONNREFUSED') || err.message?.includes('timeout');
+    if (!isStarting) {
+      console.error(`[K8s] Failed to query supervisor for ${username}:`, err.message);
+    }
+    const state = isStarting ? 'STARTING' : 'UNKNOWN';
     return {
       services: [
-        { name: 'code-server', running: false, state: 'UNKNOWN' },
-        { name: 'jupyter', running: false, state: 'UNKNOWN' },
-        { name: 'jenkins', running: false, state: 'UNKNOWN' }
+        { name: 'code-server', running: false, state },
+        { name: 'jupyter', running: false, state },
+        { name: 'jenkins', running: false, state }
       ],
       containerRunning: true,
-      error: err.message
+      starting: isStarting
     };
   }
 }

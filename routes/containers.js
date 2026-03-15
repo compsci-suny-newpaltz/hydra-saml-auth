@@ -1409,6 +1409,52 @@ router.post('/migrate', async (req, res) => {
     }
 });
 
+// POST /dashboard/api/containers/cancel-migration
+router.post('/cancel-migration', async (req, res) => {
+    try {
+        if (!req.isAuthenticated?.() || !req.user?.email) {
+            return res.status(401).json({ success: false, message: 'Not authenticated' });
+        }
+
+        const username = String(req.user.email).split('@')[0];
+        const migrationProgress = require('../services/migration-progress');
+
+        const result = await migrationProgress.cancelMigration(username);
+        if (!result.success) {
+            return res.status(400).json(result);
+        }
+
+        console.log(`[containers] Migration cancellation requested for ${username}`);
+        return res.json({ success: true, message: 'Migration cancellation requested. Your container will be restored shortly.' });
+    } catch (err) {
+        console.error('[containers] cancel-migration error:', err);
+        return res.status(500).json({ success: false, message: err.message || 'Failed to cancel migration' });
+    }
+});
+
+// Decline GPU approval (cancel before migrating)
+// POST /dashboard/api/containers/decline-gpu
+router.post('/decline-gpu', async (req, res) => {
+    try {
+        if (!req.isAuthenticated?.() || !req.user?.email) {
+            return res.status(401).json({ success: false, message: 'Not authenticated' });
+        }
+
+        const username = String(req.user.email).split('@')[0];
+        const { updateUserQuota } = require('../services/db-init');
+        await updateUserQuota(username, {
+            chimera_approved: false,
+            cerberus_approved: false
+        });
+
+        console.log(`[containers] ${username} declined GPU approval`);
+        return res.json({ success: true, message: 'GPU approval declined' });
+    } catch (err) {
+        console.error('[containers] decline-gpu error:', err);
+        return res.status(500).json({ success: false, message: err.message || 'Failed to decline GPU' });
+    }
+});
+
 // Get service statuses (via supervisorctl)
 // GET /dashboard/api/containers/services
 router.get('/services', async (req, res) => {

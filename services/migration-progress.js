@@ -22,6 +22,9 @@ const MIGRATION_STEPS = {
 // In-memory store for active migrations (faster than DB for real-time updates)
 const activeMigrations = new Map();
 
+// Track cancelled migrations
+const cancelledMigrations = new Set();
+
 /**
  * Initialize migration tracking table
  */
@@ -225,6 +228,34 @@ function hasActiveMigration(username) {
   return activeMigrations.has(username);
 }
 
+/**
+ * Request cancellation of an active migration
+ */
+async function cancelMigration(username) {
+  const migration = activeMigrations.get(username);
+  if (!migration || migration.status !== 'in_progress') {
+    return { success: false, message: 'No active migration to cancel' };
+  }
+
+  cancelledMigrations.add(username);
+  console.log(`[migration-progress] Cancellation requested for ${username}`);
+  return { success: true, message: 'Cancellation requested' };
+}
+
+/**
+ * Check if a migration has been cancelled
+ */
+function isCancelled(username) {
+  return cancelledMigrations.has(username);
+}
+
+/**
+ * Clear cancellation flag (called after migration handles the cancellation)
+ */
+function clearCancellation(username) {
+  cancelledMigrations.delete(username);
+}
+
 module.exports = {
   MIGRATION_STEPS,
   initMigrationTable,
@@ -233,5 +264,8 @@ module.exports = {
   completeMigration,
   getMigrationStatus,
   getActiveMigrations,
-  hasActiveMigration
+  hasActiveMigration,
+  cancelMigration,
+  isCancelled,
+  clearCancellation
 };

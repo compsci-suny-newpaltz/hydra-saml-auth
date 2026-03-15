@@ -719,12 +719,19 @@
               <div class="flex items-center justify-between">
                 <div>
                   <p class="font-medium text-purple-800"><i class="fas fa-rocket mr-2"></i>GPU Resources Approved!</p>
-                  <p class="text-sm text-purple-600">Ready to migrate to <strong id="migrate-target-node">Cerberus</strong> with <strong id="migrate-gpu-count">2</strong> GPU(s)</p>
+                  <p class="text-sm text-purple-600">Ready to migrate to <strong id="migrate-target-node">Cerberus</strong> (<span id="migrate-gpu-model">RTX 5090</span>) with <strong id="migrate-gpu-count">2</strong> GPU(s)</p>
                 </div>
-                <button onclick="migrateContainer()" id="migrate-btn"
-                  class="px-4 py-2 rounded bg-purple-600 text-white hover:bg-purple-700 font-medium">
-                  <i class="fas fa-exchange-alt mr-1"></i> Migrate Now
-                </button>
+                <div class="flex gap-2">
+                  <button onclick="declineGpuApproval()" id="decline-gpu-btn"
+                    class="px-3 py-2 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 text-sm"
+                    title="Decline GPU access and stay on current node">
+                    Decline
+                  </button>
+                  <button onclick="migrateContainer()" id="migrate-btn"
+                    class="px-4 py-2 rounded bg-purple-600 text-white hover:bg-purple-700 font-medium">
+                    <i class="fas fa-exchange-alt mr-1"></i> Migrate Now
+                  </button>
+                </div>
               </div>
             </div>
             <!-- Move to Hydra Banner (shown when on GPU node) -->
@@ -751,30 +758,37 @@
           <div id="container-controls" class="hidden">
             <div class="flex flex-wrap gap-2">
               <button onclick="startContainer()" id="start-btn"
+                title="Start your container. Idle containers (no CPU for 24h) are auto-reduced; stopped after 30 days idle."
                 class="px-3 py-2 rounded bg-green-600 text-white hover:bg-green-700 text-sm">
                 <i class="fas fa-play"></i> Start
               </button>
               <button onclick="stopContainer()" id="stop-btn"
+                title="Stop your container. Files are preserved. Uses no resources while stopped."
                 class="px-3 py-2 rounded bg-red-600 text-white hover:bg-red-700 text-sm">
                 <i class="fas fa-stop"></i> Stop
               </button>
               <button onclick="restartContainer()" id="restart-btn"
+                title="Restart your container (stop + start)."
                 class="px-3 py-2 rounded bg-orange-500 text-white hover:bg-orange-600 text-sm">
                 <i class="fas fa-sync-alt"></i> Restart
               </button>
               <button onclick="openLogs()" id="logs-btn"
+                title="View recent container logs."
                 class="px-3 py-2 rounded bg-gray-600 text-white hover:bg-gray-700 text-sm">
                 <i class="fas fa-file-alt"></i> Logs
               </button>
               <button onclick="openTerminal()" id="terminal-btn"
+                title="Open a web terminal in your container."
                 class="px-3 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 text-sm">
                 <i class="fas fa-terminal"></i> Terminal
               </button>
-              <button onclick="showWipeModal()" id="wipe-btn" title="Wipe Volume"
+              <button onclick="showWipeModal()" id="wipe-btn"
+                title="Permanently delete all files and reset your container. Cannot be undone."
                 class="px-3 py-2 rounded bg-yellow-500 text-white hover:bg-yellow-600 text-sm">
                 <i class="fas fa-exclamation-triangle"></i> Wipe
               </button>
-              <button onclick="showResourceModal()" id="resource-config-btn" title="Configure Resources"
+              <button onclick="showResourceModal()" id="resource-config-btn"
+                title="Change node, CPU, memory, GPU, and storage. GPU nodes require admin approval."
                 class="px-3 py-2 rounded bg-purple-600 text-white hover:bg-purple-700 text-sm">
                 <i class="fas fa-cog"></i> Configure
               </button>
@@ -1022,8 +1036,8 @@
                   <option value="conservative">Conservative (1.5GB RAM, 1 CPU) - Auto-approved</option>
                   <option value="standard">Standard (2GB RAM, 1 CPU) - Auto-approved</option>
                   <option value="enhanced">Enhanced (4GB RAM, 2 CPU) - Auto-approved</option>
-                  <option value="gpu_inference" class="gpu-preset-option" data-node="chimera">GPU Inference (32GB RAM, 8 CPU, 1 GPU) - Chimera</option>
-                  <option value="gpu_training" class="gpu-preset-option" data-node="cerberus">GPU Training (48GB RAM, 16 CPU, 2 GPU) - Cerberus</option>
+                  <option value="gpu_inference" class="gpu-preset-option" data-node="chimera">RTX 3090 (32GB RAM, 8 CPU, 1 GPU) - Chimera</option>
+                  <option value="gpu_training" class="gpu-preset-option" data-node="cerberus">RTX 5090 (48GB RAM, 16 CPU, 2 GPU) - Cerberus</option>
                 </select>
                 <p id="preset-capacity-warning" class="text-xs text-orange-600 mt-1 hidden">
                   <i class="fas fa-exclamation-triangle"></i> Limited capacity for this preset
@@ -1040,7 +1054,7 @@
                   <option value="50">50 GB</option>
                   <option value="75">75 GB (Requires approval)</option>
                   <option value="100">100 GB (Requires approval)</option>
-                  <option value="200">200 GB - GPU Training (Requires approval)</option>
+                  <option value="200">200 GB - GPU (Requires approval)</option>
                 </select>
               </div>
 
@@ -1119,7 +1133,7 @@
                 <i class="fas fa-code text-indigo-600"></i>
                 <div>
                   <div class="font-semibold">VS Code</div>
-                  <div id="vscode-service-status" class="text-sm text-gray-600"></div>
+                  <div id="vscode-service-status" class="text-sm text-gray-400 animate-pulse">Loading...</div>
                 </div>
               </div>
               <div class="flex gap-2">
@@ -1142,7 +1156,7 @@
                 <i class="fas fa-book text-purple-600"></i>
                 <div>
                   <div class="font-semibold">Jupyter Notebook</div>
-                  <div id="jupyter-service-status" class="text-sm text-gray-600"></div>
+                  <div id="jupyter-service-status" class="text-sm text-gray-400 animate-pulse">Loading...</div>
                 </div>
               </div>
               <div class="flex gap-2">
@@ -1166,7 +1180,7 @@
                 <i class="fas fa-cogs text-orange-600"></i>
                 <div>
                   <div class="font-semibold">Jenkins CI/CD</div>
-                  <div id="jenkins-service-status" class="text-sm text-gray-600"></div>
+                  <div id="jenkins-service-status" class="text-sm text-gray-400 animate-pulse">Loading...</div>
                 </div>
               </div>
               <div class="flex gap-2">
@@ -2063,6 +2077,9 @@
             if (data.resources.approved_target_node) {
               document.getElementById('migrate-target-node').textContent =
                 data.resources.approved_target_node.charAt(0).toUpperCase() + data.resources.approved_target_node.slice(1);
+              const gpuModels = { chimera: 'RTX 3090', cerberus: 'RTX 5090' };
+              document.getElementById('migrate-gpu-model').textContent =
+                gpuModels[data.resources.approved_target_node] || 'GPU';
               // Show GPU count if set, otherwise show "GPU access"
               const gpuCount = data.resources.gpu_count || 1;
               document.getElementById('migrate-gpu-count').textContent = gpuCount;
@@ -2302,10 +2319,16 @@
                   <div id="migration-progress-bar" class="bg-blue-600 h-2.5 rounded-full transition-all duration-700 ease-out" style="width: 5%"></div>
                 </div>
               </div>
-              <p id="migration-hint" class="text-xs text-blue-500 mt-2">
-                <i class="fas fa-info-circle mr-1"></i>
-                Your files will be preserved. Please do not close this page.
-              </p>
+              <div class="flex items-center justify-between mt-2">
+                <p id="migration-hint" class="text-xs text-blue-500">
+                  <i class="fas fa-info-circle mr-1"></i>
+                  Your files will be preserved. Please do not close this page.
+                </p>
+                <button onclick="cancelMigration()" id="cancel-migration-btn"
+                  class="text-xs px-3 py-1 rounded bg-red-100 hover:bg-red-200 text-red-700 border border-red-300 transition-colors">
+                  <i class="fas fa-times mr-1"></i>Cancel
+                </button>
+              </div>
             </div>
           `;
         }
@@ -2464,6 +2487,37 @@
         stopMigrationPolling();
       }
 
+      window.cancelMigration = async function() {
+        if (!confirm('Cancel the migration? Your container will be restored on the original node.')) return;
+
+        const btn = document.getElementById('cancel-migration-btn');
+        if (btn) {
+          btn.disabled = true;
+          btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Cancelling...';
+        }
+
+        try {
+          const res = await fetch('/dashboard/api/containers/cancel-migration', { method: 'POST' });
+          const data = await res.json();
+
+          if (!data.success) {
+            throw new Error(data.message || 'Failed to cancel');
+          }
+
+          // Update the hint to show cancellation is in progress
+          const hint = document.getElementById('migration-hint');
+          if (hint) hint.innerHTML = '<i class="fas fa-hourglass-half mr-1 text-yellow-600"></i> Cancelling migration...';
+          if (btn) btn.classList.add('hidden');
+
+        } catch (err) {
+          alert('Could not cancel: ' + (err.message || 'Unknown error'));
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-times mr-1"></i>Cancel';
+          }
+        }
+      };
+
       // Check for migration completion based on container status
       function handleMigrationStatus(data, migrationState) {
         const msg = document.getElementById('container-message');
@@ -2578,6 +2632,22 @@
             loadContainerStatus();
             loadPendingRequests();
           }, 3000);
+        }
+      };
+
+      // Decline GPU approval (cancel before migrating)
+      window.declineGpuApproval = async function() {
+        if (!confirm('Decline GPU access? You can request it again later from Configure.')) return;
+        try {
+          const res = await fetch('/dashboard/api/containers/decline-gpu', { method: 'POST' });
+          if (handleAuthError(res)) return;
+          const data = await res.json();
+          if (!res.ok || !data.success) throw new Error(data.message || 'Failed to decline');
+          document.getElementById('migration-banner').classList.add('hidden');
+          loadContainerStatus();
+          loadPendingRequests();
+        } catch (err) {
+          alert('Failed to decline: ' + err.message);
         }
       };
 
@@ -2839,8 +2909,8 @@
         // Update selected node display
         const labels = {
           hydra: 'Hydra (Control Plane)',
-          chimera: 'Chimera (GPU Inference)',
-          cerberus: 'Cerberus (GPU Training)'
+          chimera: 'Chimera (3× RTX 3090)',
+          cerberus: 'Cerberus (2× RTX 5090)'
         };
         document.getElementById('selected-node-label').textContent = labels[selectedNode] || selectedNode;
 
@@ -3094,7 +3164,8 @@
           const jupyter = services.find(s => s.name === 'jupyter');
 
           function formatServiceStatus(svc) {
-            if (svc.state === 'STARTING') return { text: '◌ Starting...', cls: 'text-sm text-yellow-600' };
+            if (svc.state === 'STARTING') return { text: '◌ Starting...', cls: 'text-sm text-yellow-600 animate-pulse' };
+            if (svc.state === 'UNKNOWN') return { text: '◌ Waiting...', cls: 'text-sm text-gray-400 animate-pulse' };
             if (svc.running) return { text: '● Running', cls: 'text-sm text-green-600' };
             return { text: '○ Stopped', cls: 'text-sm text-gray-500' };
           }
@@ -3127,6 +3198,11 @@
           } else if (jenkinsRow) {
             jenkinsRow.classList.add('hidden');
           }
+
+          // Auto-retry if services are still starting
+          if (data.starting || services.some(s => s.state === 'STARTING' || s.state === 'UNKNOWN')) {
+            setTimeout(loadServices, 3000);
+          }
         } catch (err) {
           console.error('Failed to load services:', err);
         }
@@ -3147,7 +3223,13 @@
 
           setTimeout(loadServices, 1000);
         } catch (err) {
-          alert('Failed to start service: ' + err.message);
+          if (err.message?.includes('ECONNREFUSED') || err.message?.includes('not running')) {
+            const msg = document.getElementById('container-message');
+            if (msg) msg.innerHTML = '<div class="text-yellow-600 bg-yellow-50 border border-yellow-200 rounded p-3 text-sm"><i class="fas fa-hourglass-half mr-1"></i> Container is still starting up. Please wait a moment and try again.</div>';
+            setTimeout(() => { if (msg) msg.innerHTML = ''; }, 5000);
+          } else {
+            alert('Failed to start service: ' + err.message);
+          }
         }
       };
 
