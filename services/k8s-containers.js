@@ -884,7 +884,32 @@ async function startContainer(username, email = '', containerConfig = null) {
     let existingPod = await k8sClient.getPod(podName);
 
     if (existingPod) {
-      console.log(`[K8s] Pod ${podName} exists, deleting before restart`);
+      const phase = existingPod.status?.phase;
+      const ready = existingPod.status?.containerStatuses?.every(c => c.ready);
+
+      // If pod is already running and ready, just return success
+      if (phase === 'Running' && ready) {
+        console.log(`[K8s] Pod ${podName} already running and ready`);
+
+        // Still update routes and sshpiper in case they're stale
+        const customRoutes = await getCustomRoutes(username).catch(() => []);
+        await k8sClient.replaceMiddleware(`strip-prefix-${username}`, runtimeConfig.k8s.namespace, buildMiddlewareSpec(username, customRoutes));
+        await k8sClient.replaceIngressRoute(`student-${username}`, runtimeConfig.k8s.namespace, buildIngressRouteSpec(username, customRoutes));
+        await writeDockerTraefikConfig(username);
+        const pod = await k8sClient.getPod(`student-${username}`);
+        if (pod?.status?.podIP) {
+          await updateSshPiperConfig(username, pod.status.podIP);
+        }
+
+        return {
+          success: true,
+          name: `student-${username}`,
+          status: 'already_running',
+          node: existingPod.spec?.nodeName
+        };
+      }
+
+      console.log(`[K8s] Pod ${podName} exists in state ${phase}, deleting before restart`);
 
       // Force delete with grace period 0 to avoid stuck "Terminating" pods
       try {

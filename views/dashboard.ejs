@@ -758,39 +758,39 @@
           <div id="container-controls" class="hidden">
             <div class="flex flex-wrap gap-2">
               <button onclick="startContainer()" id="start-btn"
-                title="Start your container. Idle containers (no CPU for 24h) are auto-reduced; stopped after 30 days idle."
-                class="px-3 py-2 rounded bg-green-600 text-white hover:bg-green-700 text-sm">
+                class="relative group px-3 py-2 rounded bg-green-600 text-white hover:bg-green-700 text-sm">
                 <i class="fas fa-play"></i> Start
+                <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 rounded bg-gray-900 px-2 py-1 text-xs text-white text-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-50">Idle containers (no CPU for 24h) are auto-reduced; stopped after 30 days idle</span>
               </button>
               <button onclick="stopContainer()" id="stop-btn"
-                title="Stop your container. Files are preserved. Uses no resources while stopped."
-                class="px-3 py-2 rounded bg-red-600 text-white hover:bg-red-700 text-sm">
+                class="relative group px-3 py-2 rounded bg-red-600 text-white hover:bg-red-700 text-sm">
                 <i class="fas fa-stop"></i> Stop
+                <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 rounded bg-gray-900 px-2 py-1 text-xs text-white text-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-50">Files are preserved. Uses no resources while stopped.</span>
               </button>
               <button onclick="restartContainer()" id="restart-btn"
-                title="Restart your container (stop + start)."
-                class="px-3 py-2 rounded bg-orange-500 text-white hover:bg-orange-600 text-sm">
+                class="relative group px-3 py-2 rounded bg-orange-500 text-white hover:bg-orange-600 text-sm">
                 <i class="fas fa-sync-alt"></i> Restart
+                <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 rounded bg-gray-900 px-2 py-1 text-xs text-white text-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-50">Stops and restarts your container.</span>
               </button>
               <button onclick="openLogs()" id="logs-btn"
-                title="View recent container logs."
-                class="px-3 py-2 rounded bg-gray-600 text-white hover:bg-gray-700 text-sm">
+                class="relative group px-3 py-2 rounded bg-gray-600 text-white hover:bg-gray-700 text-sm">
                 <i class="fas fa-file-alt"></i> Logs
+                <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 rounded bg-gray-900 px-2 py-1 text-xs text-white text-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-50">View recent container output and errors.</span>
               </button>
               <button onclick="openTerminal()" id="terminal-btn"
-                title="Open a web terminal in your container."
-                class="px-3 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 text-sm">
+                class="relative group px-3 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 text-sm">
                 <i class="fas fa-terminal"></i> Terminal
+                <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 rounded bg-gray-900 px-2 py-1 text-xs text-white text-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-50">Open a web terminal inside your container.</span>
               </button>
               <button onclick="showWipeModal()" id="wipe-btn"
-                title="Permanently delete all files and reset your container. Cannot be undone."
-                class="px-3 py-2 rounded bg-yellow-500 text-white hover:bg-yellow-600 text-sm">
+                class="relative group px-3 py-2 rounded bg-yellow-500 text-white hover:bg-yellow-600 text-sm">
                 <i class="fas fa-exclamation-triangle"></i> Wipe
+                <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 rounded bg-gray-900 px-2 py-1 text-xs text-white text-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-50">Permanently delete ALL files and reset. Cannot be undone!</span>
               </button>
               <button onclick="showResourceModal()" id="resource-config-btn"
-                title="Change node, CPU, memory, GPU, and storage. GPU nodes require admin approval."
-                class="px-3 py-2 rounded bg-purple-600 text-white hover:bg-purple-700 text-sm">
+                class="relative group px-3 py-2 rounded bg-purple-600 text-white hover:bg-purple-700 text-sm">
                 <i class="fas fa-cog"></i> Configure
+                <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 rounded bg-gray-900 px-2 py-1 text-xs text-white text-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-50">Change node, CPU, memory, GPU, and storage.</span>
               </button>
             </div>
           </div>
@@ -3373,12 +3373,13 @@
               const toggleId = `toggle-${route.endpoint}`;
               accessCol = `
                 <button id="${toggleId}" onclick="toggleRouteAccess('${route.endpoint}', ${!isPublic})"
-                  class="px-2 py-1 text-xs rounded font-medium ${isPublic
+                  title="Click to change access mode"
+                  class="px-2 py-1 text-xs rounded font-medium cursor-pointer ${isPublic
                     ? 'bg-green-100 hover:bg-green-200 text-green-700 border border-green-300'
                     : 'bg-yellow-100 hover:bg-yellow-200 text-yellow-700 border border-yellow-300'
                   }">
                   <i class="fas ${isPublic ? 'fa-globe' : 'fa-lock'}"></i>
-                  ${isPublic ? 'Public' : 'SSO'}
+                  ${isPublic ? 'Public' : 'SSO'} <span class="text-[10px] opacity-60">(click to change)</span>
                 </button>`;
             }
 
