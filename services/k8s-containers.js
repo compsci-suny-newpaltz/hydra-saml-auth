@@ -389,7 +389,7 @@ function buildIngressRouteSpec(username, customRoutes = []) {
         }))
       ],
       tls: {
-        secretName: 'hydra-tls'
+        certResolver: 'letsencrypt'
       }
     }
   };
