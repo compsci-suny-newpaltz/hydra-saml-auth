@@ -194,19 +194,25 @@ async function checkIdlePods() {
 
         // Pod is idle
         if (sleepState === 'awake' && idleMs >= SHORT_IDLE_MS) {
-          // Idle 1+ day, still on normal resources → reduce
-          // Pass actual node name so overflow pods can migrate back to Hydra
-          console.log(`[idle-manager] Reducing ${username} (idle ${Math.round(idleMs / 3600000)}h, CPU: ${cpuMilli}m, node: ${nodeName})`);
-          const result = await reducePod(username, email, config, nodeName);
-          if (result.success) {
-            await updateContainerConfig(username, { sleep_state: 'reduced' });
-            if (result.migratedToHydra) {
+          // Idle 1+ day — mark as reduced but keep full resources (no RAM downscaling)
+          // Only migrate overflow pods (non-GPU on GPU node) back to Hydra
+          const isOverflow = nodeName && nodeName !== 'hydra' &&
+            !['gpu_inference', 'gpu_training'].includes(config.preset_tier);
+
+          if (isOverflow) {
+            console.log(`[idle-manager] Migrating overflow ${username} back to Hydra (was on ${nodeName})`);
+            const result = await reducePod(username, email, config, nodeName);
+            if (result.success) {
+              await updateContainerConfig(username, { sleep_state: 'reduced' });
               actions.push({ username, action: 'reduced+migrated', from: nodeName, idleHours: Math.round(idleMs / 3600000) });
             } else {
-              actions.push({ username, action: 'reduced', idleHours: Math.round(idleMs / 3600000) });
+              actions.push({ username, action: 'reduce_failed', reason: result.reason });
             }
           } else {
-            actions.push({ username, action: 'reduce_failed', reason: result.reason });
+            // Just mark as reduced — pod keeps running with full resources
+            console.log(`[idle-manager] Marking ${username} as idle (${Math.round(idleMs / 3600000)}h, CPU: ${cpuMilli}m)`);
+            await updateContainerConfig(username, { sleep_state: 'reduced' });
+            actions.push({ username, action: 'marked_idle', idleHours: Math.round(idleMs / 3600000) });
           }
         } else if (sleepState === 'reduced' && idleMs >= LONG_IDLE_MS) {
           // Idle 30+ days on reduced resources → stop entirely
