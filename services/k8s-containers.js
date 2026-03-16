@@ -167,7 +167,8 @@ function buildPodSpec(username, email, config) {
               'NET_BIND_SERVICE', // Ports < 1024 (SSH on 22)
               'SYS_CHROOT',      // sshd privilege separation
               'KILL',            // Supervisor process management
-              'FOWNER'           // apt/dpkg file ownership operations
+              'FOWNER',          // apt/dpkg file ownership operations
+              'AUDIT_WRITE'      // sshd PAM login audit (required for interactive SSH)
             ]
           }
         },
