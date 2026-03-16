@@ -117,9 +117,9 @@ module.exports = {
     conservative: {
       id: 'conservative',
       label: 'Conservative',
-      description: 'Light workloads - auto-approved',
-      memory_mb: 1536,
-      memory_gb: 1.5,
+      description: 'Default for all students - auto-approved',
+      memory_mb: 2048,
+      memory_gb: 2,
       cpus: 1,
       storage_gb: 10,
       gpu_count: 0,
