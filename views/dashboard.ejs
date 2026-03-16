@@ -1249,24 +1249,44 @@
                 <p class="text-xs text-gray-500 mt-1">Save the key to <code class="bg-gray-200 px-1">~/.ssh/</code> and set permissions with <code class="bg-gray-200 px-1">chmod 600</code></p>
               </div>
 
-              <!-- Quick Setup Instructions -->
+              <!-- Setup Instructions -->
               <details class="mt-3">
                 <summary class="cursor-pointer text-sm font-medium text-blue-600 hover:text-blue-800">
                   <i class="fas fa-info-circle"></i> Setup Instructions
                 </summary>
-                <div class="mt-2 text-xs text-gray-600 space-y-2 bg-white rounded p-3 border">
-                  <p><strong>1. Download your private key</strong> using the button above.</p>
-                  <p><strong>2. Save the key file:</strong></p>
-                  <code class="block bg-gray-100 p-2 rounded">
-                    # Linux/Mac<br>
-                    mv ~/Downloads/<%= user.email.split('@')[0] %>_hydra_key ~/.ssh/<br>
+                <div class="mt-2 text-xs text-gray-600 space-y-3 bg-white rounded p-3 border">
+                  <p><strong>Step 1:</strong> Download your private key using the <strong>Download Key</strong> button above.</p>
+
+                  <p><strong>Step 2:</strong> Move the key to <code class="bg-gray-200 px-1">~/.ssh/</code> and set permissions:</p>
+                  <code class="block bg-gray-100 p-2 rounded font-mono leading-relaxed">
+                    cp ~/Downloads/<%= user.email.split('@')[0] %>_hydra_key ~/.ssh/<%= user.email.split('@')[0] %>_hydra_key<br>
                     chmod 600 ~/.ssh/<%= user.email.split('@')[0] %>_hydra_key
                   </code>
-                  <p><strong>3. Connect:</strong></p>
-                  <code id="ssh-setup-command" class="block bg-gray-100 p-2 rounded">
+
+                  <p><strong>Step 3:</strong> Connect:</p>
+                  <code id="ssh-setup-command" class="block bg-gray-100 p-2 rounded font-mono">
                     ssh -i ~/.ssh/<%= user.email.split('@')[0] %>_hydra_key <%= user.email.split('@')[0] %>@hydra.newpaltz.edu -p 2222
                   </code>
-                  <p class="text-yellow-600"><i class="fas fa-exclamation-triangle"></i> Windows users: Use PuTTY or Windows Terminal with OpenSSH</p>
+
+                  <div class="bg-yellow-50 border border-yellow-200 rounded p-2 mt-2">
+                    <p class="font-medium text-yellow-800"><i class="fas fa-exclamation-triangle"></i> Troubleshooting</p>
+                    <p class="mt-1">If you get <strong>"Host key verification failed"</strong> or <strong>"bad signature"</strong>, clear the old entry and retry:</p>
+                    <code class="block bg-gray-100 p-2 rounded font-mono mt-1">
+                      ssh-keygen -R "[hydra.newpaltz.edu]:2222"
+                    </code>
+                  </div>
+
+                  <div class="bg-blue-50 border border-blue-200 rounded p-2 mt-2">
+                    <p class="font-medium text-blue-800"><i class="fas fa-info-circle"></i> Key points</p>
+                    <ul class="list-disc list-inside mt-1 space-y-0.5">
+                      <li>Port is <strong>2222</strong> (not the default 22)</li>
+                      <li>The key must have <code class="bg-gray-200 px-1">600</code> permissions or SSH will refuse it</li>
+                      <li>Each student gets their own key and username</li>
+                      <li>You'll be logged in as <code class="bg-gray-200 px-1">student</code> inside your container (with full sudo access)</li>
+                    </ul>
+                  </div>
+
+                  <p class="text-gray-500 mt-1"><i class="fab fa-windows"></i> <strong>Windows:</strong> Use Windows Terminal with OpenSSH (built into Windows 10+) or PuTTY. The same commands work in PowerShell.</p>
                 </div>
               </details>
 
