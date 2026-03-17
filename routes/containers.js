@@ -2285,18 +2285,49 @@ router.get('/logs/stream', async (req, res) => {
             res.setHeader('Cache-Control', 'no-cache');
             res.setHeader('Connection', 'keep-alive');
 
+            const podName = `student-${username}`;
+            const namespace = runtimeConfig.k8s?.namespace || 'hydra-students';
+
             try {
+                // Send recent logs first
                 const logs = await k8sContainers.getContainerLogs(username, 200);
-                const lines = logs.split('\n');
-                lines.forEach(line => {
+                logs.split('\n').forEach(line => {
                     if (line) res.write(`data: ${line}\n\n`);
                 });
+
+                // Then follow new logs via K8s API stream
+                const k8sClient = require('../services/k8s-client');
+                const stream = await k8sClient.followPodLogs(podName, namespace, 'student');
+
+                if (stream) {
+                    let buffer = '';
+                    stream.on('data', (chunk) => {
+                        buffer += chunk.toString();
+                        const lines = buffer.split('\n');
+                        buffer = lines.pop(); // keep incomplete line in buffer
+                        lines.forEach(line => {
+                            if (line) res.write(`data: ${line}\n\n`);
+                        });
+                    });
+                    stream.on('end', () => {
+                        res.write(`data: [Stream ended]\n\n`);
+                        res.end();
+                    });
+                    stream.on('error', () => {
+                        res.write(`data: [Stream error - refresh for new logs]\n\n`);
+                        res.end();
+                    });
+
+                    req.on('close', () => {
+                        try { stream.destroy(); } catch (e) {}
+                    });
+                    return;
+                }
             } catch (e) {
-                res.write(`data: [K8s] Unable to fetch logs: ${e.message}\n\n`);
+                res.write(`data: [Unable to fetch logs: ${e.message}]\n\n`);
             }
 
-            // K8s log streaming is more complex - for now just send current logs and close
-            res.write(`data: [K8s] Log streaming ended - refresh for new logs\n\n`);
+            res.write(`data: [Log streaming ended - refresh for new logs]\n\n`);
             res.end();
             return;
         }
