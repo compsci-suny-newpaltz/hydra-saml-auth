@@ -1110,7 +1110,7 @@ async function wipeContainer(username) {
  */
 async function getContainerLogs(username, tailLines = 100) {
   try {
-    return await k8sClient.getPodLogs(`student-${username}`, undefined, undefined, tailLines);
+    return await k8sClient.getPodLogs(`student-${username}`, undefined, 'student', tailLines);
   } catch (err) {
     if (err.statusCode === 404) {
       return 'Container not found';
