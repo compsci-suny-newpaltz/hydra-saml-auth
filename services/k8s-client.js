@@ -146,21 +146,14 @@ class K8sClient {
     return response.body;
   }
 
-  async followPodLogs(name, namespace = this.namespace, container = undefined) {
+  async followPodLogs(name, namespace = this.namespace, container = undefined, writable) {
     this.init();
-    const response = await this.coreApi.readNamespacedPodLog(
-      name,
-      namespace,
-      container,
-      true,     // follow
-      undefined, // insecureSkipTLSVerifyBackend
-      undefined, // limitBytes
-      undefined, // pretty
-      undefined, // previous
-      10,        // sinceSeconds - only new logs
-      undefined  // tailLines
-    );
-    return response.response; // Return the readable stream
+    const log = new k8s.Log(this.kc);
+    return await log.log(namespace, name, container, writable, {
+      follow: true,
+      sinceSeconds: 10,
+      pretty: false
+    });
   }
 
   // ==================== PVC OPERATIONS ====================

@@ -2295,34 +2295,32 @@ router.get('/logs/stream', async (req, res) => {
                     if (line) res.write(`data: ${line}\n\n`);
                 });
 
-                // Then follow new logs via K8s API stream
+                // Then follow new logs via K8s Log API
                 const k8sClient = require('../services/k8s-client');
-                const stream = await k8sClient.followPodLogs(podName, namespace, 'student');
+                const { PassThrough } = require('stream');
+                const logStream = new PassThrough();
 
-                if (stream) {
-                    let buffer = '';
-                    stream.on('data', (chunk) => {
-                        buffer += chunk.toString();
-                        const lines = buffer.split('\n');
-                        buffer = lines.pop(); // keep incomplete line in buffer
-                        lines.forEach(line => {
-                            if (line) res.write(`data: ${line}\n\n`);
-                        });
+                let buffer = '';
+                logStream.on('data', (chunk) => {
+                    buffer += chunk.toString();
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop();
+                    lines.forEach(line => {
+                        if (line) res.write(`data: ${line}\n\n`);
                     });
-                    stream.on('end', () => {
-                        res.write(`data: [Stream ended]\n\n`);
-                        res.end();
-                    });
-                    stream.on('error', () => {
-                        res.write(`data: [Stream error - refresh for new logs]\n\n`);
-                        res.end();
-                    });
+                });
+                logStream.on('end', () => {
+                    res.write(`data: [Stream ended]\n\n`);
+                    res.end();
+                });
 
-                    req.on('close', () => {
-                        try { stream.destroy(); } catch (e) {}
-                    });
-                    return;
-                }
+                const logReq = await k8sClient.followPodLogs(podName, namespace, 'student', logStream);
+
+                req.on('close', () => {
+                    try { logReq.abort(); } catch (e) {}
+                    try { logStream.destroy(); } catch (e) {}
+                });
+                return;
             } catch (e) {
                 res.write(`data: [Unable to fetch logs: ${e.message}]\n\n`);
             }
