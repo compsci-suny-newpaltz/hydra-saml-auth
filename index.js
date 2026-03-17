@@ -1036,6 +1036,20 @@ const ensureAuthenticated = (req, res, next) => {
       // Start auto-reschedule service (moves expired GPU pods back to Hydra)
       const autoReschedule = require('./services/auto-reschedule');
       autoReschedule.start();
+
+      // Reconcile containers after startup (30s delay for K8s to settle)
+      const runtimeConfig = require('./config/runtime');
+      if (runtimeConfig.isKubernetes()) {
+        setTimeout(async () => {
+          try {
+            const { reconcileContainers } = require('./services/reconciler');
+            const result = await reconcileContainers();
+            console.log('[reconciler] Startup reconciliation complete:', result);
+          } catch (err) {
+            console.error('[reconciler] Startup reconciliation failed:', err.message);
+          }
+        }, 30000);
+      }
     });
   } catch (e) {
     console.error('Failed to start server:', e);

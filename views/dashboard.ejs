@@ -1385,6 +1385,18 @@
             <p class="text-xs text-gray-500 mt-2">Route your container's internal ports to custom endpoints. Reserved ports: 8443 (VS Code), 8888 (Jupyter).</p>
           </div>
           <div id="routing-message" class="mt-3"></div>
+          <div class="bg-blue-50 border border-blue-200 rounded p-3 mt-3">
+            <p class="text-sm font-medium text-blue-800"><i class="fas fa-info-circle"></i> Hosting a web app?</p>
+            <p class="text-xs text-blue-700 mt-1">
+              Your app is served at <code class="bg-blue-100 px-1">https://hydra.newpaltz.edu/students/<%= user.email.split('@')[0] %>/ENDPOINT/</code>.
+              If using a build tool, set the base path so assets load correctly:
+            </p>
+            <ul class="text-xs text-blue-700 mt-1 list-disc list-inside space-y-0.5">
+              <li><strong>Vite:</strong> <code class="bg-blue-100 px-1">base: '/students/<%= user.email.split('@')[0] %>/ENDPOINT/'</code> in vite.config</li>
+              <li><strong>Next.js:</strong> <code class="bg-blue-100 px-1">basePath: '/students/<%= user.email.split('@')[0] %>/ENDPOINT'</code> in next.config</li>
+              <li><strong>Create React App:</strong> <code class="bg-blue-100 px-1">homepage: '/students/<%= user.email.split('@')[0] %>/ENDPOINT/'</code> in package.json</li>
+            </ul>
+          </div>
         </div>
 
         <!-- Server Status Section (Collapsible) -->
@@ -3409,9 +3421,15 @@
               <td class="px-3 py-2">${typeBadge}</td>
               <td class="px-3 py-2">${accessCol}</td>
               <td class="px-3 py-2">
-                <a href="${route.url}" target="_blank" class="text-blue-600 underline text-xs">
-                  <i class="fas fa-external-link-alt"></i> ${route.url}
-                </a>
+                <div class="flex items-center gap-1">
+                  <a href="${route.url}" target="_blank" class="text-blue-600 underline text-xs truncate max-w-[260px]" title="${route.url}">
+                    <i class="fas fa-external-link-alt"></i> ${route.url}
+                  </a>
+                  <button onclick="navigator.clipboard.writeText('${route.url}').then(() => { this.innerHTML='<i class=\\'fas fa-check\\'></i>'; setTimeout(() => this.innerHTML='<i class=\\'fas fa-copy\\'></i>', 1500) })"
+                    title="Copy URL" class="px-1.5 py-0.5 text-xs rounded bg-gray-100 hover:bg-gray-200 text-gray-600 flex-shrink-0">
+                    <i class="fas fa-copy"></i>
+                  </button>
+                </div>
               </td>
               <td class="px-3 py-2">
                 ${isDefault
