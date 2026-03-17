@@ -847,6 +847,17 @@ async function startContainer(username, email = '', containerConfig = null) {
   // Check if pod already exists and running
   const status = await getContainerStatus(username);
   if (status.exists && status.running) {
+    // Refresh routes in case they're missing (e.g. after batch operations)
+    try {
+      const customRoutes = await getCustomRoutes(username).catch(() => []);
+      const ns = runtimeConfig.k8s.namespace;
+      await k8sClient.replaceMiddleware(`strip-prefix-${username}`, ns, buildMiddlewareSpec(username, customRoutes));
+      await k8sClient.replaceIngressRoute(`student-${username}`, ns, buildIngressRouteSpec(username, customRoutes));
+      await writeDockerTraefikConfig(username);
+      if (status.ip) await updateSshPiperConfig(username, status.ip);
+    } catch (routeErr) {
+      console.warn(`[K8s] Could not refresh routes for ${username}:`, routeErr.message);
+    }
     return { success: true, message: 'Container already running' };
   }
 
@@ -967,8 +978,8 @@ async function startContainer(username, email = '', containerConfig = null) {
 
     // Always replace IngressRoute and Middleware to pick up latest config (strip-session-cookie, etc.)
     const customRoutes = await getCustomRoutes(username).catch(() => []);
-    await k8sClient.replaceMiddleware(`strip-prefix-${username}`, namespace, buildMiddlewareSpec(username, customRoutes));
-    await k8sClient.replaceIngressRoute(`student-${username}`, namespace, buildIngressRouteSpec(username, customRoutes));
+    await k8sClient.replaceMiddleware(`strip-prefix-${username}`, runtimeConfig.k8s.namespace, buildMiddlewareSpec(username, customRoutes));
+    await k8sClient.replaceIngressRoute(`student-${username}`, runtimeConfig.k8s.namespace, buildIngressRouteSpec(username, customRoutes));
 
     // Ensure Docker Traefik config exists for routing
     await writeDockerTraefikConfig(username);
