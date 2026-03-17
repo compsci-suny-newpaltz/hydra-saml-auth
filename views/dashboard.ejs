@@ -3660,18 +3660,31 @@
       }
 
       window.openLogs = function () {
-        const w = window.open('', '_blank', 'width=900,height=600');
-        w.document.write('<!DOCTYPE html><html><head><title>Container Logs</title>');
-        w.document.write('<style>body { margin: 0; padding: 0; background: #1a1a1a; font-family: monospace; }');
-        w.document.write('#log { white-space: pre-wrap; margin: 0; padding: 12px; color: #ddd; height: 100vh; overflow: auto; font-size: 12px; line-height: 1.4; }</style></head>');
-        w.document.write('<body><pre id="log"></pre>');
-        w.document.write('<sc' + 'ript>');
-        w.document.write('const es = new EventSource("/dashboard/api/containers/logs/stream");');
-        w.document.write('const pre = document.getElementById("log");');
-        w.document.write('es.onmessage = (e) => { pre.textContent += e.data + "\\n"; pre.scrollTop = pre.scrollHeight; };');
-        w.document.write('es.onerror = () => { pre.textContent += "\\n[Stream closed]\\n"; es.close(); };');
-        w.document.write('window.addEventListener("beforeunload", () => es.close());');
-        w.document.write('</sc' + 'ript></body></html>');
+        // Show logs inline instead of popup (avoids cross-window auth issues)
+        const msg = document.getElementById('container-message');
+        if (document.getElementById('log-viewer')) {
+          // Already open — close it
+          document.getElementById('log-viewer').remove();
+          if (window._logES) { window._logES.close(); window._logES = null; }
+          return;
+        }
+
+        msg.innerHTML = `
+          <div id="log-viewer" class="mt-2 rounded border border-gray-700 bg-gray-900 overflow-hidden">
+            <div class="flex items-center justify-between px-3 py-1.5 bg-gray-800 border-b border-gray-700">
+              <span class="text-xs text-gray-400 font-mono"><i class="fas fa-file-alt mr-1"></i>Container Logs</span>
+              <button onclick="document.getElementById('log-viewer').remove(); if(window._logES){window._logES.close();window._logES=null;}"
+                class="text-gray-500 hover:text-white text-xs"><i class="fas fa-times"></i></button>
+            </div>
+            <pre id="log-output" class="p-3 text-xs font-mono text-green-400 max-h-80 overflow-auto whitespace-pre-wrap leading-relaxed">Loading logs...</pre>
+          </div>`;
+
+        const pre = document.getElementById('log-output');
+        pre.textContent = '';
+        const es = new EventSource('/dashboard/api/containers/logs/stream');
+        window._logES = es;
+        es.onmessage = (e) => { pre.textContent += e.data + '\n'; pre.scrollTop = pre.scrollHeight; };
+        es.onerror = () => { pre.textContent += '\n[Stream ended]\n'; es.close(); window._logES = null; };
       };
 
       window.openTerminal = function () {
