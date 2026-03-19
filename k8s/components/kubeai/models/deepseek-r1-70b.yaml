@@ -1,0 +1,17 @@
+apiVersion: kubeai.org/v1
+kind: Model
+metadata:
+  name: deepseek-r1-70b
+  namespace: kubeai
+spec:
+  features: [TextGeneration]
+  owner: deepseek-ai
+  url: "hf://deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
+  engine: VLLM
+  args:
+    - "--tensor-parallel-size=2"
+    - "--max-model-len=4096"
+    - "--gpu-memory-utilization=0.90"
+    - "--dtype=auto"
+  resourceProfile: nvidia-rtx-5090:2
+  minReplicas: 0

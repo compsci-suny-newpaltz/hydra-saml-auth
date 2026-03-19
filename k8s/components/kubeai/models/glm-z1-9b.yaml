@@ -1,0 +1,17 @@
+apiVersion: kubeai.org/v1
+kind: Model
+metadata:
+  name: glm-z1-9b-0414
+  namespace: kubeai
+spec:
+  features: [TextGeneration]
+  owner: zai-org
+  url: "hf://zai-org/GLM-Z1-9B-0414"
+  engine: VLLM
+  args:
+    - "--max-model-len=8192"
+    - "--gpu-memory-utilization=0.90"
+    - "--dtype=auto"
+    - "--trust-remote-code"
+  resourceProfile: nvidia-rtx-3090:1
+  minReplicas: 0

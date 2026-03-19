@@ -1,0 +1,19 @@
+apiVersion: kubeai.org/v1
+kind: Model
+metadata:
+  name: mistral-small-24b-instruct
+  namespace: kubeai
+spec:
+  features: [TextGeneration]
+  owner: mistralai
+  url: "hf://mistralai/Mistral-Small-24B-Instruct-2501"
+  engine: VLLM
+  args:
+    - "--max-model-len=4096"
+    - "--gpu-memory-utilization=0.90"
+    - "--dtype=auto"
+    - "--tokenizer_mode=mistral"
+    - "--config_format=mistral"
+    - "--load_format=mistral"
+  resourceProfile: nvidia-rtx-5090:2
+  minReplicas: 0

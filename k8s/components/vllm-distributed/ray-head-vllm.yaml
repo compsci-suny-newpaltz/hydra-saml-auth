@@ -1,0 +1,138 @@
+# Ray Head + vLLM on Chimera for cross-node pipeline-parallel serving
+# Uses 10GbE dedicated interconnect (10.0.0.1 <-> 10.0.0.2)
+# TP=2 per node (intra-node), PP=2 across nodes = 4+ GPUs total
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm-ray-head
+  namespace: hydra-infra
+  labels:
+    app: vllm-distributed
+    component: ray-head
+spec:
+  replicas: 0  # Scale up when needed for large models
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: vllm-distributed
+      component: ray-head
+  template:
+    metadata:
+      labels:
+        app: vllm-distributed
+        component: ray-head
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: chimera
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      runtimeClassName: nvidia
+      hostNetwork: true
+      hostIPC: true
+      containers:
+        - name: ray-head-vllm
+          image: vllm/vllm-openai:v0.11.2
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              ray start --head --port=6379 \
+                --node-ip-address=10.0.0.1 \
+                --dashboard-host=0.0.0.0 --dashboard-port=8265 \
+                --num-gpus=3
+              # Wait for worker node to join (5 GPUs = 3 chimera + 2 cerberus)
+              echo "Waiting for Ray worker (cerberus) to join..."
+              until ray status 2>/dev/null | grep -q "5.0 GPU\|5.0/5.0 GPU"; do
+                sleep 5
+              done
+              echo "Worker joined. Starting vLLM..."
+              python3 -m vllm.entrypoints.openai.api_server \
+                --model $MODEL_ID \
+                --tensor-parallel-size $TP_SIZE \
+                --pipeline-parallel-size $PP_SIZE \
+                --distributed-executor-backend ray \
+                --max-model-len $MAX_MODEL_LEN \
+                --gpu-memory-utilization 0.90 \
+                --quantization awq \
+                --enforce-eager \
+                --dtype auto \
+                --trust-remote-code \
+                --host 0.0.0.0 \
+                --port 8000
+          ports:
+            - containerPort: 6379
+              name: ray-gcs
+            - containerPort: 8265
+              name: ray-dashboard
+            - containerPort: 8000
+              name: vllm-api
+          env:
+            - name: MODEL_ID
+              value: "Qwen/Qwen2.5-72B-Instruct-AWQ"
+            - name: TP_SIZE
+              value: "1"
+            - name: PP_SIZE
+              value: "5"
+            - name: MAX_MODEL_LEN
+              value: "4096"
+            - name: HF_HOME
+              value: "/models/huggingface"
+            # NCCL — TCP sockets over 10GbE (Soft-RoCE rxe not supported by container's mlx5 IB plugin)
+            - name: NCCL_SOCKET_IFNAME
+              value: "enp69s0"
+            - name: NCCL_IB_DISABLE
+              value: "1"
+            - name: NCCL_DEBUG
+              value: "WARN"
+            # Gloo — force 10GbE (not 127.0.1.1 from /etc/hosts)
+            - name: GLOO_SOCKET_IFNAME
+              value: "enp69s0"
+            - name: TP_SOCKET_IFNAME
+              value: "enp69s0"
+            # UCX — TCP + shared memory for Ray object transfer over 10GbE
+            - name: UCX_TLS
+              value: "tcp,sm,self"
+            - name: UCX_NET_DEVICES
+              value: "enp69s0"
+            - name: UCX_MEMTYPE_CACHE
+              value: "n"
+            - name: RAY_HEAD_NODE
+              value: "1"
+            - name: VLLM_HOST_IP
+              value: "10.0.0.1"
+            # FlashInfer JIT-compiles for both sm_86 (3090) and sm_120 (5090)
+            - name: VLLM_ATTENTION_BACKEND
+              value: "FLASHINFER"
+          resources:
+            requests:
+              memory: "32Gi"
+              cpu: "8000m"
+              nvidia.com/gpu: "3"
+            limits:
+              memory: "64Gi"
+              cpu: "16000m"
+              nvidia.com/gpu: "3"
+          volumeMounts:
+            - name: models
+              mountPath: /models
+            - name: infiniband
+              mountPath: /dev/infiniband
+              readOnly: true
+            - name: shm
+              mountPath: /dev/shm
+      volumes:
+        - name: models
+          hostPath:
+            path: /models
+            type: Directory
+        - name: infiniband
+          hostPath:
+            path: /dev/infiniband
+            type: DirectoryOrCreate
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: "16Gi"

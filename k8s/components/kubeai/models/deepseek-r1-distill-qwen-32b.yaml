@@ -1,0 +1,16 @@
+apiVersion: kubeai.org/v1
+kind: Model
+metadata:
+  name: deepseek-r1-distill-qwen-32b
+  namespace: kubeai
+spec:
+  features: [TextGeneration]
+  owner: deepseek-ai
+  url: "hf://deepseek-ai/DeepSeek-R1-Distill-Qwen-32B"
+  engine: VLLM
+  args:
+    - "--max-model-len=4096"
+    - "--gpu-memory-utilization=0.90"
+    - "--dtype=auto"
+  resourceProfile: nvidia-rtx-5090:1
+  minReplicas: 0

@@ -1,0 +1,547 @@
+apiVersion: v1
+items:
+- apiVersion: traefik.containo.us/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.containo.us/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"name":"flapjs","namespace":"hydra-infra"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/jflap`)","middlewares":[{"name":"jflap-strip"}],"priority":15,"services":[{"name":"flapjs","port":8080}]}],"tls":{"certResolver":"letsencrypt"}}}
+    creationTimestamp: "2026-02-09T21:12:48Z"
+    generation: 2
+    name: flapjs
+    namespace: hydra-infra
+    resourceVersion: "7136644"
+    uid: eb546f47-d499-44db-813f-f58a24f11fee
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/jflap`)
+      middlewares:
+      - name: jflap-strip
+      priority: 15
+      services:
+      - name: flapjs
+        port: 8080
+    tls:
+      certResolver: letsencrypt
+- apiVersion: traefik.containo.us/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.containo.us/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"name":"git-learning","namespace":"hydra-infra"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/git`)","priority":15,"services":[{"name":"git-learning","port":38765}]}],"tls":{"certResolver":"letsencrypt"}}}
+    creationTimestamp: "2026-02-06T06:36:50Z"
+    generation: 1
+    name: git-learning
+    namespace: hydra-infra
+    resourceVersion: "6355781"
+    uid: 78cab56e-82ad-40e4-a6c6-1265e94efe78
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/git`)
+      priority: 15
+      services:
+      - name: git-learning
+        port: 38765
+    tls:
+      certResolver: letsencrypt
+- apiVersion: traefik.containo.us/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.containo.us/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"name":"hackathons","namespace":"hydra-infra"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/hackathons`)","priority":100,"services":[{"name":"hackathons","port":45821}]}],"tls":{"certResolver":"letsencrypt"}}}
+    creationTimestamp: "2026-02-06T06:36:50Z"
+    generation: 1
+    name: hackathons
+    namespace: hydra-infra
+    resourceVersion: "6355780"
+    uid: e8a84ab2-7cb6-473a-8485-fa646686f380
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/hackathons`)
+      priority: 100
+      services:
+      - name: hackathons
+        port: 45821
+    tls:
+      certResolver: letsencrypt
+- apiVersion: traefik.containo.us/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.containo.us/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"name":"java-executor","namespace":"hydra-infra"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/java`)","middlewares":[{"name":"java-strip"}],"priority":15,"services":[{"name":"java-executor","port":3000}]}],"tls":{"certResolver":"letsencrypt"}}}
+    creationTimestamp: "2026-02-06T06:36:50Z"
+    generation: 2
+    name: java-executor
+    namespace: hydra-infra
+    resourceVersion: "7157792"
+    uid: 1e3b1ac0-524a-4c5a-88a0-d4c5bb877459
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/java`)
+      middlewares:
+      - name: java-strip
+      priority: 15
+      services:
+      - name: java-executor
+        port: 3000
+    tls:
+      certResolver: letsencrypt
+- apiVersion: traefik.containo.us/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.containo.us/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"name":"n8n","namespace":"hydra-infra"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`n8n.hydra.newpaltz.edu`)","services":[{"name":"n8n","port":5678}]}],"tls":{"certResolver":"letsencrypt"}}}
+    creationTimestamp: "2026-02-06T06:36:50Z"
+    generation: 1
+    name: n8n
+    namespace: hydra-infra
+    resourceVersion: "6355779"
+    uid: 77c33949-5e14-4c6b-b312-7276dd742641
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`n8n.hydra.newpaltz.edu`)
+      services:
+      - name: n8n
+        port: 5678
+    tls:
+      certResolver: letsencrypt
+- apiVersion: traefik.containo.us/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.containo.us/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"name":"cs-lab-website","namespace":"hydra-system"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/api/courses`)","priority":20,"services":[{"name":"cs-lab-backend","port":5001}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/api/events`)","priority":20,"services":[{"name":"cs-lab-backend","port":5001}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/api/comp-exam`)","priority":20,"services":[{"name":"cs-lab-backend","port":5001}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/api/faq`)","priority":20,"services":[{"name":"cs-lab-backend","port":5001}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/api/faculty`)","priority":20,"services":[{"name":"cs-lab-backend","port":5001}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/api/student-resources`)","priority":20,"services":[{"name":"cs-lab-backend","port":5001}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/api/admins`)","priority":20,"services":[{"name":"cs-lab-backend","port":5001}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/api/auth`)","priority":20,"services":[{"name":"cs-lab-backend","port":5001}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/api/tech-blog`)","priority":20,"services":[{"name":"cs-lab-backend","port":5001}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/api/student-highlights`)","priority":20,"services":[{"name":"cs-lab-backend","port":5001}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/api/sd-forms`)","priority":20,"services":[{"name":"cs-lab-backend","port":5001}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/api/student`)","priority":20,"services":[{"name":"cs-lab-backend","port":5001}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/api/school-calendar`)","priority":20,"services":[{"name":"cs-lab-backend","port":5001}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/courses`)","priority":10,"services":[{"name":"cs-lab-backend","port":5001}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/events`)","priority":10,"services":[{"name":"cs-lab-backend","port":5001}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/calendar`)","priority":10,"services":[{"name":"cs-lab-backend","port":5001}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/faculty`)","priority":10,"services":[{"name":"cs-lab-backend","port":5001}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/faq`)","priority":10,"services":[{"name":"cs-lab-backend","port":5001}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/student`)","priority":10,"services":[{"name":"cs-lab-backend","port":5001}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/tech-blog`)","priority":10,"services":[{"name":"cs-lab-backend","port":5001}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/admin`)","priority":10,"services":[{"name":"cs-lab-backend","port":5001}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/comp-exam`)","priority":10,"services":[{"name":"cs-lab-backend","port":5001}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/course-progression`)","priority":10,"services":[{"name":"cs-lab-backend","port":5001}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/uploads`)","priority":10,"services":[{"name":"cs-lab-backend","port":5001}]}],"tls":{"certResolver":"letsencrypt"}}}
+    creationTimestamp: "2026-02-05T05:39:45Z"
+    generation: 1
+    name: cs-lab-website
+    namespace: hydra-system
+    resourceVersion: "5941698"
+    uid: 7cdb9fdb-02d3-4ef6-8c55-605b6dc0fd3a
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/api/courses`)
+      priority: 20
+      services:
+      - name: cs-lab-backend
+        port: 5001
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/api/events`)
+      priority: 20
+      services:
+      - name: cs-lab-backend
+        port: 5001
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/api/comp-exam`)
+      priority: 20
+      services:
+      - name: cs-lab-backend
+        port: 5001
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/api/faq`)
+      priority: 20
+      services:
+      - name: cs-lab-backend
+        port: 5001
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/api/faculty`)
+      priority: 20
+      services:
+      - name: cs-lab-backend
+        port: 5001
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/api/student-resources`)
+      priority: 20
+      services:
+      - name: cs-lab-backend
+        port: 5001
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/api/admins`)
+      priority: 20
+      services:
+      - name: cs-lab-backend
+        port: 5001
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/api/auth`)
+      priority: 20
+      services:
+      - name: cs-lab-backend
+        port: 5001
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/api/tech-blog`)
+      priority: 20
+      services:
+      - name: cs-lab-backend
+        port: 5001
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/api/student-highlights`)
+      priority: 20
+      services:
+      - name: cs-lab-backend
+        port: 5001
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/api/sd-forms`)
+      priority: 20
+      services:
+      - name: cs-lab-backend
+        port: 5001
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/api/student`)
+      priority: 20
+      services:
+      - name: cs-lab-backend
+        port: 5001
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/api/school-calendar`)
+      priority: 20
+      services:
+      - name: cs-lab-backend
+        port: 5001
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/courses`)
+      priority: 10
+      services:
+      - name: cs-lab-backend
+        port: 5001
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/events`)
+      priority: 10
+      services:
+      - name: cs-lab-backend
+        port: 5001
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/calendar`)
+      priority: 10
+      services:
+      - name: cs-lab-backend
+        port: 5001
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/faculty`)
+      priority: 10
+      services:
+      - name: cs-lab-backend
+        port: 5001
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/faq`)
+      priority: 10
+      services:
+      - name: cs-lab-backend
+        port: 5001
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/student`)
+      priority: 10
+      services:
+      - name: cs-lab-backend
+        port: 5001
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/tech-blog`)
+      priority: 10
+      services:
+      - name: cs-lab-backend
+        port: 5001
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/admin`)
+      priority: 10
+      services:
+      - name: cs-lab-backend
+        port: 5001
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/comp-exam`)
+      priority: 10
+      services:
+      - name: cs-lab-backend
+        port: 5001
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/course-progression`)
+      priority: 10
+      services:
+      - name: cs-lab-backend
+        port: 5001
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/uploads`)
+      priority: 10
+      services:
+      - name: cs-lab-backend
+        port: 5001
+    tls:
+      certResolver: letsencrypt
+- apiVersion: traefik.containo.us/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.containo.us/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"name":"git-learning","namespace":"hydra-system"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/git`)","priority":15,"services":[{"name":"git-learning-external","port":8080}]}],"tls":{"certResolver":"letsencrypt"}}}
+    creationTimestamp: "2026-02-09T19:39:35Z"
+    generation: 1
+    name: git-learning
+    namespace: hydra-system
+    resourceVersion: "7109128"
+    uid: 812688e4-443c-4421-aec4-0d9831a4027a
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/git`)
+      priority: 15
+      services:
+      - name: git-learning-external
+        port: 8080
+    tls:
+      certResolver: letsencrypt
+- apiVersion: traefik.containo.us/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.containo.us/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"name":"hackathons","namespace":"hydra-system"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/hackathons`)","priority":100,"services":[{"name":"hackathons-external","port":45821}]}],"tls":{"certResolver":"letsencrypt"}}}
+    creationTimestamp: "2026-02-09T19:39:34Z"
+    generation: 1
+    name: hackathons
+    namespace: hydra-system
+    resourceVersion: "7109126"
+    uid: 51ff3e0c-39c1-4418-97c4-1e5f352aa6ea
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/hackathons`)
+      priority: 100
+      services:
+      - name: hackathons-external
+        port: 45821
+    tls:
+      certResolver: letsencrypt
+- apiVersion: traefik.containo.us/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.containo.us/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"name":"hydra-default","namespace":"hydra-system"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`)","priority":1,"services":[{"name":"cs-lab-backend","port":5001}]}],"tls":{"certResolver":"letsencrypt"}}}
+    creationTimestamp: "2026-02-05T05:39:45Z"
+    generation: 1
+    name: hydra-default
+    namespace: hydra-system
+    resourceVersion: "5941701"
+    uid: 0c805a71-d4bf-487a-9f28-5340e362924e
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`)
+      priority: 1
+      services:
+      - name: cs-lab-backend
+        port: 5001
+    tls:
+      certResolver: letsencrypt
+- apiVersion: traefik.containo.us/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.containo.us/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"name":"hydra-main","namespace":"hydra-system"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/dashboard`)","priority":10,"services":[{"name":"hydra-auth","port":6969}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/login`)","priority":10,"services":[{"name":"hydra-auth","port":6969}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/logout`)","priority":10,"services":[{"name":"hydra-auth","port":6969}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/auth`)","priority":10,"services":[{"name":"hydra-auth","port":6969}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/callback`)","priority":10,"services":[{"name":"hydra-auth","port":6969}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/token`)","priority":10,"services":[{"name":"hydra-auth","port":6969}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/check`)","priority":10,"services":[{"name":"hydra-auth","port":6969}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/.well-known/jwks.json`)","priority":10,"services":[{"name":"hydra-auth","port":6969}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/servers`)","priority":10,"services":[{"name":"hydra-auth","port":6969}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/SUNYCAT`)","priority":5,"services":[{"name":"hydra-auth","port":6969}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/css`)","priority":5,"services":[{"name":"hydra-auth","port":6969}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/js`)","priority":5,"services":[{"name":"hydra-auth","port":6969}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/static`)","priority":5,"services":[{"name":"hydra-auth","port":6969}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/health`)","priority":10,"services":[{"name":"hydra-auth","port":6969}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/api/servers`)","priority":15,"services":[{"name":"hydra-auth","port":6969}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/api/events`)","priority":15,"services":[{"name":"hydra-auth","port":6969}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/api/webui`)","priority":15,"services":[{"name":"hydra-auth","port":6969}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/admin-api`)","priority":15,"services":[{"name":"hydra-backend","port":5002}]}],"tls":{"certResolver":"letsencrypt"}}}
+    creationTimestamp: "2026-02-05T05:39:45Z"
+    generation: 4
+    name: hydra-main
+    namespace: hydra-system
+    resourceVersion: "8471446"
+    uid: 77c9f326-e314-4fa7-9c10-663b0214e765
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/dashboard`)
+      priority: 10
+      services:
+      - name: hydra-auth
+        port: 6969
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/login`)
+      priority: 10
+      services:
+      - name: hydra-auth
+        port: 6969
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/logout`)
+      priority: 10
+      services:
+      - name: hydra-auth
+        port: 6969
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/auth`)
+      priority: 10
+      services:
+      - name: hydra-auth
+        port: 6969
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/callback`)
+      priority: 10
+      services:
+      - name: hydra-auth
+        port: 6969
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/token`)
+      priority: 10
+      services:
+      - name: hydra-auth
+        port: 6969
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/check`)
+      priority: 10
+      services:
+      - name: hydra-auth
+        port: 6969
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/.well-known/jwks.json`)
+      priority: 10
+      services:
+      - name: hydra-auth
+        port: 6969
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/servers`)
+      priority: 10
+      services:
+      - name: hydra-auth
+        port: 6969
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/SUNYCAT`)
+      priority: 5
+      services:
+      - name: hydra-auth
+        port: 6969
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/css`)
+      priority: 5
+      services:
+      - name: hydra-auth
+        port: 6969
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/js`)
+      priority: 5
+      services:
+      - name: hydra-auth
+        port: 6969
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/static`)
+      priority: 5
+      services:
+      - name: hydra-auth
+        port: 6969
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/health`)
+      priority: 10
+      services:
+      - name: hydra-auth
+        port: 6969
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/api/servers`)
+      priority: 15
+      services:
+      - name: hydra-auth
+        port: 6969
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/api/events`)
+      priority: 15
+      services:
+      - name: hydra-auth
+        port: 6969
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/api/webui`)
+      priority: 15
+      services:
+      - name: hydra-auth
+        port: 6969
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/admin-api`)
+      priority: 15
+      services:
+      - name: hydra-backend
+        port: 5002
+    tls:
+      certResolver: letsencrypt
+- apiVersion: traefik.containo.us/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.containo.us/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"name":"n8n","namespace":"hydra-system"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`n8n.hydra.newpaltz.edu`)","services":[{"name":"n8n-external","port":5678}]}],"tls":{"certResolver":"letsencrypt"}}}
+    creationTimestamp: "2026-02-09T19:39:35Z"
+    generation: 1
+    name: n8n
+    namespace: hydra-system
+    resourceVersion: "7109133"
+    uid: 7ba44917-f1f7-4a3a-b80b-25dd3ce38e60
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`n8n.hydra.newpaltz.edu`)
+      services:
+      - name: n8n-external
+        port: 5678
+    tls:
+      certResolver: letsencrypt
+- apiVersion: traefik.containo.us/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.containo.us/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"name":"openwebui","namespace":"hydra-system"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`gpt.hydra.newpaltz.edu`)","services":[{"name":"open-webui","namespace":"hydra-infra","port":3000}]}],"tls":{"certResolver":"letsencrypt"}}}
+    creationTimestamp: "2026-02-09T19:39:35Z"
+    generation: 1
+    name: openwebui
+    namespace: hydra-system
+    resourceVersion: "7109129"
+    uid: 43e24583-e7d4-42f7-bb20-0fe33e008d24
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`gpt.hydra.newpaltz.edu`)
+      services:
+      - name: open-webui
+        namespace: hydra-infra
+        port: 3000
+    tls:
+      certResolver: letsencrypt
+kind: List
+metadata:
+  resourceVersion: ""

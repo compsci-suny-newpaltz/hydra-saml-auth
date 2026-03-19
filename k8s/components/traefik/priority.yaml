@@ -1,0 +1,10 @@
+# PriorityClass for critical infrastructure (Traefik, SSHPiper)
+# Ensures these pods survive eviction pressure — student pods evicted first
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: infra-critical
+value: 1000000
+globalDefault: false
+preemptionPolicy: PreemptLowerPriority
+description: "Critical infrastructure pods (ingress, SSH) that must not be evicted"

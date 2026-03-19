@@ -1,0 +1,16 @@
+apiVersion: kubeai.org/v1
+kind: Model
+metadata:
+  name: phi-4
+  namespace: kubeai
+spec:
+  features: [TextGeneration]
+  owner: microsoft
+  url: "hf://microsoft/phi-4"
+  engine: VLLM
+  args:
+    - "--max-model-len=4096"
+    - "--gpu-memory-utilization=0.90"
+    - "--dtype=auto"
+  resourceProfile: nvidia-rtx-5090:1
+  minReplicas: 0

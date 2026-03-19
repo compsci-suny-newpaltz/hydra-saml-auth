@@ -1,0 +1,20 @@
+apiVersion: kubeai.org/v1
+kind: Model
+metadata:
+  name: llama-3-3-70b-instruct
+  namespace: kubeai
+spec:
+  features: [TextGeneration]
+  owner: meta-llama
+  # Use AWQ version for 2-GPU fit (ungated, no HF approval needed)
+  url: "hf://hugging-quants/Meta-Llama-3.1-70B-Instruct-AWQ-INT4"
+  engine: VLLM
+  args:
+    - "--tensor-parallel-size=2"
+    - "--max-model-len=4096"
+    - "--gpu-memory-utilization=0.90"
+    - "--enforce-eager"
+    - "--dtype=auto"
+    - "--quantization=awq"
+  resourceProfile: nvidia-rtx-3090:2
+  minReplicas: 0

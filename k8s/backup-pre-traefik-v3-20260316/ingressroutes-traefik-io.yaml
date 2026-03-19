@@ -1,0 +1,3954 @@
+apiVersion: v1
+items:
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"name":"risvllm","namespace":"hydra-infra"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/riscv`)","middlewares":[{"name":"risvllm-strip"},{"name":"hydra-forward-auth","namespace":"hydra-system"}],"priority":15,"services":[{"name":"risvllm","port":3000}]}],"tls":{"certResolver":"letsencrypt"}}}
+    creationTimestamp: "2026-03-11T21:09:54Z"
+    generation: 2
+    name: risvllm
+    namespace: hydra-infra
+    resourceVersion: "20439591"
+    uid: f2cc7fc7-bc50-42d2-b135-4a1655ddbc03
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/riscv`)
+      middlewares:
+      - name: risvllm-strip
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      priority: 15
+      services:
+      - name: risvllm
+        port: 3000
+    tls:
+      certResolver: letsencrypt
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"hydra.owner":"adamoa2"},"name":"student-adamoa2","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/adamoa2/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-adamoa2"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-adamoa2","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/adamoa2/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-adamoa2","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/adamoa2/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-adamoa2","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-10T20:35:37Z"
+    generation: 2
+    labels:
+      app.kubernetes.io/instance: adamoa2
+      app.kubernetes.io/name: student-route
+      hydra.owner: adamoa2
+    name: student-adamoa2
+    namespace: hydra-students
+    resourceVersion: "21882771"
+    uid: a2cbf2ab-b266-4958-a2bd-41257a0f0420
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/adamoa2/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-adamoa2
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-adamoa2
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/adamoa2/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-adamoa2
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/adamoa2/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-adamoa2
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"adlerb1","app.kubernetes.io/name":"student-route","hydra.owner":"adlerb1"},"name":"student-adlerb1","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/adlerb1/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-adlerb1"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-adlerb1","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/adlerb1/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-adlerb1","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/adlerb1/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-adlerb1","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:22Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: adlerb1
+      app.kubernetes.io/name: student-route
+      hydra.owner: adlerb1
+    name: student-adlerb1
+    namespace: hydra-students
+    resourceVersion: "22016342"
+    uid: 60e69900-3dd2-4d01-9356-da82bb67bd50
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/adlerb1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-adlerb1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-adlerb1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/adlerb1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-adlerb1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/adlerb1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-adlerb1
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"alis22","app.kubernetes.io/name":"student-route","hydra.owner":"alis22"},"name":"student-alis22","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/alis22/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-alis22"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-alis22","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/alis22/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-alis22","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/alis22/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-alis22","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:22Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: alis22
+      app.kubernetes.io/name: student-route
+      hydra.owner: alis22
+    name: student-alis22
+    namespace: hydra-students
+    resourceVersion: "22016345"
+    uid: 7ed7c491-d98b-4e2e-a4f9-42e3caecfca6
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/alis22/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-alis22
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-alis22
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/alis22/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-alis22
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/alis22/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-alis22
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"hydra.owner":"amannc1"},"name":"student-amannc1","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/amannc1/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-amannc1"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-amannc1","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/amannc1/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-amannc1","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/amannc1/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-amannc1","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-01-27T21:09:27Z"
+    generation: 11
+    labels:
+      hydra.owner: amannc1
+    name: student-amannc1
+    namespace: hydra-students
+    resourceVersion: "21882778"
+    uid: ab52fb0f-fc50-463d-8dbc-9133e79b8e67
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/amannc1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-amannc1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-amannc1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/amannc1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-amannc1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/amannc1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-amannc1
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"arenellc1","app.kubernetes.io/name":"student-route","hydra.owner":"arenellc1"},"name":"student-arenellc1","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/arenellc1/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-arenellc1"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-arenellc1","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/arenellc1/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-arenellc1","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/arenellc1/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-arenellc1","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:22Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: arenellc1
+      app.kubernetes.io/name: student-route
+      hydra.owner: arenellc1
+    name: student-arenellc1
+    namespace: hydra-students
+    resourceVersion: "22016346"
+    uid: a281dc4e-66ba-4cf6-8da2-7f09a6582fe4
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/arenellc1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-arenellc1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-arenellc1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/arenellc1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-arenellc1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/arenellc1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-arenellc1
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"ascarint1","app.kubernetes.io/name":"student-route","hydra.owner":"ascarint1"},"name":"student-ascarint1","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/ascarint1/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-ascarint1"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-ascarint1","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/ascarint1/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-ascarint1","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/ascarint1/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-ascarint1","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:23Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: ascarint1
+      app.kubernetes.io/name: student-route
+      hydra.owner: ascarint1
+    name: student-ascarint1
+    namespace: hydra-students
+    resourceVersion: "22016352"
+    uid: 62344e76-4f7f-487d-a253-093ec4bfd4df
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/ascarint1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-ascarint1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-ascarint1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/ascarint1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-ascarint1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/ascarint1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-ascarint1
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"baranovd1","app.kubernetes.io/name":"student-route","hydra.owner":"baranovd1"},"name":"student-baranovd1","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/baranovd1/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-baranovd1"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-baranovd1","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/baranovd1/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-baranovd1","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/baranovd1/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-baranovd1","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:23Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: baranovd1
+      app.kubernetes.io/name: student-route
+      hydra.owner: baranovd1
+    name: student-baranovd1
+    namespace: hydra-students
+    resourceVersion: "22016353"
+    uid: ca8afeee-6082-4ef1-b5d5-2ffa74211c1c
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/baranovd1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-baranovd1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-baranovd1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/baranovd1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-baranovd1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/baranovd1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-baranovd1
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"casconeb1","app.kubernetes.io/name":"student-route","hydra.owner":"casconeb1"},"name":"student-casconeb1","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/casconeb1/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-casconeb1"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-casconeb1","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/casconeb1/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-casconeb1","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/casconeb1/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-casconeb1","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:23Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: casconeb1
+      app.kubernetes.io/name: student-route
+      hydra.owner: casconeb1
+    name: student-casconeb1
+    namespace: hydra-students
+    resourceVersion: "22016357"
+    uid: 77224881-723c-4abf-9842-6dd974a1e06e
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/casconeb1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-casconeb1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-casconeb1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/casconeb1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-casconeb1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/casconeb1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-casconeb1
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"chenm","app.kubernetes.io/name":"student-route","hydra.owner":"chenm"},"name":"student-chenm","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/chenm/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-chenm"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-chenm","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/chenm/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-chenm","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/chenm/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-chenm","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:24Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: chenm
+      app.kubernetes.io/name: student-route
+      hydra.owner: chenm
+    name: student-chenm
+    namespace: hydra-students
+    resourceVersion: "22016359"
+    uid: 12161cc2-eb2b-4bb3-b0cf-6f84228f6489
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/chenm/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-chenm
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-chenm
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/chenm/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-chenm
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/chenm/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-chenm
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"chenma","app.kubernetes.io/name":"student-route","hydra.owner":"chenma"},"name":"student-chenma","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/chenma/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-chenma"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-chenma","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/chenma/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-chenma","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/chenma/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-chenma","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:24Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: chenma
+      app.kubernetes.io/name: student-route
+      hydra.owner: chenma
+    name: student-chenma
+    namespace: hydra-students
+    resourceVersion: "22016362"
+    uid: d86a4105-87a8-49f5-a96e-87ead8342c32
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/chenma/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-chenma
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-chenma
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/chenma/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-chenma
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/chenma/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-chenma
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"chiquitm1","app.kubernetes.io/name":"student-route","hydra.owner":"chiquitm1"},"name":"student-chiquitm1","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/chiquitm1/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-chiquitm1"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-chiquitm1","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/chiquitm1/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-chiquitm1","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/chiquitm1/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-chiquitm1","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:25Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: chiquitm1
+      app.kubernetes.io/name: student-route
+      hydra.owner: chiquitm1
+    name: student-chiquitm1
+    namespace: hydra-students
+    resourceVersion: "22016366"
+    uid: fc4be45f-cc56-46c2-a077-460cba536445
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/chiquitm1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-chiquitm1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-chiquitm1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/chiquitm1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-chiquitm1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/chiquitm1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-chiquitm1
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"colabelh1","app.kubernetes.io/name":"student-route","hydra.owner":"colabelh1"},"name":"student-colabelh1","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/colabelh1/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-colabelh1"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-colabelh1","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/colabelh1/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-colabelh1","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/colabelh1/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-colabelh1","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:25Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: colabelh1
+      app.kubernetes.io/name: student-route
+      hydra.owner: colabelh1
+    name: student-colabelh1
+    namespace: hydra-students
+    resourceVersion: "22016373"
+    uid: 44121195-b36d-40f7-8b84-a61849e81186
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/colabelh1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-colabelh1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-colabelh1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/colabelh1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-colabelh1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/colabelh1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-colabelh1
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"hydra.owner":"cruzg16"},"name":"student-cruzg16","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/cruzg16/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-cruzg16"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-cruzg16","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/cruzg16/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-cruzg16","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/cruzg16/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-cruzg16","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-01-27T21:09:37Z"
+    generation: 11
+    labels:
+      hydra.owner: cruzg16
+    name: student-cruzg16
+    namespace: hydra-students
+    resourceVersion: "21882780"
+    uid: 2b61d29b-ca7d-4696-bb12-5fed3ba0880a
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/cruzg16/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-cruzg16
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-cruzg16
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/cruzg16/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-cruzg16
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/cruzg16/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-cruzg16
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"hydra.owner":"cuacuasr1"},"name":"student-cuacuasr1","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/cuacuasr1/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-cuacuasr1"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-cuacuasr1","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/cuacuasr1/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-cuacuasr1","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/cuacuasr1/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-cuacuasr1","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-02-16T20:05:57Z"
+    generation: 2
+    labels:
+      app.kubernetes.io/instance: cuacuasr1
+      app.kubernetes.io/name: student-route
+      hydra.owner: cuacuasr1
+    name: student-cuacuasr1
+    namespace: hydra-students
+    resourceVersion: "21882786"
+    uid: 6f9c10f5-ddbf-4b60-8da9-b0005c160b6a
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/cuacuasr1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-cuacuasr1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-cuacuasr1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/cuacuasr1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-cuacuasr1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/cuacuasr1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-cuacuasr1
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"hydra.owner":"currym6"},"name":"student-currym6","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/currym6/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-currym6"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-currym6","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/currym6/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-currym6","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/currym6/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-currym6","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-02-03T16:00:30Z"
+    generation: 7
+    labels:
+      hydra.owner: currym6
+    name: student-currym6
+    namespace: hydra-students
+    resourceVersion: "21882791"
+    uid: 3e12f8d1-9983-416b-af29-fa1a09dc35e2
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/currym6/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-currym6
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-currym6
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/currym6/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-currym6
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/currym6/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-currym6
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"dankwahd1","app.kubernetes.io/name":"student-route","hydra.owner":"dankwahd1"},"name":"student-dankwahd1","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/dankwahd1/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-dankwahd1"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-dankwahd1","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/dankwahd1/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-dankwahd1","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/dankwahd1/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-dankwahd1","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:25Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: dankwahd1
+      app.kubernetes.io/name: student-route
+      hydra.owner: dankwahd1
+    name: student-dankwahd1
+    namespace: hydra-students
+    resourceVersion: "22016374"
+    uid: 7c307b9a-9964-485c-8b5b-da8a08c737ce
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/dankwahd1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-dankwahd1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-dankwahd1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/dankwahd1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-dankwahd1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/dankwahd1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-dankwahd1
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"defreitm1","app.kubernetes.io/name":"student-route","hydra.owner":"defreitm1"},"name":"student-defreitm1","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/defreitm1/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-defreitm1"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-defreitm1","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/defreitm1/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-defreitm1","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/defreitm1/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-defreitm1","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:26Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: defreitm1
+      app.kubernetes.io/name: student-route
+      hydra.owner: defreitm1
+    name: student-defreitm1
+    namespace: hydra-students
+    resourceVersion: "22016379"
+    uid: 0e35e992-c4c0-4cdf-8e72-8198a721953a
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/defreitm1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-defreitm1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-defreitm1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/defreitm1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-defreitm1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/defreitm1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-defreitm1
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"degennac1","app.kubernetes.io/name":"student-route","hydra.owner":"degennac1"},"name":"student-degennac1","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/degennac1/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-degennac1"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-degennac1","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/degennac1/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-degennac1","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/degennac1/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-degennac1","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:26Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: degennac1
+      app.kubernetes.io/name: student-route
+      hydra.owner: degennac1
+    name: student-degennac1
+    namespace: hydra-students
+    resourceVersion: "22016387"
+    uid: 69ef4413-3de3-4359-884b-4f8707b6e67c
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/degennac1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-degennac1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-degennac1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/degennac1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-degennac1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/degennac1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-degennac1
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    creationTimestamp: "2026-03-14T19:35:28Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: demilion1
+      app.kubernetes.io/name: student-route
+      hydra.owner: demilion1
+    name: student-demilion1
+    namespace: hydra-students
+    resourceVersion: "21883901"
+    uid: 84b5030b-9f93-4807-b6a2-1e433c88d1c6
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/demilion1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-demilion1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-demilion1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/demilion1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-demilion1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/demilion1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-demilion1
+        port: 8080
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/demilion1/my-site`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-demilion1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-demilion1
+        port: 3000
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"deutscha1","app.kubernetes.io/name":"student-route","hydra.owner":"deutscha1"},"name":"student-deutscha1","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/deutscha1/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-deutscha1"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-deutscha1","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/deutscha1/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-deutscha1","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/deutscha1/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-deutscha1","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:26Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: deutscha1
+      app.kubernetes.io/name: student-route
+      hydra.owner: deutscha1
+    name: student-deutscha1
+    namespace: hydra-students
+    resourceVersion: "22016388"
+    uid: 526e2793-3172-45de-9229-322762f9915c
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/deutscha1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-deutscha1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-deutscha1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/deutscha1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-deutscha1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/deutscha1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-deutscha1
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"discuad1","app.kubernetes.io/name":"student-route","hydra.owner":"discuad1"},"name":"student-discuad1","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/discuad1/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-discuad1"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-discuad1","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/discuad1/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-discuad1","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/discuad1/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-discuad1","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:27Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: discuad1
+      app.kubernetes.io/name: student-route
+      hydra.owner: discuad1
+    name: student-discuad1
+    namespace: hydra-students
+    resourceVersion: "22016393"
+    uid: 823a6742-e433-4d4c-914b-fe731f17c98b
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/discuad1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-discuad1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-discuad1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/discuad1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-discuad1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/discuad1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-discuad1
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"effendik1","app.kubernetes.io/name":"student-route","hydra.owner":"effendik1"},"name":"student-effendik1","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/effendik1/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-effendik1"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-effendik1","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/effendik1/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-effendik1","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/effendik1/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-effendik1","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:27Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: effendik1
+      app.kubernetes.io/name: student-route
+      hydra.owner: effendik1
+    name: student-effendik1
+    namespace: hydra-students
+    resourceVersion: "22016398"
+    uid: a024ae56-3bca-4419-a178-de11e0697449
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/effendik1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-effendik1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-effendik1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/effendik1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-effendik1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/effendik1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-effendik1
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"hydra.owner":"engeldie1"},"name":"student-engeldie1","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/engeldie1/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-engeldie1"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-engeldie1","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/engeldie1/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-engeldie1","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/engeldie1/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-engeldie1","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-02-13T18:20:26Z"
+    generation: 4
+    labels:
+      hydra.owner: engeldie1
+    name: student-engeldie1
+    namespace: hydra-students
+    resourceVersion: "21882800"
+    uid: 0f7c06e3-48e8-4f78-869d-cec9ddea9e25
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/engeldie1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-engeldie1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-engeldie1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/engeldie1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-engeldie1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/engeldie1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-engeldie1
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"escurrad1","app.kubernetes.io/name":"student-route","hydra.owner":"escurrad1"},"name":"student-escurrad1","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/escurrad1/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-escurrad1"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-escurrad1","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/escurrad1/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-escurrad1","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/escurrad1/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-escurrad1","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:28Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: escurrad1
+      app.kubernetes.io/name: student-route
+      hydra.owner: escurrad1
+    name: student-escurrad1
+    namespace: hydra-students
+    resourceVersion: "22016402"
+    uid: e6bb7cad-be5e-4728-a538-5408eed965ae
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/escurrad1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-escurrad1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-escurrad1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/escurrad1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-escurrad1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/escurrad1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-escurrad1
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    creationTimestamp: "2026-03-14T19:33:25Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: fennerj1
+      app.kubernetes.io/name: student-route
+      hydra.owner: fennerj1
+    name: student-fennerj1
+    namespace: hydra-students
+    resourceVersion: "21883185"
+    uid: 2b6a629d-1273-41d4-ad75-3510370c2d04
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/fennerj1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-fennerj1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-fennerj1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/fennerj1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-fennerj1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/fennerj1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-fennerj1
+        port: 8080
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/fennerj1/my-site`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-fennerj1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-fennerj1
+        port: 3000
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"fiscellv1","app.kubernetes.io/name":"student-route","hydra.owner":"fiscellv1"},"name":"student-fiscellv1","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/fiscellv1/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-fiscellv1"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-fiscellv1","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/fiscellv1/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-fiscellv1","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/fiscellv1/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-fiscellv1","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:28Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: fiscellv1
+      app.kubernetes.io/name: student-route
+      hydra.owner: fiscellv1
+    name: student-fiscellv1
+    namespace: hydra-students
+    resourceVersion: "22016403"
+    uid: c40d3ec0-9c3f-40d3-b3f0-3b337794c607
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/fiscellv1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-fiscellv1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-fiscellv1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/fiscellv1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-fiscellv1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/fiscellv1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-fiscellv1
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"fisherb5","app.kubernetes.io/name":"student-route","hydra.owner":"fisherb5"},"name":"student-fisherb5","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/fisherb5/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-fisherb5"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-fisherb5","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/fisherb5/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-fisherb5","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/fisherb5/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-fisherb5","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:28Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: fisherb5
+      app.kubernetes.io/name: student-route
+      hydra.owner: fisherb5
+    name: student-fisherb5
+    namespace: hydra-students
+    resourceVersion: "22016410"
+    uid: c38d36f5-5551-4bcb-87e4-53cc816ced08
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/fisherb5/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-fisherb5
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-fisherb5
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/fisherb5/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-fisherb5
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/fisherb5/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-fisherb5
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"formana4","app.kubernetes.io/name":"student-route","hydra.owner":"formana4"},"name":"student-formana4","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/formana4/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-formana4"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-formana4","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/formana4/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-formana4","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/formana4/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-formana4","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:29Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: formana4
+      app.kubernetes.io/name: student-route
+      hydra.owner: formana4
+    name: student-formana4
+    namespace: hydra-students
+    resourceVersion: "22016411"
+    uid: 604b428a-2c98-40ba-90b9-5ae260e45d05
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/formana4/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-formana4
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-formana4
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/formana4/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-formana4
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/formana4/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-formana4
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"hydra.owner":"ganza1"},"name":"student-ganza1","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/ganza1/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-ganza1"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-ganza1","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/ganza1/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-ganza1","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/ganza1/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-ganza1","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-01-27T21:20:41Z"
+    generation: 11
+    labels:
+      hydra.owner: ganza1
+    name: student-ganza1
+    namespace: hydra-students
+    resourceVersion: "21882812"
+    uid: d226c48b-2bc3-429d-ab54-fc8c4eca2a5a
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/ganza1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-ganza1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-ganza1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/ganza1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-ganza1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/ganza1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-ganza1
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"gildeac2","app.kubernetes.io/name":"student-route","hydra.owner":"gildeac2"},"name":"student-gildeac2","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/gildeac2/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-gildeac2"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-gildeac2","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/gildeac2/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-gildeac2","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/gildeac2/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-gildeac2","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:29Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: gildeac2
+      app.kubernetes.io/name: student-route
+      hydra.owner: gildeac2
+    name: student-gildeac2
+    namespace: hydra-students
+    resourceVersion: "22016422"
+    uid: da07ad23-147a-43d7-beee-06f42f2cd523
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/gildeac2/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-gildeac2
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-gildeac2
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/gildeac2/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-gildeac2
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/gildeac2/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-gildeac2
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    creationTimestamp: "2026-03-16T02:59:27Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: gopeen1
+      app.kubernetes.io/name: student-route
+      hydra.owner: gopeen1
+    name: student-gopeen1
+    namespace: hydra-students
+    resourceVersion: "22527949"
+    uid: 41c334fc-f194-49df-b74f-b775de7280c7
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/gopeen1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-gopeen1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-gopeen1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/gopeen1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-gopeen1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/gopeen1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-gopeen1
+        port: 8080
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/gopeen1/my-site`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-gopeen1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-gopeen1
+        port: 3000
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"habery1","app.kubernetes.io/name":"student-route","hydra.owner":"habery1"},"name":"student-habery1","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/habery1/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-habery1"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-habery1","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/habery1/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-habery1","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/habery1/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-habery1","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:29Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: habery1
+      app.kubernetes.io/name: student-route
+      hydra.owner: habery1
+    name: student-habery1
+    namespace: hydra-students
+    resourceVersion: "22016423"
+    uid: 2e95fc39-96c5-4e6d-82c8-7ef02b1f14cd
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/habery1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-habery1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-habery1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/habery1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-habery1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/habery1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-habery1
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"hamlingw1","app.kubernetes.io/name":"student-route","hydra.owner":"hamlingw1"},"name":"student-hamlingw1","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/hamlingw1/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-hamlingw1"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-hamlingw1","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/hamlingw1/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-hamlingw1","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/hamlingw1/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-hamlingw1","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:30Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: hamlingw1
+      app.kubernetes.io/name: student-route
+      hydra.owner: hamlingw1
+    name: student-hamlingw1
+    namespace: hydra-students
+    resourceVersion: "22016430"
+    uid: e76cec87-b823-4027-8fd7-262b60e25cbb
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/hamlingw1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-hamlingw1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-hamlingw1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/hamlingw1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-hamlingw1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/hamlingw1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-hamlingw1
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"hughesp1","app.kubernetes.io/name":"student-route","hydra.owner":"hughesp1"},"name":"student-hughesp1","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/hughesp1/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-hughesp1"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-hughesp1","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/hughesp1/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-hughesp1","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/hughesp1/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-hughesp1","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:30Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: hughesp1
+      app.kubernetes.io/name: student-route
+      hydra.owner: hughesp1
+    name: student-hughesp1
+    namespace: hydra-students
+    resourceVersion: "22016433"
+    uid: fe170a23-b0fc-4b29-8a2e-bfa0eff6d44b
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/hughesp1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-hughesp1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-hughesp1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/hughesp1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-hughesp1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/hughesp1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-hughesp1
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"jamiesoc2","app.kubernetes.io/name":"student-route","hydra.owner":"jamiesoc2"},"name":"student-jamiesoc2","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/jamiesoc2/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-jamiesoc2"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-jamiesoc2","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/jamiesoc2/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-jamiesoc2","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/jamiesoc2/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-jamiesoc2","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:30Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: jamiesoc2
+      app.kubernetes.io/name: student-route
+      hydra.owner: jamiesoc2
+    name: student-jamiesoc2
+    namespace: hydra-students
+    resourceVersion: "22016434"
+    uid: 7588b61c-aa7a-404f-a179-dd9860bb5084
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/jamiesoc2/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-jamiesoc2
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-jamiesoc2
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/jamiesoc2/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-jamiesoc2
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/jamiesoc2/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-jamiesoc2
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"kieselr2","app.kubernetes.io/name":"student-route","hydra.owner":"kieselr2"},"name":"student-kieselr2","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/kieselr2/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-kieselr2"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-kieselr2","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/kieselr2/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-kieselr2","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/kieselr2/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-kieselr2","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:31Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: kieselr2
+      app.kubernetes.io/name: student-route
+      hydra.owner: kieselr2
+    name: student-kieselr2
+    namespace: hydra-students
+    resourceVersion: "22016439"
+    uid: a66437da-a003-4bf2-b030-798fbdacd922
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/kieselr2/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-kieselr2
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-kieselr2
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/kieselr2/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-kieselr2
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/kieselr2/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-kieselr2
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"kudlinsm1","app.kubernetes.io/name":"student-route","hydra.owner":"kudlinsm1"},"name":"student-kudlinsm1","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/kudlinsm1/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-kudlinsm1"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-kudlinsm1","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/kudlinsm1/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-kudlinsm1","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/kudlinsm1/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-kudlinsm1","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:31Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: kudlinsm1
+      app.kubernetes.io/name: student-route
+      hydra.owner: kudlinsm1
+    name: student-kudlinsm1
+    namespace: hydra-students
+    resourceVersion: "22016440"
+    uid: 49a69d7c-493c-4107-bd25-eab77bcbd1ae
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/kudlinsm1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-kudlinsm1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-kudlinsm1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/kudlinsm1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-kudlinsm1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/kudlinsm1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-kudlinsm1
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"mazzas1","app.kubernetes.io/name":"student-route","hydra.owner":"mazzas1"},"name":"student-mazzas1","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/mazzas1/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-mazzas1"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-mazzas1","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/mazzas1/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-mazzas1","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/mazzas1/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-mazzas1","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:32Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: mazzas1
+      app.kubernetes.io/name: student-route
+      hydra.owner: mazzas1
+    name: student-mazzas1
+    namespace: hydra-students
+    resourceVersion: "22016445"
+    uid: d7840b99-6240-4bc0-9c32-186ef188b7b1
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/mazzas1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-mazzas1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-mazzas1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/mazzas1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-mazzas1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/mazzas1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-mazzas1
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"mohammeb2","app.kubernetes.io/name":"student-route","hydra.owner":"mohammeb2"},"name":"student-mohammeb2","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/mohammeb2/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-mohammeb2"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-mohammeb2","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/mohammeb2/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-mohammeb2","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/mohammeb2/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-mohammeb2","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:32Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: mohammeb2
+      app.kubernetes.io/name: student-route
+      hydra.owner: mohammeb2
+    name: student-mohammeb2
+    namespace: hydra-students
+    resourceVersion: "22016446"
+    uid: c6a4cc67-126c-45d1-a687-9fa10c5df9d5
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/mohammeb2/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-mohammeb2
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-mohammeb2
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/mohammeb2/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-mohammeb2
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/mohammeb2/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-mohammeb2
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"hydra.owner":"namc3"},"name":"student-namc3","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/namc3/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-namc3"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-namc3","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/namc3/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-namc3","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/namc3/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-namc3","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-01-27T21:09:30Z"
+    generation: 11
+    labels:
+      hydra.owner: namc3
+    name: student-namc3
+    namespace: hydra-students
+    resourceVersion: "21882822"
+    uid: 8ae88c87-1375-423c-ab13-be3ceeac43b7
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/namc3/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-namc3
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-namc3
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/namc3/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-namc3
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/namc3/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-namc3
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"napolitt1","app.kubernetes.io/name":"student-route","hydra.owner":"napolitt1"},"name":"student-napolitt1","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/napolitt1/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-napolitt1"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-napolitt1","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/napolitt1/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-napolitt1","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/napolitt1/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-napolitt1","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:32Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: napolitt1
+      app.kubernetes.io/name: student-route
+      hydra.owner: napolitt1
+    name: student-napolitt1
+    namespace: hydra-students
+    resourceVersion: "22016449"
+    uid: 13f67f0c-265c-4ee3-ada0-2787dc0ef881
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/napolitt1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-napolitt1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-napolitt1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/napolitt1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-napolitt1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/napolitt1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-napolitt1
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"odonnela6","app.kubernetes.io/name":"student-route","hydra.owner":"odonnela6"},"name":"student-odonnela6","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/odonnela6/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-odonnela6"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-odonnela6","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/odonnela6/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-odonnela6","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/odonnela6/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-odonnela6","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:33Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: odonnela6
+      app.kubernetes.io/name: student-route
+      hydra.owner: odonnela6
+    name: student-odonnela6
+    namespace: hydra-students
+    resourceVersion: "22016454"
+    uid: 86add785-21c6-4830-a6eb-4c24b8f12197
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/odonnela6/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-odonnela6
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-odonnela6
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/odonnela6/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-odonnela6
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/odonnela6/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-odonnela6
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"pazy1","app.kubernetes.io/name":"student-route","hydra.owner":"pazy1"},"name":"student-pazy1","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/pazy1/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-pazy1"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-pazy1","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/pazy1/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-pazy1","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/pazy1/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-pazy1","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:33Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: pazy1
+      app.kubernetes.io/name: student-route
+      hydra.owner: pazy1
+    name: student-pazy1
+    namespace: hydra-students
+    resourceVersion: "22016456"
+    uid: bde09683-0931-4548-af12-a93173cf32ef
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/pazy1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-pazy1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-pazy1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/pazy1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-pazy1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/pazy1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-pazy1
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"perezd36","app.kubernetes.io/name":"student-route","hydra.owner":"perezd36"},"name":"student-perezd36","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/perezd36/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-perezd36"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-perezd36","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/perezd36/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-perezd36","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/perezd36/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-perezd36","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:33Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: perezd36
+      app.kubernetes.io/name: student-route
+      hydra.owner: perezd36
+    name: student-perezd36
+    namespace: hydra-students
+    resourceVersion: "22016460"
+    uid: 51e881fc-95b6-4a52-a5fb-af3bac664cf2
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/perezd36/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-perezd36
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-perezd36
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/perezd36/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-perezd36
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/perezd36/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-perezd36
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"plotkinm","app.kubernetes.io/name":"student-route","hydra.owner":"plotkinm"},"name":"student-plotkinm","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/plotkinm/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-plotkinm"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-plotkinm","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/plotkinm/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-plotkinm","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/plotkinm/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-plotkinm","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:34Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: plotkinm
+      app.kubernetes.io/name: student-route
+      hydra.owner: plotkinm
+    name: student-plotkinm
+    namespace: hydra-students
+    resourceVersion: "22016461"
+    uid: c80ae135-bbce-4137-aac5-e44e026fad77
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/plotkinm/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-plotkinm
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-plotkinm
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/plotkinm/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-plotkinm
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/plotkinm/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-plotkinm
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"polarskn1","app.kubernetes.io/name":"student-route","hydra.owner":"polarskn1"},"name":"student-polarskn1","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/polarskn1/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-polarskn1"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-polarskn1","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/polarskn1/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-polarskn1","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/polarskn1/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-polarskn1","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:34Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: polarskn1
+      app.kubernetes.io/name: student-route
+      hydra.owner: polarskn1
+    name: student-polarskn1
+    namespace: hydra-students
+    resourceVersion: "22016464"
+    uid: 8d4cc350-3c9d-4941-9a65-5450cbd4209b
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/polarskn1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-polarskn1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-polarskn1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/polarskn1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-polarskn1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/polarskn1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-polarskn1
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"hydra.owner":"rahmanm28"},"name":"student-rahmanm28","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/rahmanm28/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-rahmanm28"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-rahmanm28","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/rahmanm28/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-rahmanm28","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/rahmanm28/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-rahmanm28","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-08T06:30:51Z"
+    generation: 2
+    labels:
+      app.kubernetes.io/instance: rahmanm28
+      app.kubernetes.io/name: student-route
+      hydra.owner: rahmanm28
+    name: student-rahmanm28
+    namespace: hydra-students
+    resourceVersion: "21882824"
+    uid: 24763938-0047-4305-b0e2-c9633d8f99e0
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/rahmanm28/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-rahmanm28
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-rahmanm28
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/rahmanm28/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-rahmanm28
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/rahmanm28/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-rahmanm28
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"rasheda1","app.kubernetes.io/name":"student-route","hydra.owner":"rasheda1"},"name":"student-rasheda1","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/rasheda1/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-rasheda1"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-rasheda1","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/rasheda1/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-rasheda1","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/rasheda1/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-rasheda1","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:34Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: rasheda1
+      app.kubernetes.io/name: student-route
+      hydra.owner: rasheda1
+    name: student-rasheda1
+    namespace: hydra-students
+    resourceVersion: "22016468"
+    uid: 3ef4faa0-016a-470c-896b-d954cc4941a4
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/rasheda1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-rasheda1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-rasheda1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/rasheda1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-rasheda1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/rasheda1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-rasheda1
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"hydra.owner":"raudalek2"},"name":"student-raudalek2","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/raudalek2/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-raudalek2"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-raudalek2","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/raudalek2/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-raudalek2","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/raudalek2/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-raudalek2","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-10T14:16:14Z"
+    generation: 2
+    labels:
+      app.kubernetes.io/instance: raudalek2
+      app.kubernetes.io/name: student-route
+      hydra.owner: raudalek2
+    name: student-raudalek2
+    namespace: hydra-students
+    resourceVersion: "21882830"
+    uid: 134fe724-ed34-4a3b-af0c-9d35156bb7a5
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/raudalek2/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-raudalek2
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-raudalek2
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/raudalek2/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-raudalek2
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/raudalek2/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-raudalek2
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"hydra.owner":"reillya1"},"name":"student-reillya1","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/reillya1/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-reillya1"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-reillya1","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/reillya1/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-reillya1","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/reillya1/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-reillya1","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-06T14:50:02Z"
+    generation: 2
+    labels:
+      app.kubernetes.io/instance: reillya1
+      app.kubernetes.io/name: student-route
+      hydra.owner: reillya1
+    name: student-reillya1
+    namespace: hydra-students
+    resourceVersion: "21882832"
+    uid: c99d9d83-2168-4e08-8ff0-c2d5a8a82032
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/reillya1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-reillya1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-reillya1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/reillya1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-reillya1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/reillya1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-reillya1
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"richarda19","app.kubernetes.io/name":"student-route","hydra.owner":"richarda19"},"name":"student-richarda19","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/richarda19/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-richarda19"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-richarda19","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/richarda19/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-richarda19","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/richarda19/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-richarda19","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:35Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: richarda19
+      app.kubernetes.io/name: student-route
+      hydra.owner: richarda19
+    name: student-richarda19
+    namespace: hydra-students
+    resourceVersion: "22016475"
+    uid: 16c0dd4e-a769-4a69-a096-17d1cefd661d
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/richarda19/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-richarda19
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-richarda19
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/richarda19/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-richarda19
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/richarda19/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-richarda19
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"robinsor15","app.kubernetes.io/name":"student-route","hydra.owner":"robinsor15"},"name":"student-robinsor15","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/robinsor15/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-robinsor15"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-robinsor15","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/robinsor15/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-robinsor15","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/robinsor15/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-robinsor15","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:35Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: robinsor15
+      app.kubernetes.io/name: student-route
+      hydra.owner: robinsor15
+    name: student-robinsor15
+    namespace: hydra-students
+    resourceVersion: "22016476"
+    uid: c2ab3cfd-0b08-4d62-9ce0-426ad9ce7c9a
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/robinsor15/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-robinsor15
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-robinsor15
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/robinsor15/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-robinsor15
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/robinsor15/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-robinsor15
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"robinsoz9","app.kubernetes.io/name":"student-route","hydra.owner":"robinsoz9"},"name":"student-robinsoz9","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/robinsoz9/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-robinsoz9"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-robinsoz9","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/robinsoz9/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-robinsoz9","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/robinsoz9/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-robinsoz9","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:36Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: robinsoz9
+      app.kubernetes.io/name: student-route
+      hydra.owner: robinsoz9
+    name: student-robinsoz9
+    namespace: hydra-students
+    resourceVersion: "22016481"
+    uid: 8213df30-43ba-433b-9146-21dd82292766
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/robinsoz9/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-robinsoz9
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-robinsoz9
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/robinsoz9/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-robinsoz9
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/robinsoz9/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-robinsoz9
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    creationTimestamp: "2026-03-15T22:56:29Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: shusterj1
+      app.kubernetes.io/name: student-route
+      hydra.owner: shusterj1
+    name: student-shusterj1
+    namespace: hydra-students
+    resourceVersion: "22444894"
+    uid: 82424bbb-0ae7-43b2-b626-d1386ae1edea
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/shusterj1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-shusterj1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-shusterj1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/shusterj1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-shusterj1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/shusterj1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-shusterj1
+        port: 8080
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/shusterj1/sidequests`)
+      middlewares:
+      - name: strip-prefix-shusterj1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-shusterj1
+        port: 3000
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"smallg1","app.kubernetes.io/name":"student-route","hydra.owner":"smallg1"},"name":"student-smallg1","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/smallg1/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-smallg1"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-smallg1","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/smallg1/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-smallg1","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/smallg1/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-smallg1","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:36Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: smallg1
+      app.kubernetes.io/name: student-route
+      hydra.owner: smallg1
+    name: student-smallg1
+    namespace: hydra-students
+    resourceVersion: "22016482"
+    uid: 1f2fa350-8cec-4144-9301-bc0e3b2b6986
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/smallg1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-smallg1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-smallg1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/smallg1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-smallg1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/smallg1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-smallg1
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"sosafrel1","app.kubernetes.io/name":"student-route","hydra.owner":"sosafrel1"},"name":"student-sosafrel1","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/sosafrel1/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-sosafrel1"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-sosafrel1","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/sosafrel1/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-sosafrel1","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/sosafrel1/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-sosafrel1","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:36Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: sosafrel1
+      app.kubernetes.io/name: student-route
+      hydra.owner: sosafrel1
+    name: student-sosafrel1
+    namespace: hydra-students
+    resourceVersion: "22016485"
+    uid: 601f3fbc-3af7-4ff4-a4e6-9d85e7d21d6f
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/sosafrel1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-sosafrel1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-sosafrel1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/sosafrel1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-sosafrel1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/sosafrel1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-sosafrel1
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"stojaf1","app.kubernetes.io/name":"student-route","hydra.owner":"stojaf1"},"name":"student-stojaf1","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/stojaf1/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-stojaf1"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-stojaf1","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/stojaf1/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-stojaf1","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/stojaf1/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-stojaf1","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:37Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: stojaf1
+      app.kubernetes.io/name: student-route
+      hydra.owner: stojaf1
+    name: student-stojaf1
+    namespace: hydra-students
+    resourceVersion: "22016490"
+    uid: 7cb6a168-5627-4650-8674-55023bd1484c
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/stojaf1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-stojaf1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-stojaf1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/stojaf1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-stojaf1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/stojaf1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-stojaf1
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"swalhaa1","app.kubernetes.io/name":"student-route","hydra.owner":"swalhaa1"},"name":"student-swalhaa1","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/swalhaa1/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-swalhaa1"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-swalhaa1","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/swalhaa1/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-swalhaa1","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/swalhaa1/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-swalhaa1","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:37Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: swalhaa1
+      app.kubernetes.io/name: student-route
+      hydra.owner: swalhaa1
+    name: student-swalhaa1
+    namespace: hydra-students
+    resourceVersion: "22016491"
+    uid: f743f463-53ef-4790-9622-bf17f96272bd
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/swalhaa1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-swalhaa1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-swalhaa1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/swalhaa1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-swalhaa1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/swalhaa1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-swalhaa1
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"thompsoc10","app.kubernetes.io/name":"student-route","hydra.owner":"thompsoc10"},"name":"student-thompsoc10","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/thompsoc10/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-thompsoc10"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-thompsoc10","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/thompsoc10/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-thompsoc10","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/thompsoc10/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-thompsoc10","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:37Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: thompsoc10
+      app.kubernetes.io/name: student-route
+      hydra.owner: thompsoc10
+    name: student-thompsoc10
+    namespace: hydra-students
+    resourceVersion: "22016495"
+    uid: 2907180f-4422-4cea-9707-9e3752e117f7
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/thompsoc10/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-thompsoc10
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-thompsoc10
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/thompsoc10/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-thompsoc10
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/thompsoc10/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-thompsoc10
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"hydra.owner":"tokor1"},"name":"student-tokor1","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/tokor1/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-tokor1"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-tokor1","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/tokor1/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-tokor1","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/tokor1/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-tokor1","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-09T23:39:02Z"
+    generation: 2
+    labels:
+      app.kubernetes.io/instance: tokor1
+      app.kubernetes.io/name: student-route
+      hydra.owner: tokor1
+    name: student-tokor1
+    namespace: hydra-students
+    resourceVersion: "21882842"
+    uid: 418a03be-1158-4747-aeec-ed709986d1da
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/tokor1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-tokor1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-tokor1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/tokor1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-tokor1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/tokor1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-tokor1
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"townsenj1","app.kubernetes.io/name":"student-route","hydra.owner":"townsenj1"},"name":"student-townsenj1","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/townsenj1/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-townsenj1"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-townsenj1","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/townsenj1/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-townsenj1","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/townsenj1/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-townsenj1","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:38Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: townsenj1
+      app.kubernetes.io/name: student-route
+      hydra.owner: townsenj1
+    name: student-townsenj1
+    namespace: hydra-students
+    resourceVersion: "22016496"
+    uid: c5d3e784-6168-4d32-aa92-9bb2c9072bc1
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/townsenj1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-townsenj1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-townsenj1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/townsenj1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-townsenj1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/townsenj1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-townsenj1
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"tuerosj1","app.kubernetes.io/name":"student-route","hydra.owner":"tuerosj1"},"name":"student-tuerosj1","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/tuerosj1/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-tuerosj1"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-tuerosj1","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/tuerosj1/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-tuerosj1","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/tuerosj1/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-tuerosj1","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:38Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: tuerosj1
+      app.kubernetes.io/name: student-route
+      hydra.owner: tuerosj1
+    name: student-tuerosj1
+    namespace: hydra-students
+    resourceVersion: "22016499"
+    uid: 0156fd13-e3b8-4042-8f91-b963d8d33ad3
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/tuerosj1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-tuerosj1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-tuerosj1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/tuerosj1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-tuerosj1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/tuerosj1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-tuerosj1
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"tuoheys1","app.kubernetes.io/name":"student-route","hydra.owner":"tuoheys1"},"name":"student-tuoheys1","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/tuoheys1/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-tuoheys1"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-tuoheys1","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/tuoheys1/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-tuoheys1","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/tuoheys1/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-tuoheys1","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:39Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: tuoheys1
+      app.kubernetes.io/name: student-route
+      hydra.owner: tuoheys1
+    name: student-tuoheys1
+    namespace: hydra-students
+    resourceVersion: "22016500"
+    uid: 117f41f0-83f5-433d-97f7-cb33a5f80caf
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/tuoheys1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-tuoheys1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-tuoheys1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/tuoheys1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-tuoheys1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/tuoheys1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-tuoheys1
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"vanderbd1","app.kubernetes.io/name":"student-route","hydra.owner":"vanderbd1"},"name":"student-vanderbd1","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/vanderbd1/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-vanderbd1"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-vanderbd1","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/vanderbd1/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-vanderbd1","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/vanderbd1/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-vanderbd1","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:39Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: vanderbd1
+      app.kubernetes.io/name: student-route
+      hydra.owner: vanderbd1
+    name: student-vanderbd1
+    namespace: hydra-students
+    resourceVersion: "22016505"
+    uid: 51d3da09-634d-4156-85a1-f3919dacc103
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/vanderbd1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-vanderbd1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-vanderbd1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/vanderbd1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-vanderbd1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/vanderbd1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-vanderbd1
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"hydra.owner":"voolm1"},"name":"student-voolm1","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/voolm1/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-voolm1"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-voolm1","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/voolm1/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-voolm1","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/voolm1/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-voolm1","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-06T14:52:25Z"
+    generation: 2
+    labels:
+      app.kubernetes.io/instance: voolm1
+      app.kubernetes.io/name: student-route
+      hydra.owner: voolm1
+    name: student-voolm1
+    namespace: hydra-students
+    resourceVersion: "21882848"
+    uid: 8ce01163-ffdd-4aaa-8533-83ab5c7f1009
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/voolm1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-voolm1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-voolm1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/voolm1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-voolm1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/voolm1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-voolm1
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"warnckea1","app.kubernetes.io/name":"student-route","hydra.owner":"warnckea1"},"name":"student-warnckea1","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/warnckea1/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-warnckea1"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-warnckea1","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/warnckea1/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-warnckea1","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/warnckea1/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-warnckea1","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:39Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: warnckea1
+      app.kubernetes.io/name: student-route
+      hydra.owner: warnckea1
+    name: student-warnckea1
+    namespace: hydra-students
+    resourceVersion: "22016507"
+    uid: 68caab1d-478e-4e7d-9fdf-88c79508447e
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/warnckea1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-warnckea1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-warnckea1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/warnckea1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-warnckea1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/warnckea1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-warnckea1
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"zhangj23","app.kubernetes.io/name":"student-route","hydra.owner":"zhangj23"},"name":"student-zhangj23","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/zhangj23/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-zhangj23"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-zhangj23","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/zhangj23/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-zhangj23","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/zhangj23/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-zhangj23","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:40Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: zhangj23
+      app.kubernetes.io/name: student-route
+      hydra.owner: zhangj23
+    name: student-zhangj23
+    namespace: hydra-students
+    resourceVersion: "22016514"
+    uid: ba6b45de-dc51-44a2-b786-4c8a99520289
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/zhangj23/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-zhangj23
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-zhangj23
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/zhangj23/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-zhangj23
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/zhangj23/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-zhangj23
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"zhumabat1","app.kubernetes.io/name":"student-route","hydra.owner":"zhumabat1"},"name":"student-zhumabat1","namespace":"hydra-students"},"spec":{"entryPoints":["web","websecure"],"routes":[{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/zhumabat1/vscode`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-prefix-zhumabat1"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-zhumabat1","port":8443}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/zhumabat1/jupyter`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-zhumabat1","port":8888}]},{"kind":"Rule","match":"Host(`hydra.newpaltz.edu`) \u0026\u0026 PathPrefix(`/students/zhumabat1/jenkins`)","middlewares":[{"name":"hydra-forward-auth","namespace":"hydra-system"},{"name":"strip-session-cookie","namespace":"hydra-system"}],"priority":100,"services":[{"name":"student-zhumabat1","port":8080}]}],"tls":{"secretName":"hydra-tls"}}}
+    creationTimestamp: "2026-03-15T02:02:40Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: zhumabat1
+      app.kubernetes.io/name: student-route
+      hydra.owner: zhumabat1
+    name: student-zhumabat1
+    namespace: hydra-students
+    resourceVersion: "22016515"
+    uid: 38622053-7143-4b2d-899b-9fbb198ef3f5
+  spec:
+    entryPoints:
+    - web
+    - websecure
+    routes:
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/zhumabat1/vscode`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-prefix-zhumabat1
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-zhumabat1
+        port: 8443
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/zhumabat1/jupyter`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-zhumabat1
+        port: 8888
+    - kind: Rule
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/students/zhumabat1/jenkins`)
+      middlewares:
+      - name: hydra-forward-auth
+        namespace: hydra-system
+      - name: strip-session-cookie
+        namespace: hydra-system
+      priority: 100
+      services:
+      - name: student-zhumabat1
+        port: 8080
+    tls:
+      secretName: hydra-tls
+- apiVersion: traefik.io/v1alpha1
+  kind: IngressRoute
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"IngressRoute","metadata":{"annotations":{},"name":"acme-challenge","namespace":"hydra-system"},"spec":{"entryPoints":["web"],"routes":[{"kind":"Rule","match":"PathPrefix(`/.well-known/acme-challenge/`)","priority":200,"services":[{"name":"acme-webroot","port":80}]}]}}
+    creationTimestamp: "2026-03-16T16:11:40Z"
+    generation: 1
+    name: acme-challenge
+    namespace: hydra-system
+    resourceVersion: "22798783"
+    uid: fa74a6a5-840f-41df-bb30-4b76eb9a52e6
+  spec:
+    entryPoints:
+    - web
+    routes:
+    - kind: Rule
+      match: PathPrefix(`/.well-known/acme-challenge/`)
+      priority: 200
+      services:
+      - name: acme-webroot
+        port: 80
+kind: List
+metadata:
+  resourceVersion: ""

@@ -1,0 +1,19 @@
+apiVersion: kubeai.org/v1
+kind: Model
+metadata:
+  name: qwen-2-5-72b-instruct
+  namespace: kubeai
+spec:
+  features: [TextGeneration]
+  owner: Qwen
+  url: "hf://Qwen/Qwen2.5-72B-Instruct-AWQ"
+  engine: VLLM
+  args:
+    - "--pipeline-parallel-size=3"
+    - "--max-model-len=4096"
+    - "--gpu-memory-utilization=0.90"
+    - "--enforce-eager"
+    - "--dtype=auto"
+    - "--quantization=awq"
+  resourceProfile: nvidia-rtx-3090:3
+  minReplicas: 1

@@ -1,0 +1,133 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: openrouter-free-model-sync
+  namespace: hydra-infra
+spec:
+  schedule: "0 6 * * 1"  # Every Monday at 6 AM
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: openrouter-sync
+          restartPolicy: OnFailure
+          containers:
+            - name: sync
+              image: python:3.12-slim
+              command: ["python3", "-c"]
+              args:
+                - |
+                  import urllib.request, json, re, subprocess, os
+
+                  # Fetch models from OpenRouter
+                  req = urllib.request.Request("https://openrouter.ai/api/v1/models")
+                  resp = urllib.request.urlopen(req, timeout=15)
+                  data = json.loads(resp.read())
+
+                  top_providers = {"openai", "meta-llama", "qwen", "google", "mistralai",
+                                   "nvidia", "nousresearch", "deepseek", "z-ai"}
+
+                  def score(m):
+                      mid = m["id"]
+                      provider = mid.split("/")[0] if "/" in mid else ""
+                      ctx = m.get("context_length", 0)
+                      desc = m.get("description", "")
+                      params = 0
+                      for match in re.findall(r"(\d+)[bB]", mid + " " + desc):
+                          p = int(match)
+                          if p > params and p < 2000:
+                              params = p
+                      s = 0
+                      if provider in top_providers:
+                          s += 50
+                      s += min(params / 10, 40)
+                      s += min(ctx / 30000, 10)
+                      if mid == "openrouter/free" or params < 5:
+                          s = -1
+                      return s
+
+                  free = []
+                  for m in data["data"]:
+                      p = m.get("pricing", {})
+                      if str(p.get("prompt", "1")) == "0" and str(p.get("completion", "1")) == "0":
+                          free.append((score(m), m["id"]))
+
+                  free.sort(reverse=True)
+                  top10 = [mid for _, mid in free[:10]]
+                  print(f"Top 10 free models: {top10}")
+
+                  configs = json.dumps({"0": {"model_ids": top10}})
+
+                  # Use kubernetes API directly to patch deployment
+                  token_path = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+                  ca_path = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+                  ns = open("/var/run/secrets/kubernetes.io/serviceaccount/namespace").read()
+                  token = open(token_path).read()
+                  host = os.environ["KUBERNETES_SERVICE_HOST"]
+                  port = os.environ["KUBERNETES_SERVICE_PORT"]
+
+                  import ssl
+                  ctx = ssl.create_default_context(cafile=ca_path)
+
+                  # Get current deployment
+                  url = f"https://{host}:{port}/apis/apps/v1/namespaces/{ns}/deployments/open-webui"
+                  req = urllib.request.Request(url)
+                  req.add_header("Authorization", f"Bearer {token}")
+                  resp = urllib.request.urlopen(req, context=ctx, timeout=10)
+                  deploy = json.loads(resp.read())
+
+                  # Update the OPENAI_API_CONFIGS env var
+                  containers = deploy["spec"]["template"]["spec"]["containers"]
+                  for c in containers:
+                      if c["name"] == "open-webui":
+                          for env in c.get("env", []):
+                              if env["name"] == "OPENAI_API_CONFIGS":
+                                  env["value"] = configs
+                                  break
+
+                  # Patch deployment
+                  patch = json.dumps(deploy).encode()
+                  req = urllib.request.Request(url, data=patch, method="PUT")
+                  req.add_header("Authorization", f"Bearer {token}")
+                  req.add_header("Content-Type", "application/json")
+                  resp = urllib.request.urlopen(req, context=ctx, timeout=10)
+                  print(f"Deployment patched: {resp.status}")
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 64Mi
+                limits:
+                  cpu: 200m
+                  memory: 128Mi
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: openrouter-sync
+  namespace: hydra-infra
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: openrouter-sync
+  namespace: hydra-infra
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "patch", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: openrouter-sync
+  namespace: hydra-infra
+subjects:
+  - kind: ServiceAccount
+    name: openrouter-sync
+    namespace: hydra-infra
+roleRef:
+  kind: Role
+  name: openrouter-sync
+  apiGroup: rbac.authorization.k8s.io

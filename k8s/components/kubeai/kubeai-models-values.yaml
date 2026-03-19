@@ -1,0 +1,331 @@
+# KubeAI Models Helm values — Hydra cluster GPU models only
+# Chimera: 3x RTX 3090 (24GB each), Cerberus: 2x RTX 5090 (32GB each)
+
+catalog:
+  # === CHIMERA (3x RTX 3090) — Always-on flagship ===
+  qwen-2-5-72b-instruct:
+    enabled: true
+    features: [TextGeneration]
+    owner: Qwen
+    url: "hf://Qwen/Qwen2.5-72B-Instruct-AWQ"
+    engine: VLLM
+    args:
+      - "--pipeline-parallel-size=3"
+      - "--max-model-len=4096"
+      - "--gpu-memory-utilization=0.90"
+      - "--enforce-eager"
+      - "--dtype=auto"
+      - "--quantization=awq"
+    resourceProfile: nvidia-rtx-3090:3
+    minReplicas: 0
+    maxReplicas: 1
+
+  # === CHIMERA — Scale-to-zero (1 GPU each) ===
+  glm-4-9b-0414:
+    enabled: true
+    features: [TextGeneration]
+    owner: zai-org
+    url: "hf://zai-org/GLM-4-9B-0414"
+    engine: VLLM
+    args:
+      - "--max-model-len=8192"
+      - "--gpu-memory-utilization=0.90"
+      - "--dtype=auto"
+      - "--trust-remote-code"
+    resourceProfile: nvidia-rtx-3090:1
+    minReplicas: 0
+
+  glm-z1-9b-0414:
+    enabled: true
+    features: [TextGeneration]
+    owner: zai-org
+    url: "hf://zai-org/GLM-Z1-9B-0414"
+    engine: VLLM
+    args:
+      - "--max-model-len=8192"
+      - "--gpu-memory-utilization=0.90"
+      - "--dtype=auto"
+      - "--trust-remote-code"
+    resourceProfile: nvidia-rtx-3090:1
+    minReplicas: 0
+
+  granite-3-3-8b-instruct:
+    enabled: true
+    features: [TextGeneration]
+    owner: ibm-granite
+    url: "hf://ibm-granite/granite-3.3-8b-instruct"
+    engine: VLLM
+    args:
+      - "--max-model-len=8192"
+      - "--gpu-memory-utilization=0.90"
+      - "--dtype=auto"
+    resourceProfile: nvidia-rtx-3090:1
+    minReplicas: 0
+
+  qwen-2-5-7b-instruct:
+    enabled: true
+    features: [TextGeneration]
+    owner: Qwen
+    url: "hf://Qwen/Qwen2.5-7B-Instruct"
+    engine: VLLM
+    args:
+      - "--max-model-len=8192"
+      - "--gpu-memory-utilization=0.90"
+      - "--dtype=auto"
+    resourceProfile: nvidia-rtx-3090:1
+    minReplicas: 0
+
+  qwen-2-5-coder-7b-instruct:
+    enabled: true
+    features: [TextGeneration]
+    owner: Qwen
+    url: "hf://Qwen/Qwen2.5-Coder-7B-Instruct"
+    engine: VLLM
+    args:
+      - "--max-model-len=8192"
+      - "--gpu-memory-utilization=0.90"
+      - "--dtype=auto"
+    resourceProfile: nvidia-rtx-3090:1
+    minReplicas: 0
+
+  deepseek-r1-distill-qwen-14b:
+    enabled: true
+    features: [TextGeneration]
+    owner: deepseek-ai
+    url: "hf://deepseek-ai/DeepSeek-R1-Distill-Qwen-14B"
+    engine: VLLM
+    args:
+      - "--max-model-len=8192"
+      - "--gpu-memory-utilization=0.90"
+      - "--dtype=auto"
+    resourceProfile: nvidia-rtx-3090:1
+    minReplicas: 0
+
+  # === CHIMERA — Scale-to-zero (2 GPUs) ===
+  llama-3-3-70b-instruct:
+    enabled: true
+    features: [TextGeneration]
+    owner: meta-llama
+    url: "hf://hugging-quants/Meta-Llama-3.1-70B-Instruct-AWQ-INT4"
+    engine: VLLM
+    args:
+      - "--tensor-parallel-size=2"
+      - "--max-model-len=4096"
+      - "--gpu-memory-utilization=0.90"
+      - "--enforce-eager"
+      - "--dtype=auto"
+      - "--quantization=awq"
+    resourceProfile: nvidia-rtx-3090:2
+    minReplicas: 0
+
+  # === CERBERUS (2x RTX 5090) ===
+  deepseek-r1-70b:
+    enabled: true
+    features: [TextGeneration]
+    owner: deepseek-ai
+    url: "hf://deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
+    engine: VLLM
+    args:
+      - "--tensor-parallel-size=2"
+      - "--max-model-len=4096"
+      - "--gpu-memory-utilization=0.90"
+      - "--dtype=auto"
+    resourceProfile: nvidia-rtx-5090:2
+    minReplicas: 0
+
+  mistral-small-24b-instruct:
+    enabled: true
+    features: [TextGeneration]
+    owner: mistralai
+    url: "hf://mistralai/Mistral-Small-24B-Instruct-2501"
+    engine: VLLM
+    args:
+      - "--max-model-len=4096"
+      - "--gpu-memory-utilization=0.90"
+      - "--dtype=auto"
+      - "--tokenizer_mode=mistral"
+      - "--config_format=mistral"
+      - "--load_format=mistral"
+    resourceProfile: nvidia-rtx-5090:2
+    minReplicas: 0
+
+  deepseek-r1-distill-qwen-32b:
+    enabled: true
+    features: [TextGeneration]
+    owner: deepseek-ai
+    url: "hf://deepseek-ai/DeepSeek-R1-Distill-Qwen-32B"
+    engine: VLLM
+    args:
+      - "--max-model-len=4096"
+      - "--gpu-memory-utilization=0.90"
+      - "--dtype=auto"
+    resourceProfile: nvidia-rtx-5090:1
+    minReplicas: 0
+
+  qwen-2-5-coder-32b-instruct:
+    enabled: true
+    features: [TextGeneration]
+    owner: Qwen
+    url: "hf://Qwen/Qwen2.5-Coder-32B-Instruct"
+    engine: VLLM
+    args:
+      - "--max-model-len=4096"
+      - "--gpu-memory-utilization=0.90"
+      - "--dtype=auto"
+    resourceProfile: nvidia-rtx-5090:1
+    minReplicas: 0
+
+  moonlight-16b-a3b-instruct:
+    enabled: true
+    features: [TextGeneration]
+    owner: moonshotai
+    url: "hf://moonshotai/Moonlight-16B-A3B-Instruct"
+    engine: VLLM
+    args:
+      - "--max-model-len=4096"
+      - "--gpu-memory-utilization=0.90"
+      - "--dtype=auto"
+    resourceProfile: nvidia-rtx-5090:1
+    minReplicas: 0
+
+  phi-4:
+    enabled: true
+    features: [TextGeneration]
+    owner: microsoft
+    url: "hf://microsoft/phi-4"
+    engine: VLLM
+    args:
+      - "--max-model-len=4096"
+      - "--gpu-memory-utilization=0.90"
+      - "--dtype=auto"
+    resourceProfile: nvidia-rtx-5090:1
+    minReplicas: 0
+
+  # === Models migrated from old Ollama setup ===
+
+  # InternLM2.5 20B (was internlm2:20b in Ollama)
+  internlm2-5-20b-chat:
+    enabled: true
+    features: [TextGeneration]
+    owner: internlm
+    url: "hf://internlm/internlm2_5-20b-chat"
+    engine: VLLM
+    args:
+      - "--max-model-len=4096"
+      - "--gpu-memory-utilization=0.90"
+      - "--dtype=auto"
+      - "--trust-remote-code"
+    resourceProfile: nvidia-rtx-5090:1
+    minReplicas: 0
+
+  # Mixtral 8x7B AWQ (was mixtral:latest in Ollama, ~47B MoE)
+  mixtral-8x7b-instruct-awq:
+    enabled: true
+    features: [TextGeneration]
+    owner: TheBloke
+    url: "hf://TheBloke/Mixtral-8x7B-Instruct-v0.1-AWQ"
+    engine: VLLM
+    args:
+      - "--max-model-len=4096"
+      - "--gpu-memory-utilization=0.90"
+      - "--dtype=auto"
+      - "--quantization=awq"
+    resourceProfile: nvidia-rtx-3090:1
+    minReplicas: 0
+
+  # Qwen3 30B MoE (was qwen3-coder:30b in Ollama — Qwen3-30B-A3B is MoE with 3B active)
+  qwen3-30b-a3b:
+    enabled: true
+    features: [TextGeneration]
+    owner: Qwen
+    url: "hf://Qwen/Qwen3-30B-A3B"
+    engine: VLLM
+    args:
+      - "--max-model-len=8192"
+      - "--gpu-memory-utilization=0.90"
+      - "--dtype=auto"
+    resourceProfile: nvidia-rtx-5090:2
+    minReplicas: 0
+
+  # Qwen3 4B (was qwen3:4b in Ollama)
+  qwen3-4b:
+    enabled: true
+    features: [TextGeneration]
+    owner: Qwen
+    url: "hf://Qwen/Qwen3-4B"
+    engine: VLLM
+    args:
+      - "--max-model-len=8192"
+      - "--gpu-memory-utilization=0.90"
+      - "--dtype=auto"
+    resourceProfile: nvidia-rtx-3090:1
+    minReplicas: 0
+
+  # DeepSeek Coder V2 16B (was deepseek-coder-v2:16b in Ollama)
+  deepseek-coder-v2-16b:
+    enabled: true
+    features: [TextGeneration]
+    owner: deepseek-ai
+    url: "hf://deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct"
+    engine: VLLM
+    args:
+      - "--max-model-len=4096"
+      - "--gpu-memory-utilization=0.90"
+      - "--dtype=auto"
+      - "--trust-remote-code"
+    resourceProfile: nvidia-rtx-3090:1
+    minReplicas: 0
+
+  # Qwen3.5 35B MoE (35B total, 3B active — newest Qwen, fits on chimera)
+  qwen3-5-35b-a3b:
+    enabled: true
+    features: [TextGeneration]
+    owner: Qwen
+    url: "hf://Qwen/Qwen3.5-35B-A3B"
+    engine: VLLM
+    args:
+      - "--max-model-len=8192"
+      - "--gpu-memory-utilization=0.90"
+      - "--dtype=auto"
+    resourceProfile: nvidia-rtx-3090:2
+    minReplicas: 0
+
+  # === NEW — Granite 4, Qwen3.5 122B ===
+  granite-4-0-h-small:
+    enabled: true
+    features: [TextGeneration]
+    owner: ibm-granite
+    url: "hf://ibm-granite/granite-4.0-h-small"
+    engine: VLLM
+    args:
+      - "--max-model-len=4096"
+      - "--gpu-memory-utilization=0.90"
+      - "--dtype=auto"
+      - "--trust-remote-code"
+    resourceProfile: nvidia-rtx-5090:1
+    minReplicas: 0
+
+  qwen3-5-122b-a10b-awq:
+    enabled: true
+    features: [TextGeneration]
+    owner: Qwen
+    url: "hf://cyankiwi/Qwen3.5-122B-A10B-AWQ-4bit"
+    engine: VLLM
+    args:
+      - "--pipeline-parallel-size=3"
+      - "--max-model-len=4096"
+      - "--gpu-memory-utilization=0.90"
+      - "--dtype=auto"
+      - "--quantization=awq"
+      - "--enforce-eager"
+    resourceProfile: nvidia-rtx-3090:3
+    minReplicas: 0
+
+  # === Embedding model (1 GPU) ===
+  nomic-embed-text:
+    enabled: true
+    features: [TextEmbedding]
+    url: "ollama://nomic-embed-text"
+    engine: OLlama
+    resourceProfile: nvidia-rtx-3090:1
+    minReplicas: 0

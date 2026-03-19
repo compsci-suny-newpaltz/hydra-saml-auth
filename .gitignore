@@ -23,3 +23,4 @@ data/ssh-keys/
 # K8s secrets (contain credentials — use sealed-secrets or external-secrets in prod)
 k8s/components/cs-lab/secret.yaml
 k8s/components/n8n/secret.yaml
+k8s/backup-pre-traefik-v3-20260316/secrets-hydra-system.yaml

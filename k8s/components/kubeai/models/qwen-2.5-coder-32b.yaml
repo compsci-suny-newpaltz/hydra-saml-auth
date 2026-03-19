@@ -1,0 +1,16 @@
+apiVersion: kubeai.org/v1
+kind: Model
+metadata:
+  name: qwen-2-5-coder-32b-instruct
+  namespace: kubeai
+spec:
+  features: [TextGeneration]
+  owner: Qwen
+  url: "hf://Qwen/Qwen2.5-Coder-32B-Instruct"
+  engine: VLLM
+  args:
+    - "--max-model-len=4096"
+    - "--gpu-memory-utilization=0.90"
+    - "--dtype=auto"
+  resourceProfile: nvidia-rtx-5090:1
+  minReplicas: 0

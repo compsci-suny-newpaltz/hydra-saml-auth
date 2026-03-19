@@ -1,0 +1,103 @@
+# Ray Worker on Cerberus for cross-node pipeline-parallel serving
+# Joins Ray cluster at Chimera 10.0.0.1:6379 via 10GbE interconnect
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm-ray-worker
+  namespace: hydra-infra
+  labels:
+    app: vllm-distributed
+    component: ray-worker
+spec:
+  replicas: 0  # Scale up when needed for large models
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: vllm-distributed
+      component: ray-worker
+  template:
+    metadata:
+      labels:
+        app: vllm-distributed
+        component: ray-worker
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: cerberus
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      runtimeClassName: nvidia
+      hostNetwork: true
+      hostIPC: true
+      containers:
+        - name: ray-worker
+          image: vllm/vllm-openai:v0.11.2
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              ray start --address=10.0.0.1:6379 \
+                --node-ip-address=10.0.0.2 \
+                --num-gpus=2 \
+                --block
+          env:
+            - name: RAY_HEAD_ADDRESS
+              value: "10.0.0.1:6379"
+            - name: HF_HOME
+              value: "/models/huggingface"
+            # NCCL — TCP sockets over 10GbE (Soft-RoCE rxe not supported by container's mlx5 IB plugin)
+            - name: NCCL_SOCKET_IFNAME
+              value: "eno1np0"
+            - name: NCCL_IB_DISABLE
+              value: "1"
+            - name: NCCL_DEBUG
+              value: "WARN"
+            # Gloo — force 10GbE (not 127.0.1.1 from /etc/hosts)
+            - name: GLOO_SOCKET_IFNAME
+              value: "eno1np0"
+            - name: TP_SOCKET_IFNAME
+              value: "eno1np0"
+            # UCX — TCP + shared memory for Ray object transfer over 10GbE
+            - name: UCX_TLS
+              value: "tcp,sm,self"
+            - name: UCX_NET_DEVICES
+              value: "eno1np0"
+            - name: UCX_MEMTYPE_CACHE
+              value: "n"
+            - name: VLLM_HOST_IP
+              value: "10.0.0.2"
+            # FlashInfer JIT-compiles for both sm_86 (3090) and sm_120 (5090)
+            - name: VLLM_ATTENTION_BACKEND
+              value: "FLASHINFER"
+          resources:
+            requests:
+              memory: "16Gi"
+              cpu: "4000m"
+              nvidia.com/gpu: "2"
+            limits:
+              memory: "32Gi"
+              cpu: "16000m"
+              nvidia.com/gpu: "2"
+          volumeMounts:
+            - name: models
+              mountPath: /models
+            - name: infiniband
+              mountPath: /dev/infiniband
+              readOnly: true
+            - name: shm
+              mountPath: /dev/shm
+      volumes:
+        - name: models
+          hostPath:
+            path: /models
+            type: Directory
+        - name: infiniband
+          hostPath:
+            path: /dev/infiniband
+            type: DirectoryOrCreate
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: "16Gi"

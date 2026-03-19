@@ -1,0 +1,16 @@
+apiVersion: kubeai.org/v1
+kind: Model
+metadata:
+  name: moonlight-16b-a3b-instruct
+  namespace: kubeai
+spec:
+  features: [TextGeneration]
+  owner: moonshotai
+  url: "hf://moonshotai/Moonlight-16B-A3B-Instruct"
+  engine: VLLM
+  args:
+    - "--max-model-len=4096"
+    - "--gpu-memory-utilization=0.90"
+    - "--dtype=auto"
+  resourceProfile: nvidia-rtx-5090:1
+  minReplicas: 0

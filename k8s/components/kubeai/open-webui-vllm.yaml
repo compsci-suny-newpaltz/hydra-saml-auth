@@ -1,0 +1,137 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: open-webui
+  namespace: hydra-infra
+  labels:
+    app: open-webui
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: open-webui
+  template:
+    metadata:
+      labels:
+        app: open-webui
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: chimera
+      containers:
+        - name: open-webui
+          image: ghcr.io/open-webui/open-webui:v0.8.7
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: OPENROUTER_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: openrouter-secret
+                  key: api-key
+            - name: OPENAI_API_BASE_URLS
+              value: "https://openrouter.ai/api/v1;http://kubeai.kubeai.svc:80/openai/v1"
+            - name: OPENAI_API_KEYS
+              value: "$(OPENROUTER_API_KEY);none"
+            - name: OPENAI_API_CONFIGS
+              value: '{"0": {"model_ids": ["openai/gpt-oss-20b:free", "openai/gpt-oss-120b:free", "qwen/qwen3-coder:free", "qwen/qwen3-next-80b-a3b-instruct:free", "qwen/qwen3-4b:free", "nousresearch/hermes-3-llama-3.1-405b:free", "meta-llama/llama-3.3-70b-instruct:free", "mistralai/mistral-small-3.1-24b-instruct:free", "google/gemma-3-27b-it:free", "google/gemma-3-12b-it:free", "nvidia/nemotron-3-nano-30b-a3b:free", "nvidia/nemotron-nano-12b-v2-vl:free", "stepfun/step-3.5-flash:free", "arcee-ai/trinity-large-preview:free", "upstage/solar-pro-3:free", "z-ai/glm-4.5-air:free"]}}'
+            - name: ENABLE_OLLAMA_API
+              value: "true"
+            - name: OLLAMA_BASE_URLS
+              value: "http://ollama.hydra-infra.svc:11434"
+            - name: ENABLE_API_KEYS
+              value: "true"
+            - name: DEFAULT_MODELS
+              value: "gpt-oss:latest"
+            - name: WEBUI_SECRET_KEY
+              value: ""
+            - name: CHAT_RESPONSE_STREAM_DELTA_CHUNK_SIZE
+              value: "5"
+            - name: SCARF_NO_ANALYTICS
+              value: "true"
+            - name: DO_NOT_TRACK
+              value: "true"
+            - name: ANONYMIZED_TELEMETRY
+              value: "false"
+          volumeMounts:
+            - name: webui-data
+              mountPath: /app/backend/data
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "200m"
+            limits:
+              memory: "2Gi"
+              cpu: "2000m"
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+        - name: middleman
+          image: chimera_docker-openwebui_middleman:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 7070
+              name: api
+          env:
+            - name: OPENWEBUI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: openwebui-secret
+                  key: api-key
+            - name: OPENWEBUI_API_PORT
+              value: "7070"
+            - name: DB_PATH
+              value: "/app/data/webui.db"
+          volumeMounts:
+            - name: webui-data
+              mountPath: /app/data
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+      volumes:
+        - name: webui-data
+          persistentVolumeClaim:
+            claimName: openwebui-data-nfs
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: openwebui-secret
+  namespace: hydra-infra
+type: Opaque
+stringData:
+  api-key: "THUCU9zS34pde7GvYNmFZoA41hc86Hss"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: open-webui
+  namespace: hydra-infra
+  labels:
+    app: open-webui
+spec:
+  selector:
+    app: open-webui
+  ports:
+    - port: 3000
+      targetPort: 8080
+      name: http
+    - port: 7070
+      targetPort: 7070
+      name: middleman

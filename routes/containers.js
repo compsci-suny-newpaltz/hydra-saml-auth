@@ -1846,7 +1846,36 @@ router.post('/routes', async (req, res) => {
             }
 
             const isPublic = req.body.public !== false; // default to public
+            const startCommand = req.body.startCommand ? String(req.body.startCommand).trim() : null;
+
             await k8sContainers.addRoute(username, endpoint, port, isPublic);
+
+            // Create supervisor.d config if start command provided
+            if (startCommand) {
+                try {
+                    const k8s = require('@kubernetes/client-node');
+                    const kc = new k8s.KubeConfig();
+                    kc.loadFromCluster();
+                    const exec = new k8s.Exec(kc);
+                    const { PassThrough } = require('stream');
+
+                    const confContent = `[program:${endpoint}]\ncommand=/bin/bash -c "${startCommand.replace(/"/g, '\\"')}"\ndirectory=/home/student\nuser=student\nautostart=true\nautorestart=true\nstartsecs=5\nstdout_logfile=/var/log/supervisor/${endpoint}.log\nstderr_logfile=/var/log/supervisor/${endpoint}_err.log\nstdout_logfile_maxbytes=1MB\nstderr_logfile_maxbytes=1MB\n`;
+
+                    const ws = new PassThrough();
+                    const es = new PassThrough();
+                    await exec.exec(
+                        runtimeConfig.k8s.namespace,
+                        `student-${username}`,
+                        'student',
+                        ['sh', '-c', `cat > /home/student/supervisor.d/${endpoint}.conf << 'SUPERVISOREOF'\n${confContent}SUPERVISOREOF\nsupervisorctl reread && supervisorctl update`],
+                        ws, es, null, false
+                    );
+                    console.log(`[containers] Created supervisor.d/${endpoint}.conf for ${username}: ${startCommand}`);
+                } catch (supervisorErr) {
+                    console.warn(`[containers] Could not create supervisor config for ${username}/${endpoint}:`, supervisorErr.message);
+                    // Non-fatal — route still works, just no auto-start
+                }
+            }
 
             const host = 'hydra.newpaltz.edu';
             const publicBase = (process.env.PUBLIC_STUDENTS_BASE || `https://${host}/students`).replace(/\/$/, '');
@@ -1857,6 +1886,7 @@ router.post('/routes', async (req, res) => {
                     endpoint,
                     port,
                     public: isPublic,
+                    startCommand,
                     url: `${publicBase}/${username}/${endpoint}/`
                 }
             });

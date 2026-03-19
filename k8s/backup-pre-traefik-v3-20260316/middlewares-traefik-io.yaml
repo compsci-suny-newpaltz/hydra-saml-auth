@@ -1,0 +1,1369 @@
+apiVersion: v1
+items:
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"name":"risvllm-strip","namespace":"hydra-infra"},"spec":{"stripPrefix":{"prefixes":["/riscv"]}}}
+    creationTimestamp: "2026-03-11T21:09:54Z"
+    generation: 1
+    name: risvllm-strip
+    namespace: hydra-infra
+    resourceVersion: "20439236"
+    uid: 2bd38405-41bb-423f-923c-0069a5ce983e
+  spec:
+    stripPrefix:
+      prefixes:
+      - /riscv
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"name":"hydra-forward-auth","namespace":"hydra-students"},"spec":{"forwardAuth":{"address":"http://hydra-auth.hydra-system.svc.cluster.local:6969/auth/verify","trustForwardHeader":true}}}
+    creationTimestamp: "2026-01-27T01:25:07Z"
+    generation: 1
+    name: hydra-forward-auth
+    namespace: hydra-students
+    resourceVersion: "2290103"
+    uid: 14b00cd6-feac-4065-924c-09d83a24d885
+  spec:
+    forwardAuth:
+      address: http://hydra-auth.hydra-system.svc.cluster.local:6969/auth/verify
+      trustForwardHeader: true
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"labels":{"hydra.owner":"adamoa2"},"name":"strip-prefix-adamoa2","namespace":"hydra-students"},"spec":{"stripPrefix":{"prefixes":["/students/adamoa2/vscode","/students/adamoa2/jupyter","/students/adamoa2/supervisor","/students/adamoa2/jenkins"]}}}
+    creationTimestamp: "2026-03-10T20:35:37Z"
+    generation: 1
+    labels:
+      hydra.owner: adamoa2
+    name: strip-prefix-adamoa2
+    namespace: hydra-students
+    resourceVersion: "21882770"
+    uid: ab6ae605-e684-4a03-8974-0eb91611651e
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/adamoa2/vscode
+      - /students/adamoa2/jupyter
+      - /students/adamoa2/supervisor
+      - /students/adamoa2/jenkins
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"name":"strip-prefix-adlerb1","namespace":"hydra-students"},"spec":{"stripPrefix":{"prefixes":["/students/adlerb1/vscode","/students/adlerb1/jupyter","/students/adlerb1/supervisor"]}}}
+    creationTimestamp: "2026-01-28T21:19:39Z"
+    generation: 3
+    name: strip-prefix-adlerb1
+    namespace: hydra-students
+    resourceVersion: "7911124"
+    uid: 7c6684a2-e406-43d2-a213-2e2b7c69bb22
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/adlerb1/vscode
+      - /students/adlerb1/jupyter
+      - /students/adlerb1/supervisor
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    creationTimestamp: "2026-03-06T14:49:39Z"
+    generation: 1
+    labels:
+      hydra.owner: alis22
+    name: strip-prefix-alis22
+    namespace: hydra-students
+    resourceVersion: "17847936"
+    uid: e71c3d0d-2329-4d9b-bd0e-beb37ada2ea3
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/alis22/vscode
+      - /students/alis22/jupyter
+      - /students/alis22/supervisor
+      - /students/alis22/jenkins
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"labels":{"hydra.owner":"amannc1"},"name":"strip-prefix-amannc1","namespace":"hydra-students"},"spec":{"stripPrefix":{"prefixes":["/students/amannc1/vscode","/students/amannc1/jupyter","/students/amannc1/supervisor","/students/amannc1/jenkins"]}}}
+    creationTimestamp: "2026-01-27T21:09:27Z"
+    generation: 4
+    labels:
+      hydra.owner: amannc1
+    name: strip-prefix-amannc1
+    namespace: hydra-students
+    resourceVersion: "21882772"
+    uid: af442c38-d04f-450f-910f-ba5a070d1ca9
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/amannc1/vscode
+      - /students/amannc1/jupyter
+      - /students/amannc1/supervisor
+      - /students/amannc1/jenkins
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"name":"strip-prefix-arenellc1","namespace":"hydra-students"},"spec":{"stripPrefix":{"prefixes":["/students/arenellc1/vscode","/students/arenellc1/jupyter","/students/arenellc1/supervisor"]}}}
+    creationTimestamp: "2026-01-25T17:42:16Z"
+    generation: 5
+    name: strip-prefix-arenellc1
+    namespace: hydra-students
+    resourceVersion: "7911127"
+    uid: 3547271a-26f8-4af8-a780-44b488ad0547
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/arenellc1/vscode
+      - /students/arenellc1/jupyter
+      - /students/arenellc1/supervisor
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    creationTimestamp: "2026-03-06T14:47:58Z"
+    generation: 1
+    labels:
+      hydra.owner: ascarint1
+    name: strip-prefix-ascarint1
+    namespace: hydra-students
+    resourceVersion: "17847234"
+    uid: fed2111d-8165-4356-a231-6a8d00dcc52d
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/ascarint1/vscode
+      - /students/ascarint1/jupyter
+      - /students/ascarint1/supervisor
+      - /students/ascarint1/jenkins
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    creationTimestamp: "2026-03-06T14:49:11Z"
+    generation: 1
+    labels:
+      hydra.owner: baranovd1
+    name: strip-prefix-baranovd1
+    namespace: hydra-students
+    resourceVersion: "17847697"
+    uid: 3ee512b0-461d-43d9-8607-0ceb666bd1a5
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/baranovd1/vscode
+      - /students/baranovd1/jupyter
+      - /students/baranovd1/supervisor
+      - /students/baranovd1/jenkins
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    creationTimestamp: "2026-03-06T14:51:28Z"
+    generation: 1
+    labels:
+      hydra.owner: casconeb1
+    name: strip-prefix-casconeb1
+    namespace: hydra-students
+    resourceVersion: "17848716"
+    uid: 5d51b93d-4d8f-44a4-9e02-e29a0e2b3662
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/casconeb1/vscode
+      - /students/casconeb1/jupyter
+      - /students/casconeb1/supervisor
+      - /students/casconeb1/jenkins
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    creationTimestamp: "2026-03-05T15:41:12Z"
+    generation: 1
+    labels:
+      hydra.owner: chenm
+    name: strip-prefix-chenm
+    namespace: hydra-students
+    resourceVersion: "17371991"
+    uid: bc406be8-3747-423a-aab6-84df4998ae88
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/chenm/vscode
+      - /students/chenm/jupyter
+      - /students/chenm/supervisor
+      - /students/chenm/jenkins
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    creationTimestamp: "2026-03-08T06:34:07Z"
+    generation: 1
+    labels:
+      hydra.owner: chenma
+    name: strip-prefix-chenma
+    namespace: hydra-students
+    resourceVersion: "18667507"
+    uid: 16474f52-c492-426a-9633-4a81c6a98d98
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/chenma/vscode
+      - /students/chenma/jupyter
+      - /students/chenma/supervisor
+      - /students/chenma/jenkins
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    creationTimestamp: "2026-03-06T14:49:13Z"
+    generation: 1
+    labels:
+      hydra.owner: chiquitm1
+    name: strip-prefix-chiquitm1
+    namespace: hydra-students
+    resourceVersion: "17847742"
+    uid: 66006948-eec2-4a24-bd1b-a5d60aef9152
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/chiquitm1/vscode
+      - /students/chiquitm1/jupyter
+      - /students/chiquitm1/supervisor
+      - /students/chiquitm1/jenkins
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"name":"strip-prefix-colabelh1","namespace":"hydra-students"},"spec":{"stripPrefix":{"prefixes":["/students/colabelh1/vscode","/students/colabelh1/jupyter","/students/colabelh1/supervisor"]}}}
+    creationTimestamp: "2026-01-27T05:19:30Z"
+    generation: 3
+    name: strip-prefix-colabelh1
+    namespace: hydra-students
+    resourceVersion: "7911129"
+    uid: 600e553c-6e5b-4094-9571-980980618707
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/colabelh1/vscode
+      - /students/colabelh1/jupyter
+      - /students/colabelh1/supervisor
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"labels":{"hydra.owner":"cruzg16"},"name":"strip-prefix-cruzg16","namespace":"hydra-students"},"spec":{"stripPrefix":{"prefixes":["/students/cruzg16/vscode","/students/cruzg16/jupyter","/students/cruzg16/supervisor","/students/cruzg16/jenkins"]}}}
+    creationTimestamp: "2026-01-27T21:09:37Z"
+    generation: 4
+    labels:
+      hydra.owner: cruzg16
+    name: strip-prefix-cruzg16
+    namespace: hydra-students
+    resourceVersion: "21882779"
+    uid: bc7cd950-f20d-4654-9f31-7b4a41d1e95e
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/cruzg16/vscode
+      - /students/cruzg16/jupyter
+      - /students/cruzg16/supervisor
+      - /students/cruzg16/jenkins
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"labels":{"hydra.owner":"cuacuasr1"},"name":"strip-prefix-cuacuasr1","namespace":"hydra-students"},"spec":{"stripPrefix":{"prefixes":["/students/cuacuasr1/vscode","/students/cuacuasr1/jupyter","/students/cuacuasr1/supervisor","/students/cuacuasr1/jenkins"]}}}
+    creationTimestamp: "2026-02-16T20:05:57Z"
+    generation: 1
+    labels:
+      hydra.owner: cuacuasr1
+    name: strip-prefix-cuacuasr1
+    namespace: hydra-students
+    resourceVersion: "21882783"
+    uid: 8daaab97-b197-4bd3-bd93-930c3870d9fc
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/cuacuasr1/vscode
+      - /students/cuacuasr1/jupyter
+      - /students/cuacuasr1/supervisor
+      - /students/cuacuasr1/jenkins
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"labels":{"hydra.owner":"currym6"},"name":"strip-prefix-currym6","namespace":"hydra-students"},"spec":{"stripPrefix":{"prefixes":["/students/currym6/vscode","/students/currym6/jupyter","/students/currym6/supervisor","/students/currym6/jenkins"]}}}
+    creationTimestamp: "2026-02-03T16:00:30Z"
+    generation: 4
+    labels:
+      hydra.owner: currym6
+    name: strip-prefix-currym6
+    namespace: hydra-students
+    resourceVersion: "21882790"
+    uid: c18145e6-9260-4e7e-a0f0-30417cc98dde
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/currym6/vscode
+      - /students/currym6/jupyter
+      - /students/currym6/supervisor
+      - /students/currym6/jenkins
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    creationTimestamp: "2026-02-16T22:01:39Z"
+    generation: 1
+    labels:
+      hydra.owner: dankwahd1
+    name: strip-prefix-dankwahd1
+    namespace: hydra-students
+    resourceVersion: "9933216"
+    uid: 88771347-1f08-4964-aa0c-498360564684
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/dankwahd1/vscode
+      - /students/dankwahd1/jupyter
+      - /students/dankwahd1/supervisor
+      - /students/dankwahd1/jenkins
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    creationTimestamp: "2026-02-25T02:20:44Z"
+    generation: 1
+    labels:
+      hydra.owner: defreitm1
+    name: strip-prefix-defreitm1
+    namespace: hydra-students
+    resourceVersion: "13192275"
+    uid: 8947d71a-9ccb-4043-88d1-7f12bf22eeb5
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/defreitm1/vscode
+      - /students/defreitm1/jupyter
+      - /students/defreitm1/supervisor
+      - /students/defreitm1/jenkins
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    creationTimestamp: "2026-02-04T00:33:10Z"
+    generation: 1
+    labels:
+      hydra.owner: degennac1
+    name: strip-prefix-degennac1
+    namespace: hydra-students
+    resourceVersion: "5458988"
+    uid: df45cd34-7dbc-4845-a1f9-6f4afada2a64
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/degennac1/vscode
+      - /students/degennac1/jupyter
+      - /students/degennac1/supervisor
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"labels":{"hydra.owner":"demilion1"},"name":"strip-prefix-demilion1","namespace":"hydra-students"},"spec":{"stripPrefix":{"prefixes":["/students/demilion1/vscode","/students/demilion1/jupyter","/students/demilion1/supervisor","/students/demilion1/jenkins","/students/demilion1/my-site"]}}}
+    creationTimestamp: "2026-03-14T18:40:11Z"
+    generation: 1
+    labels:
+      hydra.owner: demilion1
+    name: strip-prefix-demilion1
+    namespace: hydra-students
+    resourceVersion: "21882792"
+    uid: 8608c759-cf3a-4aac-9bb3-7d59461ea645
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/demilion1/vscode
+      - /students/demilion1/jupyter
+      - /students/demilion1/supervisor
+      - /students/demilion1/jenkins
+      - /students/demilion1/my-site
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"name":"strip-prefix-deutscha1","namespace":"hydra-students"},"spec":{"stripPrefix":{"prefixes":["/students/deutscha1/vscode","/students/deutscha1/jupyter","/students/deutscha1/supervisor"]}}}
+    creationTimestamp: "2026-01-27T21:09:31Z"
+    generation: 3
+    name: strip-prefix-deutscha1
+    namespace: hydra-students
+    resourceVersion: "7911137"
+    uid: 5e277bd5-d88f-479b-9ba9-7d1530e96595
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/deutscha1/vscode
+      - /students/deutscha1/jupyter
+      - /students/deutscha1/supervisor
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    creationTimestamp: "2026-03-06T17:49:43Z"
+    generation: 1
+    labels:
+      hydra.owner: discuad1
+    name: strip-prefix-discuad1
+    namespace: hydra-students
+    resourceVersion: "17910417"
+    uid: a95cf921-7cdd-4c6a-b498-1e4672d633d0
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/discuad1/vscode
+      - /students/discuad1/jupyter
+      - /students/discuad1/supervisor
+      - /students/discuad1/jenkins
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"name":"strip-prefix-effendik1","namespace":"hydra-students"},"spec":{"stripPrefix":{"prefixes":["/students/effendik1/vscode","/students/effendik1/jupyter","/students/effendik1/supervisor"]}}}
+    creationTimestamp: "2026-01-27T21:09:34Z"
+    generation: 3
+    name: strip-prefix-effendik1
+    namespace: hydra-students
+    resourceVersion: "7911138"
+    uid: 6796f6b9-81e7-4ce6-9e7d-82c027221351
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/effendik1/vscode
+      - /students/effendik1/jupyter
+      - /students/effendik1/supervisor
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"labels":{"hydra.owner":"engeldie1"},"name":"strip-prefix-engeldie1","namespace":"hydra-students"},"spec":{"stripPrefix":{"prefixes":["/students/engeldie1/vscode","/students/engeldie1/jupyter","/students/engeldie1/supervisor","/students/engeldie1/jenkins"]}}}
+    creationTimestamp: "2026-02-13T18:20:25Z"
+    generation: 3
+    labels:
+      hydra.owner: engeldie1
+    name: strip-prefix-engeldie1
+    namespace: hydra-students
+    resourceVersion: "21882799"
+    uid: 3ed01cab-3408-4686-ae1a-cc2c56c7ae4e
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/engeldie1/vscode
+      - /students/engeldie1/jupyter
+      - /students/engeldie1/supervisor
+      - /students/engeldie1/jenkins
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    creationTimestamp: "2026-02-04T18:17:09Z"
+    generation: 1
+    labels:
+      hydra.owner: escurrad1
+    name: strip-prefix-escurrad1
+    namespace: hydra-students
+    resourceVersion: "5752868"
+    uid: 2f5d7065-a19c-4406-b32a-88ec7ac1d402
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/escurrad1/vscode
+      - /students/escurrad1/jupyter
+      - /students/escurrad1/supervisor
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"labels":{"hydra.owner":"fennerj1"},"name":"strip-prefix-fennerj1","namespace":"hydra-students"},"spec":{"stripPrefix":{"prefixes":["/students/fennerj1/vscode","/students/fennerj1/jupyter","/students/fennerj1/supervisor","/students/fennerj1/jenkins","/students/fennerj1/my-site"]}}}
+    creationTimestamp: "2026-03-14T18:33:48Z"
+    generation: 1
+    labels:
+      hydra.owner: fennerj1
+    name: strip-prefix-fennerj1
+    namespace: hydra-students
+    resourceVersion: "21882804"
+    uid: 7cd25741-4ed8-449b-8ad9-280864eaec7a
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/fennerj1/vscode
+      - /students/fennerj1/jupyter
+      - /students/fennerj1/supervisor
+      - /students/fennerj1/jenkins
+      - /students/fennerj1/my-site
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    creationTimestamp: "2026-03-06T14:28:57Z"
+    generation: 1
+    labels:
+      hydra.owner: fiscellv1
+    name: strip-prefix-fiscellv1
+    namespace: hydra-students
+    resourceVersion: "17840718"
+    uid: 4e300764-63ce-4d53-86f2-88bdc6caf6e1
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/fiscellv1/vscode
+      - /students/fiscellv1/jupyter
+      - /students/fiscellv1/supervisor
+      - /students/fiscellv1/jenkins
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"name":"strip-prefix-fisherb5","namespace":"hydra-students"},"spec":{"stripPrefix":{"prefixes":["/students/fisherb5/vscode","/students/fisherb5/jupyter","/students/fisherb5/supervisor"]}}}
+    creationTimestamp: "2026-01-27T20:13:28Z"
+    generation: 3
+    name: strip-prefix-fisherb5
+    namespace: hydra-students
+    resourceVersion: "7911141"
+    uid: d740e618-62d7-4063-96c8-bfb887ac5c45
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/fisherb5/vscode
+      - /students/fisherb5/jupyter
+      - /students/fisherb5/supervisor
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"name":"strip-prefix-formana4","namespace":"hydra-students"},"spec":{"stripPrefix":{"prefixes":["/students/formana4/vscode","/students/formana4/jupyter","/students/formana4/supervisor"]}}}
+    creationTimestamp: "2026-02-11T21:47:44Z"
+    generation: 2
+    labels:
+      hydra.owner: formana4
+    name: strip-prefix-formana4
+    namespace: hydra-students
+    resourceVersion: "8924233"
+    uid: 48aa5746-6c08-4e53-ad95-d5b95231734d
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/formana4/vscode
+      - /students/formana4/jupyter
+      - /students/formana4/supervisor
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"labels":{"hydra.owner":"ganza1"},"name":"strip-prefix-ganza1","namespace":"hydra-students"},"spec":{"stripPrefix":{"prefixes":["/students/ganza1/vscode","/students/ganza1/jupyter","/students/ganza1/supervisor","/students/ganza1/jenkins"]}}}
+    creationTimestamp: "2026-01-27T21:20:41Z"
+    generation: 4
+    labels:
+      hydra.owner: ganza1
+    name: strip-prefix-ganza1
+    namespace: hydra-students
+    resourceVersion: "21882811"
+    uid: c09a64cb-b4f7-4c2c-8b2f-6e416da6b917
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/ganza1/vscode
+      - /students/ganza1/jupyter
+      - /students/ganza1/supervisor
+      - /students/ganza1/jenkins
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"name":"strip-prefix-gildeac2","namespace":"hydra-students"},"spec":{"stripPrefix":{"prefixes":["/students/gildeac2/vscode","/students/gildeac2/jupyter","/students/gildeac2/supervisor"]}}}
+    creationTimestamp: "2026-01-27T21:09:36Z"
+    generation: 3
+    name: strip-prefix-gildeac2
+    namespace: hydra-students
+    resourceVersion: "7911144"
+    uid: 8c79910b-5505-46b8-ad68-5c390b88772f
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/gildeac2/vscode
+      - /students/gildeac2/jupyter
+      - /students/gildeac2/supervisor
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    creationTimestamp: "2026-03-16T00:05:01Z"
+    generation: 1
+    labels:
+      hydra.owner: gopeen1
+    name: strip-prefix-gopeen1
+    namespace: hydra-students
+    resourceVersion: "22468397"
+    uid: 17b7520d-2549-428c-8a9e-05b920637383
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/gopeen1/vscode
+      - /students/gopeen1/jupyter
+      - /students/gopeen1/supervisor
+      - /students/gopeen1/jenkins
+      - /students/gopeen1/my-site
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"name":"strip-prefix-habery1","namespace":"hydra-students"},"spec":{"stripPrefix":{"prefixes":["/students/habery1/vscode","/students/habery1/jupyter","/students/habery1/supervisor"]}}}
+    creationTimestamp: "2026-01-27T21:09:26Z"
+    generation: 3
+    name: strip-prefix-habery1
+    namespace: hydra-students
+    resourceVersion: "7911150"
+    uid: a43d7637-b816-4d05-92ec-cced1331d5e1
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/habery1/vscode
+      - /students/habery1/jupyter
+      - /students/habery1/supervisor
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    creationTimestamp: "2026-02-19T00:33:22Z"
+    generation: 1
+    labels:
+      hydra.owner: hamlingw1
+    name: strip-prefix-hamlingw1
+    namespace: hydra-students
+    resourceVersion: "10771851"
+    uid: 0024b45d-cc6e-45d1-b033-8446890ca982
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/hamlingw1/vscode
+      - /students/hamlingw1/jupyter
+      - /students/hamlingw1/supervisor
+      - /students/hamlingw1/jenkins
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    creationTimestamp: "2026-03-06T14:49:56Z"
+    generation: 1
+    labels:
+      hydra.owner: hughesp1
+    name: strip-prefix-hughesp1
+    namespace: hydra-students
+    resourceVersion: "17848061"
+    uid: 023ed1c5-ba54-4f90-9cdd-0c37ae5bfea3
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/hughesp1/vscode
+      - /students/hughesp1/jupyter
+      - /students/hughesp1/supervisor
+      - /students/hughesp1/jenkins
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    creationTimestamp: "2026-02-18T00:08:50Z"
+    generation: 1
+    labels:
+      hydra.owner: jamiesoc2
+    name: strip-prefix-jamiesoc2
+    namespace: hydra-students
+    resourceVersion: "10366664"
+    uid: 3324429c-4dcc-445d-b017-2668ac5499f4
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/jamiesoc2/vscode
+      - /students/jamiesoc2/jupyter
+      - /students/jamiesoc2/supervisor
+      - /students/jamiesoc2/jenkins
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    creationTimestamp: "2026-03-06T17:48:36Z"
+    generation: 1
+    labels:
+      hydra.owner: kieselr2
+    name: strip-prefix-kieselr2
+    namespace: hydra-students
+    resourceVersion: "17909998"
+    uid: d61e7bcd-bbe5-42d6-b41a-690177dea5b8
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/kieselr2/vscode
+      - /students/kieselr2/jupyter
+      - /students/kieselr2/supervisor
+      - /students/kieselr2/jenkins
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    creationTimestamp: "2026-03-06T14:52:33Z"
+    generation: 1
+    labels:
+      hydra.owner: kudlinsm1
+    name: strip-prefix-kudlinsm1
+    namespace: hydra-students
+    resourceVersion: "17849155"
+    uid: edf1476b-4009-4f20-b27f-d3f73cc78b08
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/kudlinsm1/vscode
+      - /students/kudlinsm1/jupyter
+      - /students/kudlinsm1/supervisor
+      - /students/kudlinsm1/jenkins
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    creationTimestamp: "2026-03-06T17:48:17Z"
+    generation: 1
+    labels:
+      hydra.owner: mazzas1
+    name: strip-prefix-mazzas1
+    namespace: hydra-students
+    resourceVersion: "17909839"
+    uid: e75bc6dc-58ab-48a2-b865-6d8fee04949b
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/mazzas1/vscode
+      - /students/mazzas1/jupyter
+      - /students/mazzas1/supervisor
+      - /students/mazzas1/jenkins
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    creationTimestamp: "2026-03-06T14:50:49Z"
+    generation: 1
+    labels:
+      hydra.owner: mohammeb2
+    name: strip-prefix-mohammeb2
+    namespace: hydra-students
+    resourceVersion: "17848460"
+    uid: ae5085cc-1c85-43a2-82be-be714832550a
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/mohammeb2/vscode
+      - /students/mohammeb2/jupyter
+      - /students/mohammeb2/supervisor
+      - /students/mohammeb2/jenkins
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"labels":{"hydra.owner":"namc3"},"name":"strip-prefix-namc3","namespace":"hydra-students"},"spec":{"stripPrefix":{"prefixes":["/students/namc3/vscode","/students/namc3/jupyter","/students/namc3/supervisor","/students/namc3/jenkins"]}}}
+    creationTimestamp: "2026-01-27T21:09:30Z"
+    generation: 4
+    labels:
+      hydra.owner: namc3
+    name: strip-prefix-namc3
+    namespace: hydra-students
+    resourceVersion: "21882821"
+    uid: 752cb772-3b5c-4fd2-a629-715979c756f3
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/namc3/vscode
+      - /students/namc3/jupyter
+      - /students/namc3/supervisor
+      - /students/namc3/jenkins
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    creationTimestamp: "2026-03-06T14:55:35Z"
+    generation: 1
+    labels:
+      hydra.owner: napolitt1
+    name: strip-prefix-napolitt1
+    namespace: hydra-students
+    resourceVersion: "17850453"
+    uid: 647b8276-e9a5-4e56-8455-025d2161baf2
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/napolitt1/vscode
+      - /students/napolitt1/jupyter
+      - /students/napolitt1/supervisor
+      - /students/napolitt1/jenkins
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"name":"strip-prefix-odonnela6","namespace":"hydra-students"},"spec":{"stripPrefix":{"prefixes":["/students/odonnela6/vscode","/students/odonnela6/jupyter","/students/odonnela6/supervisor"]}}}
+    creationTimestamp: "2026-02-04T00:33:14Z"
+    generation: 3
+    name: strip-prefix-odonnela6
+    namespace: hydra-students
+    resourceVersion: "7911219"
+    uid: 825a48a4-95ca-4173-af74-48738b766ab1
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/odonnela6/vscode
+      - /students/odonnela6/jupyter
+      - /students/odonnela6/supervisor
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    creationTimestamp: "2026-03-06T17:45:28Z"
+    generation: 1
+    labels:
+      hydra.owner: pazy1
+    name: strip-prefix-pazy1
+    namespace: hydra-students
+    resourceVersion: "17908617"
+    uid: eaed40a2-e1e4-48ac-abfb-2006aab73302
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/pazy1/vscode
+      - /students/pazy1/jupyter
+      - /students/pazy1/supervisor
+      - /students/pazy1/jenkins
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"name":"strip-prefix-perezd36","namespace":"hydra-students"},"spec":{"stripPrefix":{"prefixes":["/students/perezd36/vscode","/students/perezd36/jupyter","/students/perezd36/supervisor"]}}}
+    creationTimestamp: "2026-01-27T21:09:34Z"
+    generation: 1
+    labels:
+      hydra.owner: perezd36
+    name: strip-prefix-perezd36
+    namespace: hydra-students
+    resourceVersion: "4359100"
+    uid: ed63187b-1dcb-4798-9b59-7e0a520505c2
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/perezd36/vscode
+      - /students/perezd36/jupyter
+      - /students/perezd36/supervisor
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"name":"strip-prefix-plotkinm","namespace":"hydra-students"},"spec":{"stripPrefix":{"prefixes":["/students/plotkinm/vscode","/students/plotkinm/jupyter","/students/plotkinm/supervisor"]}}}
+    creationTimestamp: "2026-02-13T19:40:18Z"
+    generation: 2
+    labels:
+      hydra.owner: plotkinm
+    name: strip-prefix-plotkinm
+    namespace: hydra-students
+    resourceVersion: "8924241"
+    uid: 9fac13dd-b611-4d37-a6b0-d1474d22f9a6
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/plotkinm/vscode
+      - /students/plotkinm/jupyter
+      - /students/plotkinm/supervisor
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"name":"strip-prefix-polarskn1","namespace":"hydra-students"},"spec":{"stripPrefix":{"prefixes":["/students/polarskn1/vscode","/students/polarskn1/jupyter","/students/polarskn1/supervisor"]}}}
+    creationTimestamp: "2026-01-28T16:05:27Z"
+    generation: 3
+    name: strip-prefix-polarskn1
+    namespace: hydra-students
+    resourceVersion: "7911221"
+    uid: ed7beb88-a5fc-406c-8923-8246cf16b8fd
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/polarskn1/vscode
+      - /students/polarskn1/jupyter
+      - /students/polarskn1/supervisor
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"labels":{"hydra.owner":"rahmanm28"},"name":"strip-prefix-rahmanm28","namespace":"hydra-students"},"spec":{"stripPrefix":{"prefixes":["/students/rahmanm28/vscode","/students/rahmanm28/jupyter","/students/rahmanm28/supervisor","/students/rahmanm28/jenkins"]}}}
+    creationTimestamp: "2026-03-08T06:30:51Z"
+    generation: 1
+    labels:
+      hydra.owner: rahmanm28
+    name: strip-prefix-rahmanm28
+    namespace: hydra-students
+    resourceVersion: "21882823"
+    uid: ee5d9aee-4787-4054-bbae-dcc8637a45ed
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/rahmanm28/vscode
+      - /students/rahmanm28/jupyter
+      - /students/rahmanm28/supervisor
+      - /students/rahmanm28/jenkins
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"name":"strip-prefix-rasheda1","namespace":"hydra-students"},"spec":{"stripPrefix":{"prefixes":["/students/rasheda1/vscode","/students/rasheda1/jupyter","/students/rasheda1/supervisor"]}}}
+    creationTimestamp: "2026-01-28T21:14:59Z"
+    generation: 3
+    name: strip-prefix-rasheda1
+    namespace: hydra-students
+    resourceVersion: "7911222"
+    uid: 6ab1c4bf-23f5-4d1a-b84f-726a30e88062
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/rasheda1/vscode
+      - /students/rasheda1/jupyter
+      - /students/rasheda1/supervisor
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"labels":{"hydra.owner":"raudalek2"},"name":"strip-prefix-raudalek2","namespace":"hydra-students"},"spec":{"stripPrefix":{"prefixes":["/students/raudalek2/vscode","/students/raudalek2/jupyter","/students/raudalek2/supervisor","/students/raudalek2/jenkins"]}}}
+    creationTimestamp: "2026-03-10T14:16:14Z"
+    generation: 1
+    labels:
+      hydra.owner: raudalek2
+    name: strip-prefix-raudalek2
+    namespace: hydra-students
+    resourceVersion: "21882829"
+    uid: 658fd38e-537b-4eab-99f3-66715d9e3280
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/raudalek2/vscode
+      - /students/raudalek2/jupyter
+      - /students/raudalek2/supervisor
+      - /students/raudalek2/jenkins
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"labels":{"hydra.owner":"reillya1"},"name":"strip-prefix-reillya1","namespace":"hydra-students"},"spec":{"stripPrefix":{"prefixes":["/students/reillya1/vscode","/students/reillya1/jupyter","/students/reillya1/supervisor","/students/reillya1/jenkins"]}}}
+    creationTimestamp: "2026-03-06T14:50:02Z"
+    generation: 1
+    labels:
+      hydra.owner: reillya1
+    name: strip-prefix-reillya1
+    namespace: hydra-students
+    resourceVersion: "21882831"
+    uid: 0b834c74-e22e-42aa-b0af-927d440088a2
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/reillya1/vscode
+      - /students/reillya1/jupyter
+      - /students/reillya1/supervisor
+      - /students/reillya1/jenkins
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"name":"strip-prefix-richarda19","namespace":"hydra-students"},"spec":{"stripPrefix":{"prefixes":["/students/richarda19/vscode","/students/richarda19/jupyter","/students/richarda19/supervisor"]}}}
+    creationTimestamp: "2026-01-27T21:10:05Z"
+    generation: 3
+    name: strip-prefix-richarda19
+    namespace: hydra-students
+    resourceVersion: "7911224"
+    uid: c9559c24-8080-44d2-a8a0-e145d646679e
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/richarda19/vscode
+      - /students/richarda19/jupyter
+      - /students/richarda19/supervisor
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"name":"strip-prefix-robinsor15","namespace":"hydra-students"},"spec":{"stripPrefix":{"prefixes":["/students/robinsor15/vscode","/students/robinsor15/jupyter","/students/robinsor15/supervisor"]}}}
+    creationTimestamp: "2026-01-27T21:09:45Z"
+    generation: 3
+    name: strip-prefix-robinsor15
+    namespace: hydra-students
+    resourceVersion: "7911225"
+    uid: 4ffab5dd-7228-4d5c-86a6-0c54da9103d6
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/robinsor15/vscode
+      - /students/robinsor15/jupyter
+      - /students/robinsor15/supervisor
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    creationTimestamp: "2026-03-06T17:48:01Z"
+    generation: 1
+    labels:
+      hydra.owner: robinsoz9
+    name: strip-prefix-robinsoz9
+    namespace: hydra-students
+    resourceVersion: "17909680"
+    uid: f5242e85-8d4a-4ae3-8dee-94f4348f4eab
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/robinsoz9/vscode
+      - /students/robinsoz9/jupyter
+      - /students/robinsoz9/supervisor
+      - /students/robinsoz9/jenkins
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    creationTimestamp: "2026-03-15T22:56:29Z"
+    generation: 1
+    labels:
+      hydra.owner: shusterj1
+    name: strip-prefix-shusterj1
+    namespace: hydra-students
+    resourceVersion: "22444892"
+    uid: f97b3911-8e4e-4806-a391-75b7afa05d96
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/shusterj1/vscode
+      - /students/shusterj1/jupyter
+      - /students/shusterj1/supervisor
+      - /students/shusterj1/jenkins
+      - /students/shusterj1/sidequests
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"name":"strip-prefix-smallg1","namespace":"hydra-students"},"spec":{"stripPrefix":{"prefixes":["/students/smallg1/vscode","/students/smallg1/jupyter","/students/smallg1/supervisor"]}}}
+    creationTimestamp: "2026-01-27T21:09:29Z"
+    generation: 1
+    labels:
+      hydra.owner: smallg1
+    name: strip-prefix-smallg1
+    namespace: hydra-students
+    resourceVersion: "4359112"
+    uid: fa074b33-c073-4d77-8bd9-21f8e64fa353
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/smallg1/vscode
+      - /students/smallg1/jupyter
+      - /students/smallg1/supervisor
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"name":"strip-prefix-sosafrel1","namespace":"hydra-students"},"spec":{"stripPrefix":{"prefixes":["/students/sosafrel1/vscode","/students/sosafrel1/jupyter","/students/sosafrel1/supervisor"]}}}
+    creationTimestamp: "2026-01-28T21:14:37Z"
+    generation: 3
+    name: strip-prefix-sosafrel1
+    namespace: hydra-students
+    resourceVersion: "7911230"
+    uid: 2b6e2641-c76f-4988-b023-a9067a17b997
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/sosafrel1/vscode
+      - /students/sosafrel1/jupyter
+      - /students/sosafrel1/supervisor
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    creationTimestamp: "2026-03-06T14:52:59Z"
+    generation: 1
+    labels:
+      hydra.owner: stojaf1
+    name: strip-prefix-stojaf1
+    namespace: hydra-students
+    resourceVersion: "17849385"
+    uid: 5cea38cd-03de-4aa9-a382-dc0e00a67d91
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/stojaf1/vscode
+      - /students/stojaf1/jupyter
+      - /students/stojaf1/supervisor
+      - /students/stojaf1/jenkins
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"name":"strip-prefix-swalhaa1","namespace":"hydra-students"},"spec":{"stripPrefix":{"prefixes":["/students/swalhaa1/vscode","/students/swalhaa1/jupyter","/students/swalhaa1/supervisor"]}}}
+    creationTimestamp: "2026-01-27T21:16:57Z"
+    generation: 3
+    name: strip-prefix-swalhaa1
+    namespace: hydra-students
+    resourceVersion: "7911231"
+    uid: 0502e0e3-f2f7-4da7-88ba-7301e1b21178
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/swalhaa1/vscode
+      - /students/swalhaa1/jupyter
+      - /students/swalhaa1/supervisor
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"name":"strip-prefix-thompsoc10","namespace":"hydra-students"},"spec":{"stripPrefix":{"prefixes":["/students/thompsoc10/vscode","/students/thompsoc10/jupyter","/students/thompsoc10/supervisor"]}}}
+    creationTimestamp: "2026-01-28T21:16:38Z"
+    generation: 3
+    name: strip-prefix-thompsoc10
+    namespace: hydra-students
+    resourceVersion: "7911232"
+    uid: db239962-b648-4cb2-a30e-989d6e3590a2
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/thompsoc10/vscode
+      - /students/thompsoc10/jupyter
+      - /students/thompsoc10/supervisor
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"labels":{"hydra.owner":"tokor1"},"name":"strip-prefix-tokor1","namespace":"hydra-students"},"spec":{"stripPrefix":{"prefixes":["/students/tokor1/vscode","/students/tokor1/jupyter","/students/tokor1/supervisor","/students/tokor1/jenkins"]}}}
+    creationTimestamp: "2026-03-09T23:39:02Z"
+    generation: 1
+    labels:
+      hydra.owner: tokor1
+    name: strip-prefix-tokor1
+    namespace: hydra-students
+    resourceVersion: "21882841"
+    uid: 4abb2cad-e62f-4496-96d4-65ca9a8fb941
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/tokor1/vscode
+      - /students/tokor1/jupyter
+      - /students/tokor1/supervisor
+      - /students/tokor1/jenkins
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"name":"strip-prefix-townsenj1","namespace":"hydra-students"},"spec":{"stripPrefix":{"prefixes":["/students/townsenj1/vscode","/students/townsenj1/jupyter","/students/townsenj1/supervisor"]}}}
+    creationTimestamp: "2026-01-27T21:10:29Z"
+    generation: 3
+    name: strip-prefix-townsenj1
+    namespace: hydra-students
+    resourceVersion: "7911234"
+    uid: 6af9273d-72c7-4043-8e34-bf9c4ff86019
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/townsenj1/vscode
+      - /students/townsenj1/jupyter
+      - /students/townsenj1/supervisor
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    creationTimestamp: "2026-03-06T17:47:28Z"
+    generation: 1
+    labels:
+      hydra.owner: tuerosj1
+    name: strip-prefix-tuerosj1
+    namespace: hydra-students
+    resourceVersion: "17909390"
+    uid: 3866c9af-ec51-4cee-95db-0f00c17760b7
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/tuerosj1/vscode
+      - /students/tuerosj1/jupyter
+      - /students/tuerosj1/supervisor
+      - /students/tuerosj1/jenkins
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    creationTimestamp: "2026-03-06T17:44:11Z"
+    generation: 1
+    labels:
+      hydra.owner: tuoheys1
+    name: strip-prefix-tuoheys1
+    namespace: hydra-students
+    resourceVersion: "17908127"
+    uid: c1bdc6ed-a25c-48f0-acb7-44d335f91a8a
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/tuoheys1/vscode
+      - /students/tuoheys1/jupyter
+      - /students/tuoheys1/supervisor
+      - /students/tuoheys1/jenkins
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    creationTimestamp: "2026-03-06T19:59:45Z"
+    generation: 1
+    labels:
+      hydra.owner: vanderbd1
+    name: strip-prefix-vanderbd1
+    namespace: hydra-students
+    resourceVersion: "17955385"
+    uid: bb48bde5-6a6a-4be2-9b08-418aa955443a
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/vanderbd1/vscode
+      - /students/vanderbd1/jupyter
+      - /students/vanderbd1/supervisor
+      - /students/vanderbd1/jenkins
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"labels":{"hydra.owner":"voolm1"},"name":"strip-prefix-voolm1","namespace":"hydra-students"},"spec":{"stripPrefix":{"prefixes":["/students/voolm1/vscode","/students/voolm1/jupyter","/students/voolm1/supervisor","/students/voolm1/jenkins"]}}}
+    creationTimestamp: "2026-03-06T14:52:25Z"
+    generation: 1
+    labels:
+      hydra.owner: voolm1
+    name: strip-prefix-voolm1
+    namespace: hydra-students
+    resourceVersion: "21882847"
+    uid: 537d6b98-05ae-4266-89f0-d39190ec171e
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/voolm1/vscode
+      - /students/voolm1/jupyter
+      - /students/voolm1/supervisor
+      - /students/voolm1/jenkins
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"name":"strip-prefix-warnckea1","namespace":"hydra-students"},"spec":{"stripPrefix":{"prefixes":["/students/warnckea1/vscode","/students/warnckea1/jupyter","/students/warnckea1/supervisor"]}}}
+    creationTimestamp: "2026-01-27T21:09:53Z"
+    generation: 1
+    labels:
+      hydra.owner: warnckea1
+    name: strip-prefix-warnckea1
+    namespace: hydra-students
+    resourceVersion: "4359128"
+    uid: 0554cc49-c81a-4972-99c0-d56e4f252295
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/warnckea1/vscode
+      - /students/warnckea1/jupyter
+      - /students/warnckea1/supervisor
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    creationTimestamp: "2026-03-06T14:52:40Z"
+    generation: 1
+    labels:
+      hydra.owner: zhangj23
+    name: strip-prefix-zhangj23
+    namespace: hydra-students
+    resourceVersion: "17849222"
+    uid: dffca518-b0d1-4d49-af0c-526435d80c0e
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/zhangj23/vscode
+      - /students/zhangj23/jupyter
+      - /students/zhangj23/supervisor
+      - /students/zhangj23/jenkins
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    creationTimestamp: "2026-03-06T17:46:36Z"
+    generation: 1
+    labels:
+      hydra.owner: zhumabat1
+    name: strip-prefix-zhumabat1
+    namespace: hydra-students
+    resourceVersion: "17909048"
+    uid: d048987f-b8fc-45b1-a2c6-98b44a73eb3d
+  spec:
+    stripPrefix:
+      prefixes:
+      - /students/zhumabat1/vscode
+      - /students/zhumabat1/jupyter
+      - /students/zhumabat1/supervisor
+      - /students/zhumabat1/jenkins
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"name":"hydra-forward-auth","namespace":"hydra-system"},"spec":{"forwardAuth":{"address":"http://hydra-auth.hydra-system.svc.cluster.local:6969/auth/verify","authResponseHeaders":["X-Hydra-User","X-Hydra-Email"],"trustForwardHeader":true}}}
+    creationTimestamp: "2026-01-19T14:35:50Z"
+    generation: 6
+    name: hydra-forward-auth
+    namespace: hydra-system
+    resourceVersion: "3769407"
+    uid: 4a68c34e-f4ee-4156-8fc6-9abd4895a071
+  spec:
+    forwardAuth:
+      address: http://hydra-auth.hydra-system.svc.cluster.local:6969/auth/verify
+      authResponseHeaders:
+      - X-Hydra-User
+      - X-Hydra-Email
+      trustForwardHeader: true
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"name":"redirect-https","namespace":"hydra-system"},"spec":{"redirectScheme":{"permanent":true,"scheme":"https"}}}
+    creationTimestamp: "2026-01-19T16:09:31Z"
+    generation: 1
+    name: redirect-https
+    namespace: hydra-system
+    resourceVersion: "27425"
+    uid: f0df0fb7-fdfe-4df7-bed9-054a6d3fe19c
+  spec:
+    redirectScheme:
+      permanent: true
+      scheme: https
+- apiVersion: traefik.io/v1alpha1
+  kind: Middleware
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"traefik.io/v1alpha1","kind":"Middleware","metadata":{"annotations":{},"name":"strip-session-cookie","namespace":"hydra-system"},"spec":{"headers":{"customRequestHeaders":{"Cookie":""}}}}
+    creationTimestamp: "2026-03-14T19:28:52Z"
+    generation: 1
+    name: strip-session-cookie
+    namespace: hydra-system
+    resourceVersion: "21881555"
+    uid: 764a3114-0cdf-4917-8b8f-d885c15d9246
+  spec:
+    headers:
+      customRequestHeaders:
+        Cookie: ""
+kind: List
+metadata:
+  resourceVersion: ""

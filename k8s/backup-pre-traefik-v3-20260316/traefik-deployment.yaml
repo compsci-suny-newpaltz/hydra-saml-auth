@@ -1,0 +1,144 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "41"
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"labels":{"app.kubernetes.io/component":"ingress","app.kubernetes.io/name":"traefik"},"name":"traefik","namespace":"hydra-system"},"spec":{"replicas":1,"selector":{"matchLabels":{"app.kubernetes.io/name":"traefik"}},"strategy":{"type":"Recreate"},"template":{"metadata":{"labels":{"app.kubernetes.io/component":"ingress","app.kubernetes.io/name":"traefik"}},"spec":{"containers":[{"args":["--api.dashboard=true","--api.insecure=true","--providers.kubernetescrd","--providers.kubernetescrd.namespaces=hydra-system,hydra-students,hydra-infra","--providers.kubernetescrd.allowCrossNamespace=true","--providers.kubernetescrd.allowExternalNameServices=true","--entrypoints.web.address=:80","--entrypoints.websecure.address=:443","--entrypoints.hydra.address=:6969","--entrypoints.ping.address=:8082","--ping=true","--ping.entryPoint=ping","--certificatesresolvers.letsencrypt.acme.email=cslab@newpaltz.edu","--certificatesresolvers.letsencrypt.acme.storage=/acme/acme.json","--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web","--log.level=DEBUG"],"image":"traefik:v2.11","livenessProbe":{"failureThreshold":3,"httpGet":{"path":"/ping","port":8082},"initialDelaySeconds":10,"periodSeconds":10},"name":"traefik","ports":[{"containerPort":80,"hostPort":80,"name":"web","protocol":"TCP"},{"containerPort":443,"hostPort":443,"name":"websecure","protocol":"TCP"},{"containerPort":6969,"hostPort":6969,"name":"hydra","protocol":"TCP"},{"containerPort":8080,"name":"dashboard","protocol":"TCP"}],"readinessProbe":{"failureThreshold":2,"httpGet":{"path":"/ping","port":8082},"initialDelaySeconds":5,"periodSeconds":5},"resources":{"limits":{"cpu":"1000m","memory":"512Mi"},"requests":{"cpu":"200m","memory":"128Mi"}},"securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"add":["NET_BIND_SERVICE"],"drop":["ALL"]}},"volumeMounts":[{"mountPath":"/acme","name":"acme"}]}],"nodeSelector":{"kubernetes.io/hostname":"hydra"},"priorityClassName":"infra-critical","serviceAccountName":"traefik","volumes":[{"hostPath":{"path":"/data/traefik-acme","type":"DirectoryOrCreate"},"name":"acme"}]}}}}
+  creationTimestamp: "2026-01-19T14:35:48Z"
+  generation: 57
+  labels:
+    app.kubernetes.io/component: ingress
+    app.kubernetes.io/name: traefik
+  name: traefik
+  namespace: hydra-system
+  resourceVersion: "22862293"
+  uid: 1d1f9f24-0b6b-474a-9d37-c42c0649da7d
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: traefik
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/restartedAt: "2026-03-16T14:58:34-04:00"
+      creationTimestamp: null
+      labels:
+        app.kubernetes.io/component: ingress
+        app.kubernetes.io/name: traefik
+    spec:
+      containers:
+      - args:
+        - --api.dashboard=true
+        - --api.insecure=true
+        - --providers.kubernetescrd
+        - --providers.kubernetescrd.namespaces=hydra-system,hydra-students,hydra-infra
+        - --providers.kubernetescrd.allowCrossNamespace=true
+        - --providers.kubernetescrd.allowExternalNameServices=true
+        - --entrypoints.web.address=:80
+        - --entrypoints.websecure.address=:443
+        - --entrypoints.hydra.address=:6969
+        - --entrypoints.ping.address=:8082
+        - --ping=true
+        - --ping.entryPoint=ping
+        - --certificatesresolvers.letsencrypt.acme.email=cslab@newpaltz.edu
+        - --certificatesresolvers.letsencrypt.acme.storage=/acme/acme.json
+        - --certificatesresolvers.letsencrypt.acme.tlschallenge=true
+        - --log.level=DEBUG
+        image: traefik:v2.11
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /ping
+            port: 8082
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        name: traefik
+        ports:
+        - containerPort: 80
+          hostPort: 80
+          name: web
+          protocol: TCP
+        - containerPort: 443
+          hostPort: 443
+          name: websecure
+          protocol: TCP
+        - containerPort: 6969
+          hostPort: 6969
+          name: hydra
+          protocol: TCP
+        - containerPort: 8080
+          name: dashboard
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 2
+          httpGet:
+            path: /ping
+            port: 8082
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 1
+        resources:
+          limits:
+            cpu: "1"
+            memory: 512Mi
+          requests:
+            cpu: 200m
+            memory: 128Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            add:
+            - NET_BIND_SERVICE
+            drop:
+            - ALL
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /acme
+          name: acme
+      dnsPolicy: ClusterFirst
+      nodeSelector:
+        kubernetes.io/hostname: hydra
+      priorityClassName: infra-critical
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: traefik
+      serviceAccountName: traefik
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - hostPath:
+          path: /data/traefik-acme
+          type: DirectoryOrCreate
+        name: acme
+status:
+  availableReplicas: 1
+  conditions:
+  - lastTransitionTime: "2026-02-07T20:03:05Z"
+    lastUpdateTime: "2026-03-16T19:15:34Z"
+    message: ReplicaSet "traefik-5597469c49" has successfully progressed.
+    reason: NewReplicaSetAvailable
+    status: "True"
+    type: Progressing
+  - lastTransitionTime: "2026-03-16T19:16:49Z"
+    lastUpdateTime: "2026-03-16T19:16:49Z"
+    message: Deployment has minimum availability.
+    reason: MinimumReplicasAvailable
+    status: "True"
+    type: Available
+  observedGeneration: 57
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1

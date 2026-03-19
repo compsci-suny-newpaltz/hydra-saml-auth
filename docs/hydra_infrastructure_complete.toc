@@ -1,0 +1,96 @@
+\contentsline {part}{I\hspace {1em}System Overview}{5}{part.1}%
+\contentsline {section}{\numberline {1}Introduction}{5}{section.1}%
+\contentsline {subsection}{\numberline {1.1}Key Features}{5}{subsection.1.1}%
+\contentsline {subsection}{\numberline {1.2}Access URLs}{5}{subsection.1.2}%
+\contentsline {section}{\numberline {2}Cluster Architecture}{5}{section.2}%
+\contentsline {subsection}{\numberline {2.1}Node Inventory}{5}{subsection.2.1}%
+\contentsline {subsection}{\numberline {2.2}Architecture Diagram}{6}{subsection.2.2}%
+\contentsline {subsection}{\numberline {2.3}Network Architecture}{6}{subsection.2.3}%
+\contentsline {part}{II\hspace {1em}System Layer}{7}{part.2}%
+\contentsline {section}{\numberline {3}Kernel Configuration (sysctl)}{7}{section.3}%
+\contentsline {section}{\numberline {4}Container Runtimes (containerd)}{7}{section.4}%
+\contentsline {section}{\numberline {5}RKE2 Configuration}{7}{section.5}%
+\contentsline {section}{\numberline {6}Systemd Services}{8}{section.6}%
+\contentsline {section}{\numberline {7}Storage}{8}{section.7}%
+\contentsline {subsection}{\numberline {7.1}Hydra Storage Layout}{9}{subsection.7.1}%
+\contentsline {subsection}{\numberline {7.2}Kubernetes Storage Classes}{9}{subsection.7.2}%
+\contentsline {subsection}{\numberline {7.3}NFS Configuration}{9}{subsection.7.3}%
+\contentsline {part}{III\hspace {1em}Kubernetes Services}{10}{part.3}%
+\contentsline {section}{\numberline {8}Namespace Layout}{10}{section.8}%
+\contentsline {section}{\numberline {9}Core Services (hydra-system)}{10}{section.9}%
+\contentsline {subsection}{\numberline {9.1}Traefik (Reverse Proxy)}{10}{subsection.9.1}%
+\contentsline {subsection}{\numberline {9.2}Hydra Auth (SAML Gateway)}{10}{subsection.9.2}%
+\contentsline {subsection}{\numberline {9.3}CS Lab Website}{10}{subsection.9.3}%
+\contentsline {subsection}{\numberline {9.4}IngressRoute Summary}{11}{subsection.9.4}%
+\contentsline {section}{\numberline {10}Infrastructure Services (hydra-infra)}{11}{section.10}%
+\contentsline {subsection}{\numberline {10.1}KubeAI + vLLM (LLM Inference)}{11}{subsection.10.1}%
+\contentsline {subsection}{\numberline {10.2}OpenWebUI}{11}{subsection.10.2}%
+\contentsline {subsection}{\numberline {10.3}n8n (Workflow Automation)}{11}{subsection.10.3}%
+\contentsline {subsection}{\numberline {10.4}Other Services}{12}{subsection.10.4}%
+\contentsline {section}{\numberline {11}GPU Infrastructure}{12}{section.11}%
+\contentsline {subsection}{\numberline {11.1}NVIDIA GPU Operator}{12}{subsection.11.1}%
+\contentsline {subsection}{\numberline {11.2}GPU Allocation}{12}{subsection.11.2}%
+\contentsline {part}{IV\hspace {1em}Authentication System}{13}{part.4}%
+\contentsline {section}{\numberline {12}SAML 2.0 SSO Flow}{13}{section.12}%
+\contentsline {section}{\numberline {13}Session and JWT Management}{13}{section.13}%
+\contentsline {section}{\numberline {14}Cross-Service Authentication}{13}{section.14}%
+\contentsline {part}{V\hspace {1em}Student Containers}{14}{part.5}%
+\contentsline {section}{\numberline {15}Container Features}{14}{section.15}%
+\contentsline {section}{\numberline {16}Service Management}{14}{section.16}%
+\contentsline {section}{\numberline {17}Resource Presets}{14}{section.17}%
+\contentsline {section}{\numberline {18}Pod Lifecycle}{15}{section.18}%
+\contentsline {subsection}{\numberline {18.1}K8s Resources Created on Init}{15}{subsection.18.1}%
+\contentsline {subsection}{\numberline {18.2}IngressRoute per Student}{15}{subsection.18.2}%
+\contentsline {subsection}{\numberline {18.3}Deletion Levels}{15}{subsection.18.3}%
+\contentsline {subsection}{\numberline {18.4}Pod Settings}{16}{subsection.18.4}%
+\contentsline {section}{\numberline {19}SSH Access via SSHPiper}{16}{section.19}%
+\contentsline {part}{VI\hspace {1em}Networking}{17}{part.6}%
+\contentsline {section}{\numberline {20}Firewall Configuration (UFW)}{17}{section.20}%
+\contentsline {subsection}{\numberline {20.1}Hydra (Control Plane)}{17}{subsection.20.1}%
+\contentsline {subsection}{\numberline {20.2}Workers (Chimera / Cerberus)}{17}{subsection.20.2}%
+\contentsline {section}{\numberline {21}Router Port Forwarding}{17}{section.21}%
+\contentsline {section}{\numberline {22}DNS and TLS}{17}{section.22}%
+\contentsline {part}{VII\hspace {1em}Web Services and Route Map}{18}{part.7}%
+\contentsline {section}{\numberline {23}Complete Site Inventory}{18}{section.23}%
+\contentsline {section}{\numberline {24}Traefik Route Priority Table}{18}{section.24}%
+\contentsline {section}{\numberline {25}How to Update Each Service}{18}{section.25}%
+\contentsline {subsection}{\numberline {25.1}Hydra Auth (Dashboard)}{19}{subsection.25.1}%
+\contentsline {subsection}{\numberline {25.2}CS Lab Website}{19}{subsection.25.2}%
+\contentsline {subsection}{\numberline {25.3}Other Custom Services}{19}{subsection.25.3}%
+\contentsline {subsection}{\numberline {25.4}Student Container Image}{19}{subsection.25.4}%
+\contentsline {subsection}{\numberline {25.5}Upstream Images (OpenWebUI, n8n)}{19}{subsection.25.5}%
+\contentsline {part}{VIII\hspace {1em}OpenWebUI API Integration}{20}{part.8}%
+\contentsline {section}{\numberline {26}Getting Started}{20}{section.26}%
+\contentsline {section}{\numberline {27}API Configuration}{20}{section.27}%
+\contentsline {section}{\numberline {28}cURL Example}{20}{section.28}%
+\contentsline {section}{\numberline {29}Python Example}{20}{section.29}%
+\contentsline {section}{\numberline {30}JavaScript Example}{20}{section.30}%
+\contentsline {part}{IX\hspace {1em}Security}{22}{part.9}%
+\contentsline {section}{\numberline {31}Security Architecture}{22}{section.31}%
+\contentsline {section}{\numberline {32}Known Vulnerabilities}{22}{section.32}%
+\contentsline {section}{\numberline {33}Mining Detection}{22}{section.33}%
+\contentsline {part}{X\hspace {1em}RDMA and GPUDirect}{23}{part.10}%
+\contentsline {section}{\numberline {34}Overview}{23}{section.34}%
+\contentsline {section}{\numberline {35}Installation Order (Critical)}{23}{section.35}%
+\contentsline {part}{XI\hspace {1em}Deployment and Operations}{24}{part.11}%
+\contentsline {section}{\numberline {36}Ansible Playbooks}{24}{section.36}%
+\contentsline {section}{\numberline {37}Backup System}{24}{section.37}%
+\contentsline {section}{\numberline {38}Scheduled Tasks}{24}{section.38}%
+\contentsline {section}{\numberline {39}Application Background Services}{24}{section.39}%
+\contentsline {section}{\numberline {40}Common Operations}{25}{section.40}%
+\contentsline {subsection}{\numberline {40.1}Kubectl Shortcuts}{25}{subsection.40.1}%
+\contentsline {part}{XII\hspace {1em}Troubleshooting}{26}{part.12}%
+\contentsline {section}{\numberline {41}Authentication Issues}{26}{section.41}%
+\contentsline {section}{\numberline {42}Container Issues}{26}{section.42}%
+\contentsline {section}{\numberline {43}GPU Issues}{26}{section.43}%
+\contentsline {section}{\numberline {44}Networking Issues}{27}{section.44}%
+\contentsline {part}{XIII\hspace {1em}Repository Structure}{28}{part.13}%
+\contentsline {part}{XIV\hspace {1em}Environment Configuration}{29}{part.14}%
+\contentsline {section}{\numberline {45}Required Variables (hydra-saml-auth)}{29}{section.45}%
+\contentsline {part}{Appendices}{30}{part*.1}%
+\contentsline {section}{\numberline {A}Migration History}{30}{appendix.A}%
+\contentsline {section}{\numberline {B}February 2026 Changelog Summary}{30}{appendix.B}%
+\contentsline {subsection}{\numberline {B.1}Feb 4--7: Initial Cleanup}{30}{subsection.B.1}%
+\contentsline {subsection}{\numberline {B.2}Feb 9: Infrastructure Overhaul}{30}{subsection.B.2}%
+\contentsline {subsection}{\numberline {B.3}Feb 12--13: Reliability and Scheduling}{30}{subsection.B.3}%
+\contentsline {section}{\numberline {C}References}{30}{appendix.C}%
