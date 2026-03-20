@@ -105,9 +105,24 @@ This separation means:
 - Custom port routing via dashboard UI
 
 ### Resource Management
-- **RAM:** 4GB per container
-- **CPU:** 2 cores per container
-- **Storage:** Persistent Docker volumes
+- **RAM:** Configurable per student (1–8 GB without approval, up to 32 GB with admin approval)
+- **CPU:** Configurable per student (0.25–2 core limit without approval, bursts higher when node is idle)
+- **Storage:** Persistent volumes on ZFS RAID-10 (10–40 GB without approval)
+- **Custom routes:** Persisted in SQLite with auto-start via supervisor.d on pod restart
+- **Docker-in-Docker:** Every student pod includes a DinD sidecar for running Docker Compose apps
+
+### Capacity Model
+
+Each student pod runs two containers: `student` (configurable) + `dind` (fixed 1Gi/1 core).
+
+| | Per Pod (default) | 100 Pods | Hydra Allocatable |
+|---|---|---|---|
+| Memory requests | 1.3 GB | 125 GB | 243 GB |
+| Memory limits | 3 GB | 300 GB | 243 GB (overcommit OK) |
+| CPU requests | 0.35 cores | 35 cores | 17 cores (overcommit OK) |
+| CPU limits | 1.5 cores | 150 cores | 17 cores (burstable) |
+
+CPU limits are intentionally overcommitted — K8s CPU limits are soft (pods burst when idle). Memory limits overcommit is safe because not all pods use their full allocation simultaneously. Pods auto-migrate to Chimera/Cerberus if Hydra runs out of capacity.
 
 ## Architecture
 
@@ -117,9 +132,9 @@ The platform runs on RKE2 (Rancher Kubernetes Engine 2) with orchestration mode 
 
 | Node | IP | Role | K8s Labels | Resources |
 |------|-----|------|------------|-----------|
-| **Hydra** | 192.168.1.160 | Control plane, student containers | `hydra.node-role=control-plane` | 256GB RAM, 64 cores, 21TB ZFS |
-| **Chimera** | 192.168.1.150 | AI inference (OpenWebUI + Ollama) | `hydra.node-role=inference`, `hydra.gpu-enabled=true` | 3× RTX 3090 (72GB VRAM) |
-| **Cerberus** | 192.168.1.242 | GPU training workloads | `hydra.node-role=training`, `hydra.gpu-enabled=true` | 2× RTX 5090 (64GB VRAM) |
+| **Hydra** | 192.168.1.160 | Control plane, student containers | `hydra.node-role=control-plane` | 251GB RAM, 20 vCPUs (17 allocatable), 21TB ZFS |
+| **Chimera** | 192.168.1.150 | AI inference (OpenWebUI + Ollama) | `hydra.node-role=inference`, `hydra.gpu-enabled=true` | 251GB RAM, 48 cores, 3× RTX 3090 (72GB VRAM) |
+| **Cerberus** | 192.168.1.242 | GPU training workloads | `hydra.node-role=training`, `hydra.gpu-enabled=true` | 64GB RAM, 48 cores, 2× RTX 5090 (64GB VRAM) |
 
 ### Storage Classes
 

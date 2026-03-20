@@ -154,6 +154,13 @@ function buildPodSpec(username, email, config) {
           { name: 'home', mountPath: '/home/student' },
           { name: 'docker-socket', mountPath: '/var/run/docker', readOnly: false }
         ],
+        lifecycle: {
+          postStart: {
+            exec: {
+              command: ['sh', '-c', 'ln -sf /var/run/docker/docker.sock /var/run/docker.sock']
+            }
+          }
+        },
         // Container runs as root initially, then drops to user 1000 via entrypoint
         securityContext: {
           allowPrivilegeEscalation: true,
@@ -371,23 +378,25 @@ function buildIngressRouteSpec(username, customRoutes = []) {
             { name: 'strip-session-cookie', namespace: runtimeConfig.k8s.systemNamespace }
           ]
         },
-        ...customRoutes.map(route => ({
-          match: `Host(\`hydra.newpaltz.edu\`) && PathPrefix(\`/students/${username}/${route.endpoint}\`)`,
-          kind: 'Rule',
-          priority: 100,
-          services: [{ name: `student-${username}`, port: route.port }],
-          middlewares: route.public === false
-            ? [
-                { name: 'hydra-forward-auth', namespace: runtimeConfig.k8s.systemNamespace },
-                { name: `strip-prefix-${username}` },
-                { name: 'strip-session-cookie', namespace: runtimeConfig.k8s.systemNamespace }
-              ]
-            : [
-                // Public route — no SSO, strip prefix + cookies
-                { name: `strip-prefix-${username}` },
-                { name: 'strip-session-cookie', namespace: runtimeConfig.k8s.systemNamespace }
-              ]
-        }))
+        ...customRoutes.map(route => {
+          // Build middlewares list — skip strip-prefix if route handles its own baseURL
+          const middlewares = [];
+          if (route.public === false) {
+            middlewares.push({ name: 'hydra-forward-auth', namespace: runtimeConfig.k8s.systemNamespace });
+          }
+          if (route.strip_prefix !== false) {
+            middlewares.push({ name: `strip-prefix-${username}` });
+          }
+          middlewares.push({ name: 'strip-session-cookie', namespace: runtimeConfig.k8s.systemNamespace });
+
+          return {
+            match: `Host(\`hydra.newpaltz.edu\`) && PathPrefix(\`/students/${username}/${route.endpoint}\`)`,
+            kind: 'Rule',
+            priority: 100,
+            services: [{ name: `student-${username}`, port: route.port }],
+            middlewares
+          };
+        })
       ],
       tls: {
         certResolver: 'letsencrypt'
@@ -425,10 +434,17 @@ function buildMiddlewareSpec(username, customRoutes = []) {
 // ==================== CUSTOM ROUTE HELPERS ====================
 
 /**
- * Get custom routes from IngressRoute (non-default routes)
- * Default routes are vscode, jupyter, jenkins
+ * Get custom routes — DB is source of truth, fall back to IngressRoute for migration
  */
 async function getCustomRoutes(username) {
+  const { getCustomRoutesFromDB } = require('./db-init');
+  const dbRoutes = await getCustomRoutesFromDB(username);
+
+  if (dbRoutes.length > 0) {
+    return dbRoutes;
+  }
+
+  // Fallback: parse IngressRoute CRDs (migration path for pre-DB routes)
   const ingressRoute = await k8sClient.getIngressRoute(`student-${username}`);
   if (!ingressRoute?.spec?.routes) return [];
 
@@ -440,14 +456,94 @@ async function getCustomRoutes(username) {
     if (match && !defaultEndpoints.includes(match[1])) {
       const port = route.services?.[0]?.port;
       if (port) {
-        // Detect if route has forward-auth middleware (SSO enabled)
         const hasAuth = route.middlewares?.some(m => m.name === 'hydra-forward-auth');
         customRoutes.push({ endpoint: match[1], port, public: !hasAuth });
       }
     }
   }
 
+  // Backfill DB with discovered IngressRoute routes
+  if (customRoutes.length > 0) {
+    const { addCustomRoute } = require('./db-init');
+    for (const r of customRoutes) {
+      try {
+        await addCustomRoute(username, r.endpoint, r.port, null, r.public);
+      } catch (e) {
+        // Ignore duplicates from concurrent calls
+      }
+    }
+    console.log(`[K8s] Migrated ${customRoutes.length} IngressRoute routes to DB for ${username}`);
+  }
+
   return customRoutes;
+}
+
+/**
+ * Build supervisor.d config content for a route
+ */
+function buildSupervisorConf(endpoint, startCommand) {
+  return [
+    `[program:${endpoint}]`,
+    `command=/bin/bash -c "${startCommand.replace(/"/g, '\\"')}"`,
+    `directory=/home/student`,
+    `user=student`,
+    `autostart=true`,
+    `autorestart=true`,
+    `startsecs=5`,
+    `stdout_logfile=/var/log/supervisor/${endpoint}.log`,
+    `stderr_logfile=/var/log/supervisor/${endpoint}_err.log`,
+    `stdout_logfile_maxbytes=1MB`,
+    `stderr_logfile_maxbytes=1MB`,
+    ''
+  ].join('\n');
+}
+
+/**
+ * Create a single supervisor.d config inside a running pod via K8s exec API
+ */
+async function writeSupervisorConfig(namespace, username, endpoint, startCommand) {
+  const confContent = buildSupervisorConf(endpoint, startCommand);
+  const b64 = Buffer.from(confContent).toString('base64');
+  await k8sClient.execInPod(
+    `student-${username}`,
+    ['sh', '-c', `mkdir -p /home/student/supervisor.d /var/log/supervisor && echo '${b64}' | base64 -d > /home/student/supervisor.d/${endpoint}.conf`],
+    'student',
+    namespace
+  );
+}
+
+/**
+ * Restore supervisor.d configs for all custom routes with start commands
+ * Called on every pod start to ensure auto-start services survive restarts
+ */
+async function restoreSupervisorConfigs(username) {
+  const namespace = runtimeConfig.k8s.namespace;
+  const routes = await getCustomRoutes(username);
+  const routesWithCmd = routes.filter(r => r.startCommand);
+
+  if (routesWithCmd.length === 0) return;
+
+  for (const route of routesWithCmd) {
+    try {
+      await writeSupervisorConfig(namespace, username, route.endpoint, route.startCommand);
+    } catch (e) {
+      console.warn(`[K8s] Failed to write supervisor.d/${route.endpoint}.conf for ${username}:`, e.message);
+    }
+  }
+
+  // Reload supervisor to pick up all configs
+  try {
+    await k8sClient.execInPod(
+      `student-${username}`,
+      ['sh', '-c', 'supervisorctl reread && supervisorctl update'],
+      'student',
+      namespace
+    );
+  } catch (e) {
+    // supervisor may not be fully ready yet
+  }
+
+  console.log(`[K8s] Restored ${routesWithCmd.length} supervisor.d configs for ${username}`);
 }
 
 // ==================== DOCKER TRAEFIK CONFIG ====================
@@ -858,6 +954,8 @@ async function startContainer(username, email = '', containerConfig = null) {
     } catch (routeErr) {
       console.warn(`[K8s] Could not refresh routes for ${username}:`, routeErr.message);
     }
+    // Ensure supervisor.d configs exist for auto-start routes
+    try { await restoreSupervisorConfigs(username); } catch (e) { /* best-effort */ }
     return { success: true, message: 'Container already running' };
   }
 
@@ -1009,6 +1107,15 @@ async function startContainer(username, email = '', containerConfig = null) {
       console.warn(`[K8s] Failed to reset sleep state for ${username}:`, e.message);
     }
 
+    // Restore supervisor.d configs for custom routes with start commands
+    if (readyStatus.ready) {
+      try {
+        await restoreSupervisorConfigs(username);
+      } catch (e) {
+        console.warn(`[K8s] Failed to restore supervisor.d configs for ${username}:`, e.message);
+      }
+    }
+
     return {
       success: true,
       message: 'Container started',
@@ -1069,6 +1176,14 @@ async function destroyContainer(username) {
     results.pod = await k8sClient.deletePod(`student-${username}`);
     results.traefikConfig = await deleteDockerTraefikConfig(username);
     results.sshPiperConfig = await deleteSshPiperConfig(username);
+
+    // Clean up custom routes from DB
+    try {
+      const { removeAllCustomRoutes } = require('./db-init');
+      results.customRoutes = await removeAllCustomRoutes(username);
+    } catch (e) {
+      console.warn(`[K8s] Failed to clean up custom routes for ${username}:`, e.message);
+    }
 
     console.log(`[K8s] Destroyed container resources for ${username}:`, results);
     return { success: true, results };
@@ -1163,16 +1278,17 @@ async function getRoutes(username) {
 
   return [
     ...defaultRoutes,
-    ...customRoutes.map(r => ({ endpoint: r.endpoint, port: r.port, public: r.public, default: false }))
+    ...customRoutes.map(r => ({ endpoint: r.endpoint, port: r.port, public: r.public, startCommand: r.startCommand || null, strip_prefix: r.strip_prefix !== false, default: false }))
   ];
 }
 
 /**
  * Add a custom route for a student
- * Updates IngressRoute, Middleware, Service, and Docker Traefik config
+ * Saves to DB first, then updates K8s resources
  */
-async function addRoute(username, endpoint, port, isPublic = true) {
+async function addRoute(username, endpoint, port, isPublic = true, startCommand = null, stripPrefix = true) {
   const namespace = runtimeConfig.k8s.namespace;
+  const { addCustomRoute, removeCustomRoute } = require('./db-init');
 
   // 1. Get current custom routes and check for duplicates
   const customRoutes = await getCustomRoutes(username);
@@ -1182,36 +1298,46 @@ async function addRoute(username, endpoint, port, isPublic = true) {
   if (customRoutes.some(r => r.port === port)) {
     throw new Error(`Port ${port} already in use`);
   }
-  customRoutes.push({ endpoint, port, public: isPublic });
 
-  // 2. Patch Service to add the new port (strategic merge adds by port key)
-  await k8sClient.patchService(`student-${username}`, namespace, {
-    spec: {
-      ports: [
-        { name: `custom-${endpoint}`, port: port, targetPort: port, protocol: 'TCP' }
-      ]
-    }
-  });
+  // 2. Save to DB first (source of truth)
+  await addCustomRoute(username, endpoint, port, startCommand, isPublic, stripPrefix);
 
-  // 3. Replace Middleware with updated strip-prefix paths
-  await k8sClient.replaceMiddleware(
-    `strip-prefix-${username}`,
-    namespace,
-    buildMiddlewareSpec(username, customRoutes)
-  );
+  try {
+    customRoutes.push({ endpoint, port, public: isPublic, startCommand, strip_prefix: stripPrefix });
 
-  // 4. Replace IngressRoute with new route added
-  await k8sClient.replaceIngressRoute(
-    `student-${username}`,
-    namespace,
-    buildIngressRouteSpec(username, customRoutes)
-  );
+    // 3. Patch Service to add the new port
+    await k8sClient.patchService(`student-${username}`, namespace, {
+      spec: {
+        ports: [
+          { name: `custom-${endpoint}`, port: port, targetPort: port, protocol: 'TCP' }
+        ]
+      }
+    });
 
-  // 5. Update Docker Traefik config
-  await writeDockerTraefikConfig(username, customRoutes);
+    // 4. Replace Middleware with updated strip-prefix paths
+    await k8sClient.replaceMiddleware(
+      `strip-prefix-${username}`,
+      namespace,
+      buildMiddlewareSpec(username, customRoutes)
+    );
+
+    // 5. Replace IngressRoute with new route added
+    await k8sClient.replaceIngressRoute(
+      `student-${username}`,
+      namespace,
+      buildIngressRouteSpec(username, customRoutes)
+    );
+
+    // 6. Update Docker Traefik config
+    await writeDockerTraefikConfig(username, customRoutes);
+  } catch (k8sErr) {
+    // Rollback DB insert on K8s failure
+    try { await removeCustomRoute(username, endpoint); } catch (e) { /* ignore */ }
+    throw k8sErr;
+  }
 
   console.log(`[K8s] Added route for ${username}: ${endpoint} -> port ${port} (public: ${isPublic})`);
-  return { endpoint, port, public: isPublic };
+  return { endpoint, port, public: isPublic, startCommand };
 }
 
 /**
@@ -1219,6 +1345,7 @@ async function addRoute(username, endpoint, port, isPublic = true) {
  */
 async function updateRoute(username, endpoint, isPublic) {
   const namespace = runtimeConfig.k8s.namespace;
+  const { updateCustomRoute } = require('./db-init');
 
   const customRoutes = await getCustomRoutes(username);
   const route = customRoutes.find(r => r.endpoint === endpoint);
@@ -1226,6 +1353,9 @@ async function updateRoute(username, endpoint, isPublic) {
     throw new Error(`Route '${endpoint}' not found`);
   }
   route.public = isPublic;
+
+  // Update DB
+  await updateCustomRoute(username, endpoint, { is_public: isPublic });
 
   // Replace IngressRoute with updated auth settings
   await k8sClient.replaceIngressRoute(
@@ -1246,6 +1376,7 @@ async function updateRoute(username, endpoint, isPublic) {
  */
 async function removeRoute(username, endpoint) {
   const namespace = runtimeConfig.k8s.namespace;
+  const { removeCustomRoute } = require('./db-init');
 
   // 1. Get current custom routes and find the one to remove
   const customRoutes = await getCustomRoutes(username);
@@ -1256,27 +1387,29 @@ async function removeRoute(username, endpoint) {
   const removed = customRoutes[index];
   customRoutes.splice(index, 1);
 
-  // 2. Replace Middleware with updated strip-prefix paths
+  // 2. Delete from DB
+  await removeCustomRoute(username, endpoint);
+
+  // 3. Replace Middleware with updated strip-prefix paths
   await k8sClient.replaceMiddleware(
     `strip-prefix-${username}`,
     namespace,
     buildMiddlewareSpec(username, customRoutes)
   );
 
-  // 3. Replace IngressRoute with route removed
+  // 4. Replace IngressRoute with route removed
   await k8sClient.replaceIngressRoute(
     `student-${username}`,
     namespace,
     buildIngressRouteSpec(username, customRoutes)
   );
 
-  // 4. Remove port from Service (read-modify-write)
+  // 5. Remove port from Service (read-modify-write)
   try {
     const svc = await k8sClient.getService(`student-${username}`, namespace);
     if (svc) {
       const updatedPorts = svc.spec.ports.filter(p => p.name !== `custom-${endpoint}`);
       if (updatedPorts.length !== svc.spec.ports.length) {
-        // Use strategic merge with all desired ports — rebuild from scratch
         await k8sClient.patchService(`student-${username}`, namespace, {
           spec: { ports: updatedPorts }
         });
@@ -1286,8 +1419,23 @@ async function removeRoute(username, endpoint) {
     console.warn(`[K8s] Failed to remove port from service for ${username}:`, e.message);
   }
 
-  // 5. Update Docker Traefik config
+  // 6. Update Docker Traefik config
   await writeDockerTraefikConfig(username, customRoutes);
+
+  // 7. Remove supervisor.d config from pod if running
+  try {
+    const podStatus = await getContainerStatus(username);
+    if (podStatus.exists && podStatus.running) {
+      await k8sClient.execInPod(
+        `student-${username}`,
+        ['sh', '-c', `rm -f /home/student/supervisor.d/${endpoint}.conf && supervisorctl reread && supervisorctl update`],
+        'student',
+        namespace
+      );
+    }
+  } catch (e) {
+    // Non-fatal — pod may not be running
+  }
 
   console.log(`[K8s] Removed route for ${username}: ${endpoint}`);
   return { endpoint, port: removed.port };
@@ -1659,6 +1807,7 @@ module.exports = {
   removeRoute,
   generateSSHKeys,
   updateSshPiperConfig,
+  writeSupervisorConfig,
   // Expose for testing
   buildPodSpec,
   buildPVCSpec,

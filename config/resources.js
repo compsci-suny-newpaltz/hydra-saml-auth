@@ -196,7 +196,8 @@ module.exports = {
     { value: 1.5, label: '1.5 GB', requiresApproval: false },
     { value: 2, label: '2 GB (Default)', requiresApproval: false },
     { value: 4, label: '4 GB', requiresApproval: false },
-    { value: 8, label: '8 GB', requiresApproval: true },
+    { value: 6, label: '6 GB', requiresApproval: false },
+    { value: 8, label: '8 GB', requiresApproval: false },
     { value: 16, label: '16 GB', requiresApproval: true },
     { value: 32, label: '32 GB (GPU)', requiresApproval: true }
   ],
@@ -206,7 +207,7 @@ module.exports = {
     { value: 0.5, label: '0.5 Core', requiresApproval: false },
     { value: 1, label: '1 Core (Default)', requiresApproval: false },
     { value: 2, label: '2 Cores', requiresApproval: false },
-    { value: 4, label: '4 Cores', requiresApproval: true },
+    { value: 4, label: '4 Cores', requiresApproval: false },
     { value: 8, label: '8 Cores', requiresApproval: true },
     { value: 16, label: '16 Cores', requiresApproval: true }
   ],
@@ -253,8 +254,8 @@ module.exports = {
     autoApproveConservativeOnHydra: true,
     // Thresholds for auto-approval on Hydra
     autoApproveThresholds: {
-      maxMemory_gb: 4,      // Up to 4GB auto-approved
-      maxCpus: 2,           // Up to 2 cores auto-approved
+      maxMemory_gb: 8,      // Up to 8GB auto-approved
+      maxCpus: 4,           // Up to 4 cores auto-approved
       maxStorage_gb: 40     // Up to 40GB auto-approved
     }
   },

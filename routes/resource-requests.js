@@ -322,6 +322,37 @@ router.get('/presets', async (req, res) => {
             gpu_count: currentPreset.gpu_count || 0
         });
 
+        // Get cluster-level allocation from K8s
+        let clusterCapacity = null;
+        try {
+            const k8sClient = require('../services/k8s-client');
+            const pods = await k8sClient.listPods('app.kubernetes.io/name=student-container');
+            let memReqMi = 0, memLimMi = 0, cpuReqM = 0, cpuLimM = 0;
+            const parseMem = (s) => { if (!s) return 0; if (s.endsWith('Mi')) return parseInt(s); if (s.endsWith('Gi')) return parseFloat(s) * 1024; return 0; };
+            const parseCpu = (s) => { if (!s) return 0; if (s.endsWith('m')) return parseInt(s); return parseFloat(s) * 1000; };
+            for (const pod of pods) {
+                for (const c of (pod.spec?.containers || [])) {
+                    const req = c.resources?.requests || {};
+                    const lim = c.resources?.limits || {};
+                    memReqMi += parseMem(req.memory);
+                    memLimMi += parseMem(lim.memory);
+                    cpuReqM += parseCpu(req.cpu);
+                    cpuLimM += parseCpu(lim.cpu);
+                }
+            }
+            clusterCapacity = {
+                podCount: pods.length,
+                memReqGb: Math.round(memReqMi / 1024 * 10) / 10,
+                memLimGb: Math.round(memLimMi / 1024 * 10) / 10,
+                memTotalGb: 243,
+                cpuReqCores: Math.round(cpuReqM / 100) / 10,
+                cpuLimCores: Math.round(cpuLimM / 100) / 10,
+                cpuTotalCores: 17
+            };
+        } catch (e) {
+            // Non-fatal
+        }
+
         res.json({
             presets: availablePresets,
             nodes,
@@ -343,7 +374,8 @@ router.get('/presets', async (req, res) => {
                 cerberus_approved: !!quota.cerberus_approved
             },
             limits: resourceConfig.limits,
-            recommendation
+            recommendation,
+            clusterCapacity
         });
     } catch (error) {
         console.error('[resource-requests] Failed to get presets:', error);

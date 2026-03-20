@@ -951,6 +951,29 @@
               </div>
             </div>
 
+            <!-- Cluster Capacity (populated by JS) -->
+            <div id="cluster-capacity" class="bg-gray-50 rounded p-3 mb-4 hidden">
+              <p class="text-sm font-medium text-gray-700 mb-2">Hydra Capacity — <span id="cap-pod-count">-</span> pods</p>
+              <div class="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <div class="flex justify-between mb-0.5">
+                    <span class="text-gray-500">RAM reserved</span>
+                    <span><span id="cap-mem-req" class="font-medium">-</span> / <span id="cap-mem-total">243</span> GB</span>
+                  </div>
+                  <div class="w-full bg-gray-200 rounded h-1.5"><div id="cap-mem-bar" class="h-full rounded bg-blue-500 transition-all" style="width:0%"></div></div>
+                  <p class="text-[10px] text-gray-400 mt-0.5">Max burst: <span id="cap-mem-lim">-</span> GB</p>
+                </div>
+                <div>
+                  <div class="flex justify-between mb-0.5">
+                    <span class="text-gray-500">CPU reserved</span>
+                    <span><span id="cap-cpu-req" class="font-medium">-</span> / <span id="cap-cpu-total">17</span> cores</span>
+                  </div>
+                  <div class="w-full bg-gray-200 rounded h-1.5"><div id="cap-cpu-bar" class="h-full rounded bg-blue-500 transition-all" style="width:0%"></div></div>
+                  <p class="text-[10px] text-gray-400 mt-0.5">Max burst: <span id="cap-cpu-lim">-</span> cores (burstable — throttled when busy)</p>
+                </div>
+              </div>
+            </div>
+
             <!-- Auto-Recommendation Banner -->
             <div id="recommendation-banner" class="bg-blue-50 border border-blue-200 rounded p-3 mb-4 hidden">
               <div class="flex items-start gap-2">
@@ -1029,19 +1052,49 @@
                 </div>
               </div>
 
-              <!-- Resource Preset -->
+              <!-- RAM -->
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Resource Preset</label>
+                <label class="block text-sm font-medium text-gray-700 mb-1">RAM Limit</label>
+                <select id="resource-memory" class="w-full rounded border border-gray-300 px-3 py-2" onchange="updateApprovalStatus()">
+                  <option value="1">1 GB</option>
+                  <option value="1.5">1.5 GB</option>
+                  <option value="2" selected>2 GB (Default)</option>
+                  <option value="4">4 GB</option>
+                  <option value="6">6 GB</option>
+                  <option value="8">8 GB</option>
+                  <option value="16" class="gpu-preset-option">16 GB (Requires approval)</option>
+                  <option value="32" class="gpu-preset-option">32 GB (Requires approval)</option>
+                </select>
+              </div>
+
+              <!-- CPU — backend applies cpus * 0.5 as the actual limit, labels show real values -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">CPU Limit</label>
+                <select id="resource-cpus" class="w-full rounded border border-gray-300 px-3 py-2" onchange="updateApprovalStatus()">
+                  <option value="0.5">0.25 Core</option>
+                  <option value="1" selected>0.5 Core (Default)</option>
+                  <option value="2">1 Core</option>
+                  <option value="4">2 Cores</option>
+                  <option value="8" class="gpu-preset-option">4 Cores (Requires approval)</option>
+                  <option value="16" class="gpu-preset-option">8 Cores (Requires approval)</option>
+                </select>
+                <p class="text-xs text-gray-500 mt-1">CPU bursts above this limit when the server isn't busy</p>
+              </div>
+
+              <!-- GPU Preset (only shown for GPU nodes, auto-selected by node) -->
+              <div id="gpu-preset-section" class="hidden">
+                <label class="block text-sm font-medium text-gray-700 mb-1">GPU Configuration</label>
                 <select id="resource-preset" class="w-full rounded border border-gray-300 px-3 py-2">
-                  <option value="conservative">Conservative (1.5GB RAM, 1 CPU) - Auto-approved</option>
-                  <option value="standard">Standard (2GB RAM, 1 CPU) - Auto-approved</option>
-                  <option value="enhanced">Enhanced (4GB RAM, 2 CPU) - Auto-approved</option>
-                  <option value="gpu_inference" class="gpu-preset-option" data-node="chimera">RTX 3090 (32GB RAM, 8 CPU, 1 GPU) - Chimera</option>
-                  <option value="gpu_training" class="gpu-preset-option" data-node="cerberus">RTX 5090 (48GB RAM, 16 CPU, 2 GPU) - Cerberus</option>
+                  <option value="gpu_inference_1" data-node="chimera" data-gpus="1">Chimera — 1x RTX 3090 (24GB VRAM)</option>
+                  <option value="gpu_inference_2" data-node="chimera" data-gpus="2">Chimera — 2x RTX 3090 (48GB VRAM)</option>
+                  <option value="gpu_inference_3" data-node="chimera" data-gpus="3">Chimera — 3x RTX 3090 (72GB VRAM)</option>
+                  <option value="gpu_training_1" data-node="cerberus" data-gpus="1">Cerberus — 1x RTX 5090 (32GB VRAM)</option>
+                  <option value="gpu_training_2" data-node="cerberus" data-gpus="2">Cerberus — 2x RTX 5090 (64GB VRAM)</option>
                 </select>
                 <p id="preset-capacity-warning" class="text-xs text-orange-600 mt-1 hidden">
-                  <i class="fas fa-exclamation-triangle"></i> Limited capacity for this preset
+                  <i class="fas fa-exclamation-triangle"></i> Limited capacity
                 </p>
+                <p class="text-xs text-gray-500 mt-1">GPU presets override RAM/CPU selections above. Requires admin approval.</p>
               </div>
 
               <!-- Storage Tier -->
@@ -1384,25 +1437,18 @@
                 </button>
               </div>
             </div>
-            <div class="mt-2">
-              <label class="block text-xs font-medium mb-1" for="new-start-cmd">Start Command <span class="text-gray-400">(optional — auto-starts your app on container restart)</span></label>
-              <input type="text" id="new-start-cmd" placeholder="cd myapp && npm start"
-                class="w-full rounded border border-gray-300 px-3 py-2 text-sm font-mono" />
-            </div>
-            <p class="text-xs text-gray-500 mt-2">Route your container's internal ports to custom endpoints. If you provide a start command, your app will auto-restart when the container starts.</p>
+            <p class="text-xs text-gray-500 mt-1">Add a route, then click <strong>Edit</strong> to configure start command and URL prefix settings.</p>
           </div>
           <div id="routing-message" class="mt-3"></div>
-          <div class="bg-blue-50 border border-blue-200 rounded p-3 mt-3">
-            <p class="text-sm font-medium text-blue-800"><i class="fas fa-info-circle"></i> Hosting a web app?</p>
-            <p class="text-xs text-blue-700 mt-1">
-              Your app is served at <code class="bg-blue-100 px-1">https://hydra.newpaltz.edu/students/<%= user.email.split('@')[0] %>/ENDPOINT/</code>.
-              If using a build tool, set the base path so assets load correctly:
+          <div class="bg-gray-50 border border-gray-200 rounded p-3 mt-3">
+            <p class="text-sm font-medium text-gray-700"><i class="fas fa-docker text-blue-500"></i> Tip: Use Docker for heavy apps</p>
+            <p class="text-xs text-gray-600 mt-1">
+              Your container has Docker-in-Docker. For apps that need a build step (Nuxt, Next.js, etc.),
+              create a <code class="bg-gray-100 px-1">Dockerfile</code> and <code class="bg-gray-100 px-1">compose.yaml</code>, then set your start command to:
+              <code class="bg-gray-100 px-1 block mt-1">cd ~/myapp && docker compose up -d --build</code>
+              Docker runs inside your container automatically — no extra setup needed.
+              Avoid mapping to reserved ports (22, 8080, 8443, 8888, 9001).
             </p>
-            <ul class="text-xs text-blue-700 mt-1 list-disc list-inside space-y-0.5">
-              <li><strong>Vite:</strong> <code class="bg-blue-100 px-1">base: '/students/<%= user.email.split('@')[0] %>/ENDPOINT/'</code> in vite.config</li>
-              <li><strong>Next.js:</strong> <code class="bg-blue-100 px-1">basePath: '/students/<%= user.email.split('@')[0] %>/ENDPOINT'</code> in next.config</li>
-              <li><strong>Create React App:</strong> <code class="bg-blue-100 px-1">homepage: '/students/<%= user.email.split('@')[0] %>/ENDPOINT/'</code> in package.json</li>
-            </ul>
           </div>
         </div>
 
@@ -1410,84 +1456,112 @@
         <details id="server-status-section" class="mb-6 border rounded hidden group">
           <summary class="p-4 cursor-pointer hover:bg-gray-50 flex items-center justify-between">
             <h4 class="text-lg font-semibold">
-              <i class="fas fa-server text-purple-600"></i> Server Status
+              <i class="fas fa-server text-purple-600"></i> Cluster Status
             </h4>
             <i class="fas fa-chevron-down text-gray-400 group-open:rotate-180 transition-transform"></i>
           </summary>
           <div class="p-4 pt-0 grid grid-cols-1 md:grid-cols-3 gap-4">
             <!-- Hydra Status -->
-            <div class="border rounded p-3 bg-gray-50">
-              <div class="flex items-center justify-between mb-2">
-                <span class="font-semibold text-[#052049]">Hydra</span>
-                <span id="hydra-status-badge" class="px-2 py-1 text-xs rounded bg-green-100 text-green-700">Online</span>
+            <div class="border rounded-lg p-4 bg-gradient-to-b from-white to-gray-50">
+              <div class="flex items-center justify-between mb-1">
+                <span class="font-bold text-[#052049]">Hydra</span>
+                <span id="hydra-status-badge" class="px-2 py-0.5 text-[10px] rounded-full bg-green-100 text-green-700 font-medium">Online</span>
               </div>
-              <p class="text-xs text-gray-500 mb-2">Control Plane</p>
-              <div class="space-y-1 text-sm">
-                <div class="flex justify-between">
-                  <span class="text-gray-600">CPU:</span>
-                  <span id="hydra-cpu" class="font-mono">--%</span>
+              <p class="text-[10px] text-gray-400 mb-3">Control Plane — 20 vCPUs, 251 GB RAM</p>
+              <div class="space-y-2.5">
+                <div>
+                  <div class="flex justify-between text-xs mb-0.5">
+                    <span class="text-gray-500">CPU</span>
+                    <span id="hydra-cpu" class="font-mono text-gray-700">--%</span>
+                  </div>
+                  <div class="w-full bg-gray-200 rounded-full h-2"><div id="hydra-cpu-bar" class="h-full rounded-full bg-blue-500 transition-all" style="width:0%"></div></div>
                 </div>
-                <div class="flex justify-between">
-                  <span class="text-gray-600">RAM:</span>
-                  <span id="hydra-ram" class="font-mono">--</span>
+                <div>
+                  <div class="flex justify-between text-xs mb-0.5">
+                    <span class="text-gray-500">RAM</span>
+                    <span id="hydra-ram" class="font-mono text-gray-700">--</span>
+                  </div>
+                  <div class="w-full bg-gray-200 rounded-full h-2"><div id="hydra-ram-bar" class="h-full rounded-full bg-purple-500 transition-all" style="width:0%"></div></div>
                 </div>
-                <div class="flex justify-between">
-                  <span class="text-gray-600">Disk:</span>
-                  <span id="hydra-disk" class="font-mono">--</span>
+                <div>
+                  <div class="flex justify-between text-xs mb-0.5">
+                    <span class="text-gray-500">RAID</span>
+                    <span id="hydra-disk" class="font-mono text-gray-700">--</span>
+                  </div>
+                  <div class="w-full bg-gray-200 rounded-full h-2"><div id="hydra-disk-bar" class="h-full rounded-full bg-amber-500 transition-all" style="width:0%"></div></div>
                 </div>
               </div>
             </div>
 
             <!-- Chimera Status -->
-            <div class="border rounded p-3 bg-gray-50">
-              <div class="flex items-center justify-between mb-2">
-                <span class="font-semibold text-[#052049]">Chimera</span>
-                <span id="chimera-status-badge" class="px-2 py-1 text-xs rounded bg-green-100 text-green-700">Online</span>
+            <div class="border rounded-lg p-4 bg-gradient-to-b from-white to-gray-50">
+              <div class="flex items-center justify-between mb-1">
+                <span class="font-bold text-[#052049]">Chimera</span>
+                <span id="chimera-status-badge" class="px-2 py-0.5 text-[10px] rounded-full bg-green-100 text-green-700 font-medium">Online</span>
               </div>
-              <p class="text-xs text-gray-500 mb-2">Inference Node</p>
-              <div class="space-y-1 text-sm">
-                <div class="flex justify-between">
-                  <span class="text-gray-600">CPU:</span>
-                  <span id="chimera-cpu" class="font-mono">--%</span>
+              <p class="text-[10px] text-gray-400 mb-3">Inference — 3x RTX 3090 (72 GB VRAM)</p>
+              <div class="space-y-2.5">
+                <div>
+                  <div class="flex justify-between text-xs mb-0.5">
+                    <span class="text-gray-500">CPU</span>
+                    <span id="chimera-cpu" class="font-mono text-gray-700">--%</span>
+                  </div>
+                  <div class="w-full bg-gray-200 rounded-full h-2"><div id="chimera-cpu-bar" class="h-full rounded-full bg-blue-500 transition-all" style="width:0%"></div></div>
                 </div>
-                <div class="flex justify-between">
-                  <span class="text-gray-600">RAM:</span>
-                  <span id="chimera-ram" class="font-mono">--</span>
+                <div>
+                  <div class="flex justify-between text-xs mb-0.5">
+                    <span class="text-gray-500">RAM</span>
+                    <span id="chimera-ram" class="font-mono text-gray-700">--</span>
+                  </div>
+                  <div class="w-full bg-gray-200 rounded-full h-2"><div id="chimera-ram-bar" class="h-full rounded-full bg-purple-500 transition-all" style="width:0%"></div></div>
                 </div>
-                <div class="flex justify-between">
-                  <span class="text-gray-600">Disk:</span>
-                  <span id="chimera-disk" class="font-mono">--</span>
+                <div>
+                  <div class="flex justify-between text-xs mb-0.5">
+                    <span class="text-gray-500">Disk</span>
+                    <span id="chimera-disk" class="font-mono text-gray-700">--</span>
+                  </div>
+                  <div class="w-full bg-gray-200 rounded-full h-2"><div id="chimera-disk-bar" class="h-full rounded-full bg-amber-500 transition-all" style="width:0%"></div></div>
                 </div>
               </div>
             </div>
 
             <!-- Cerberus Status -->
-            <div class="border rounded p-3 bg-gray-50">
-              <div class="flex items-center justify-between mb-2">
-                <span class="font-semibold text-[#052049]">Cerberus</span>
-                <span id="cerberus-status-badge" class="px-2 py-1 text-xs rounded bg-green-100 text-green-700">Online</span>
+            <div class="border rounded-lg p-4 bg-gradient-to-b from-white to-gray-50">
+              <div class="flex items-center justify-between mb-1">
+                <span class="font-bold text-[#052049]">Cerberus</span>
+                <span id="cerberus-status-badge" class="px-2 py-0.5 text-[10px] rounded-full bg-green-100 text-green-700 font-medium">Online</span>
               </div>
-              <p class="text-xs text-gray-500 mb-2">Training Node</p>
-              <div class="space-y-1 text-sm">
-                <div class="flex justify-between">
-                  <span class="text-gray-600">CPU:</span>
-                  <span id="cerberus-cpu" class="font-mono">--%</span>
+              <p class="text-[10px] text-gray-400 mb-3">Training — 2x RTX 5090 (64 GB VRAM)</p>
+              <div class="space-y-2.5">
+                <div>
+                  <div class="flex justify-between text-xs mb-0.5">
+                    <span class="text-gray-500">CPU</span>
+                    <span id="cerberus-cpu" class="font-mono text-gray-700">--%</span>
+                  </div>
+                  <div class="w-full bg-gray-200 rounded-full h-2"><div id="cerberus-cpu-bar" class="h-full rounded-full bg-blue-500 transition-all" style="width:0%"></div></div>
                 </div>
-                <div class="flex justify-between">
-                  <span class="text-gray-600">RAM:</span>
-                  <span id="cerberus-ram" class="font-mono">--</span>
+                <div>
+                  <div class="flex justify-between text-xs mb-0.5">
+                    <span class="text-gray-500">RAM</span>
+                    <span id="cerberus-ram" class="font-mono text-gray-700">--</span>
+                  </div>
+                  <div class="w-full bg-gray-200 rounded-full h-2"><div id="cerberus-ram-bar" class="h-full rounded-full bg-purple-500 transition-all" style="width:0%"></div></div>
                 </div>
-                <div class="flex justify-between">
-                  <span class="text-gray-600">Disk:</span>
-                  <span id="cerberus-disk" class="font-mono">--</span>
+                <div>
+                  <div class="flex justify-between text-xs mb-0.5">
+                    <span class="text-gray-500">Disk</span>
+                    <span id="cerberus-disk" class="font-mono text-gray-700">--</span>
+                  </div>
+                  <div class="w-full bg-gray-200 rounded-full h-2"><div id="cerberus-disk-bar" class="h-full rounded-full bg-amber-500 transition-all" style="width:0%"></div></div>
                 </div>
               </div>
             </div>
           </div>
 
-          <p class="text-xs text-gray-500 mt-3 px-4 pb-2">
+          <p class="text-xs text-gray-500 mt-3 px-4 pb-3">
             <i class="fas fa-info-circle"></i>
-            <a href="/servers" target="_blank" class="text-blue-600 underline">View full cluster status</a>
+            Showing real-time hardware utilization.
+            <a href="/servers" target="_blank" class="text-blue-600 underline ml-1">Full cluster dashboard</a>
           </p>
         </details>
 
@@ -2939,6 +3013,28 @@
             showRecommendation(currentRecommendation);
           }
 
+          // Populate cluster capacity
+          if (resourceConfig.clusterCapacity) {
+            const cap = resourceConfig.clusterCapacity;
+            const capDiv = document.getElementById('cluster-capacity');
+            capDiv.classList.remove('hidden');
+            document.getElementById('cap-pod-count').textContent = cap.podCount;
+            // RAM — bar based on requests (what scheduler reserves)
+            document.getElementById('cap-mem-req').textContent = cap.memReqGb;
+            document.getElementById('cap-mem-total').textContent = cap.memTotalGb;
+            document.getElementById('cap-mem-lim').textContent = cap.memLimGb;
+            const memPct = Math.min(100, Math.round(cap.memReqGb / cap.memTotalGb * 100));
+            document.getElementById('cap-mem-bar').style.width = memPct + '%';
+            document.getElementById('cap-mem-bar').className = 'h-full rounded transition-all ' + (memPct > 80 ? 'bg-red-500' : memPct > 60 ? 'bg-yellow-500' : 'bg-blue-500');
+            // CPU — bar based on requests
+            document.getElementById('cap-cpu-req').textContent = cap.cpuReqCores;
+            document.getElementById('cap-cpu-total').textContent = cap.cpuTotalCores;
+            document.getElementById('cap-cpu-lim').textContent = cap.cpuLimCores;
+            const cpuPct = Math.min(100, Math.round(cap.cpuReqCores / cap.cpuTotalCores * 100));
+            document.getElementById('cap-cpu-bar').style.width = cpuPct + '%';
+            document.getElementById('cap-cpu-bar').className = 'h-full rounded transition-all ' + (cpuPct > 80 ? 'bg-red-500' : cpuPct > 60 ? 'bg-yellow-500' : 'bg-blue-500');
+          }
+
           // Highlight currently selected node
           selectNode(selectedNode, false);
 
@@ -3032,15 +3128,28 @@
         };
         document.getElementById('selected-node-label').textContent = labels[selectedNode] || selectedNode;
 
-        // Filter resource presets based on node (hide GPU presets on Hydra)
-        const presetSelect = document.getElementById('resource-preset');
-        presetSelect.querySelectorAll('.gpu-preset-option').forEach(opt => {
+        // Show/hide GPU-only options based on node
+        document.querySelectorAll('#resource-memory .gpu-preset-option, #resource-cpus .gpu-preset-option').forEach(opt => {
           opt.hidden = (selectedNode === 'hydra');
           opt.disabled = (selectedNode === 'hydra');
         });
-        // If current selection is a GPU preset but we switched to Hydra, reset to standard
-        if (selectedNode === 'hydra' && presetSelect.value.startsWith('gpu_')) {
-          presetSelect.value = 'standard';
+
+        // Show/hide GPU preset section and filter options by node
+        const gpuSection = document.getElementById('gpu-preset-section');
+        const gpuPresetSelect = document.getElementById('resource-preset');
+        if (selectedNode !== 'hydra') {
+          gpuSection.classList.remove('hidden');
+          // Show only options for the selected node
+          let firstVisible = null;
+          gpuPresetSelect.querySelectorAll('option').forEach(opt => {
+            const show = opt.dataset.node === selectedNode;
+            opt.hidden = !show;
+            opt.disabled = !show;
+            if (show && !firstVisible) firstVisible = opt.value;
+          });
+          if (firstVisible) gpuPresetSelect.value = firstVisible;
+        } else {
+          gpuSection.classList.add('hidden');
         }
 
         // Show GPU info for GPU nodes
@@ -3073,14 +3182,14 @@
 
       // Get updated recommendation based on current selections
       async function updateRecommendation() {
-        const preset = document.getElementById('resource-preset').value;
+        const memory = parseFloat(document.getElementById('resource-memory').value);
         const storage = parseInt(document.getElementById('storage-tier').value);
 
         try {
           const res = await fetch('/dashboard/api/resource-requests/recommend', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ preset_id: preset, storage_gb: storage })
+            body: JSON.stringify({ memory_gb: memory, storage_gb: storage })
           });
 
           if (res.ok) {
@@ -3124,18 +3233,24 @@
 
       function updateApprovalStatus() {
         const targetNode = document.getElementById('target-node').value;
-        const preset = document.getElementById('resource-preset').value;
+        const memory = parseFloat(document.getElementById('resource-memory').value);
+        const cpus = parseFloat(document.getElementById('resource-cpus').value);
         const storage = parseInt(document.getElementById('storage-tier').value);
         const durationDays = parseInt(document.getElementById('duration-days').value);
 
-        // Check if this requires approval
-        // GPU nodes require approval, but returning to hydra is auto-approved
-        // Match backend logic: auto-approve on Hydra for conservative/standard/enhanced
-        // with storage <= 40GB and duration <= 30 days
-        const autoApprovePresets = ['conservative', 'standard', 'enhanced'];
+        // Show/hide GPU preset section
+        const gpuSection = document.getElementById('gpu-preset-section');
+        if (targetNode !== 'hydra') {
+          gpuSection.classList.remove('hidden');
+        } else {
+          gpuSection.classList.add('hidden');
+        }
+
+        // Match backend thresholds: 8GB RAM, 4 CPU, 40GB storage auto-approved on Hydra
         const needsApproval = (
           targetNode !== 'hydra' ||
-          !autoApprovePresets.includes(preset) ||
+          memory > 8 ||
+          cpus > 4 ||
           storage > 40 ||
           durationDays > 30
         );
@@ -3181,16 +3296,29 @@
         msg.innerHTML = '<p class="text-gray-600">Submitting request...</p>';
 
         try {
+          const targetNode = document.getElementById('target-node').value;
+          const isGpu = targetNode !== 'hydra';
+          const body = {
+            target_node: targetNode,
+            memory_gb: parseFloat(document.getElementById('resource-memory').value),
+            cpus: parseFloat(document.getElementById('resource-cpus').value),
+            storage_gb: parseInt(document.getElementById('storage-tier').value),
+            duration_days: parseInt(document.getElementById('duration-days').value),
+            reason: document.getElementById('request-reason').value || null
+          };
+          if (isGpu) {
+            const gpuSelect = document.getElementById('resource-preset');
+            const gpuOption = gpuSelect.options[gpuSelect.selectedIndex];
+            const gpuCount = parseInt(gpuOption.dataset.gpus) || 1;
+            // Map back to base preset id (gpu_inference_1 -> gpu_inference)
+            const gpuValue = gpuSelect.value;
+            body.preset_id = gpuValue.replace(/_\d+$/, '');
+            body.gpu_count = gpuCount;
+          }
           const res = await fetch('/dashboard/api/resource-requests', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              target_node: document.getElementById('target-node').value,
-              preset_id: document.getElementById('resource-preset').value,
-              storage_gb: parseInt(document.getElementById('storage-tier').value),
-              duration_days: parseInt(document.getElementById('duration-days').value),
-              reason: document.getElementById('request-reason').value || null
-            })
+            body: JSON.stringify(body)
           });
 
           if (handleAuthError(res)) return;
@@ -3441,9 +3569,15 @@
               <td class="px-3 py-2">
                 ${isDefault
                   ? '<span class="text-xs text-gray-400">-</span>'
-                  : `<button onclick="deleteRoute('${route.endpoint}')" class="px-2 py-1 text-xs rounded bg-red-100 hover:bg-red-200 text-red-700">
-                      <i class="fas fa-trash"></i> Delete
-                    </button>`
+                  : `<div class="flex items-center gap-1">
+                      <button onclick="editRoute('${route.endpoint}', ${route.port}, ${route.startCommand ? "'" + route.startCommand.replace(/\\/g,'\\\\').replace(/'/g,"\\'") + "'" : 'null'}, ${route.stripPrefix !== false})"
+                        class="px-2 py-1 text-xs rounded bg-blue-100 hover:bg-blue-200 text-blue-700">
+                        <i class="fas fa-pen"></i> Edit
+                      </button>
+                      <button onclick="deleteRoute('${route.endpoint}')" class="px-2 py-1 text-xs rounded bg-red-100 hover:bg-red-200 text-red-700">
+                        <i class="fas fa-trash"></i> Delete
+                      </button>
+                    </div>`
                 }
               </td>
             `;
@@ -3462,26 +3596,37 @@
           const statusData = await statusRes.json();
 
           if (statusData.servers) {
-            // Helper to update server card
+            const barColor = (pct) => pct > 80 ? 'bg-red-500' : pct > 60 ? 'bg-yellow-500' : pct > 40 ? 'bg-blue-500' : 'bg-green-500';
             const updateServer = (name, data) => {
               if (!data) return;
               const badge = document.getElementById(`${name}-status-badge`);
               if (badge) {
                 badge.textContent = data.status === 'online' ? 'Online' : (data.status || 'Unknown');
                 badge.className = data.status === 'online'
-                  ? 'px-2 py-1 text-xs rounded bg-green-100 text-green-700'
-                  : 'px-2 py-1 text-xs rounded bg-gray-100 text-gray-600';
+                  ? 'px-2 py-0.5 text-[10px] rounded-full bg-green-100 text-green-700 font-medium'
+                  : 'px-2 py-0.5 text-[10px] rounded-full bg-red-100 text-red-700 font-medium';
               }
+              const cpuPct = data.cpu_percent || 0;
               const cpu = document.getElementById(`${name}-cpu`);
-              if (cpu) cpu.textContent = `${data.cpu_percent || 0}%`;
+              if (cpu) cpu.textContent = `${cpuPct}%`;
+              const cpuBar = document.getElementById(`${name}-cpu-bar`);
+              if (cpuBar) { cpuBar.style.width = cpuPct + '%'; cpuBar.className = 'h-full rounded-full transition-all ' + barColor(cpuPct); }
+
+              const ramUsed = data.ram_used_gb || 0;
+              const ramTotal = data.ram_total_gb || 1;
+              const ramPct = Math.round(ramUsed / ramTotal * 100);
               const ram = document.getElementById(`${name}-ram`);
-              if (ram) ram.textContent = `${data.ram_used_gb || 0}/${data.ram_total_gb || 0} GB`;
+              if (ram) ram.textContent = `${ramUsed}/${ramTotal} GB`;
+              const ramBar = document.getElementById(`${name}-ram-bar`);
+              if (ramBar) { ramBar.style.width = ramPct + '%'; ramBar.className = 'h-full rounded-full transition-all ' + barColor(ramPct); }
+
+              const diskUsed = data.raid_used_gb || data.disk_used_gb || 0;
+              const diskTotal = data.raid_total_gb || data.disk_total_gb || 1;
+              const diskPct = Math.round(diskUsed / diskTotal * 100);
               const disk = document.getElementById(`${name}-disk`);
-              if (disk && data.disk_total_gb) {
-                disk.textContent = `${Math.round((data.disk_used_gb || 0) / 1000)}/${Math.round(data.disk_total_gb / 1000)} TB`;
-              } else if (disk) {
-                disk.textContent = '--';
-              }
+              if (disk) disk.textContent = diskTotal > 1000 ? `${(diskUsed/1000).toFixed(1)}/${(diskTotal/1000).toFixed(1)} TB` : `${diskUsed}/${diskTotal} GB`;
+              const diskBar = document.getElementById(`${name}-disk-bar`);
+              if (diskBar) { diskBar.style.width = diskPct + '%'; diskBar.className = 'h-full rounded-full transition-all ' + barColor(diskPct); }
             };
 
             updateServer('hydra', statusData.servers.hydra);
@@ -3496,7 +3641,6 @@
       window.addRoute = async function () {
         const endpoint = document.getElementById('new-endpoint').value.trim().toLowerCase();
         const port = Number(document.getElementById('new-port').value);
-        const startCmd = document.getElementById('new-start-cmd').value.trim();
         const msg = document.getElementById('routing-message');
 
         if (!endpoint || !/^[a-z0-9-]{1,40}$/.test(endpoint)) {
@@ -3514,7 +3658,7 @@
           const res = await fetch('/dashboard/api/containers/routes', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ endpoint, port, startCommand: startCmd || undefined })
+            body: JSON.stringify({ endpoint, port })
           });
           const data = await res.json();
 
@@ -3571,6 +3715,63 @@
           msg.innerHTML = `<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2 text-sm">${err.message || 'Failed to toggle access'}</p>`;
           if (btn) btn.disabled = false;
         }
+      };
+
+      window.editRoute = async function (endpoint, port, currentCmd, currentStrip) {
+        const msg = document.getElementById('routing-message');
+
+        // Build a simple edit dialog
+        const dialog = document.createElement('div');
+        dialog.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50';
+        dialog.innerHTML = `
+          <div class="bg-white rounded-lg shadow-xl p-5 w-full max-w-md mx-4">
+            <h3 class="font-semibold text-lg mb-3">Edit route: <code class="text-blue-700">${endpoint}</code> (port ${port})</h3>
+            <div class="mb-3">
+              <label class="block text-xs font-medium mb-1">Start Command <span class="text-gray-400">(auto-starts on container restart)</span></label>
+              <input type="text" id="edit-start-cmd" value="${(currentCmd || '').replace(/"/g, '&quot;')}"
+                placeholder="cd myapp && npm start"
+                class="w-full rounded border border-gray-300 px-3 py-2 text-sm font-mono" />
+            </div>
+            <div class="mb-4">
+              <label class="inline-flex items-center gap-2 text-xs">
+                <input type="checkbox" id="edit-strip-prefix" ${currentStrip ? 'checked' : ''} class="rounded border-gray-300" />
+                <span class="font-medium">Strip URL prefix</span>
+                <span class="text-gray-400">(uncheck if your app sets its own base path)</span>
+              </label>
+            </div>
+            <div class="flex justify-end gap-2">
+              <button id="edit-cancel" class="px-4 py-2 text-sm rounded border border-gray-300 hover:bg-gray-50">Cancel</button>
+              <button id="edit-save" class="px-4 py-2 text-sm rounded bg-blue-600 text-white hover:bg-blue-700">Save</button>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(dialog);
+
+        dialog.querySelector('#edit-cancel').onclick = () => dialog.remove();
+        dialog.onclick = (e) => { if (e.target === dialog) dialog.remove(); };
+
+        dialog.querySelector('#edit-save').onclick = async () => {
+          const newCmd = dialog.querySelector('#edit-start-cmd').value.trim();
+          const newStrip = dialog.querySelector('#edit-strip-prefix').checked;
+          dialog.remove();
+
+          try {
+            msg.innerHTML = '<p class="text-gray-600 text-sm">Updating route...</p>';
+            const res = await fetch(`/dashboard/api/containers/routes/${encodeURIComponent(endpoint)}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ startCommand: newCmd || null, stripPrefix: newStrip })
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) throw new Error(data.message || 'Failed');
+
+            msg.innerHTML = '<p class="text-green-700 bg-green-100 border border-green-200 rounded p-2 text-sm">Route updated!</p>';
+            setTimeout(() => { msg.innerHTML = ''; }, 3000);
+            loadRoutes();
+          } catch (err) {
+            msg.innerHTML = `<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2 text-sm">${err.message || 'Failed to update route'}</p>`;
+          }
+        };
       };
 
       // Store discovered services for reference when adding

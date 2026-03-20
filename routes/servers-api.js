@@ -115,7 +115,7 @@ router.get('/status', async (req, res) => {
     // Inject admin-only node details (IPs, hardware)
     if (showPodDetails && serverData) {
       const nodeDetails = {
-        hydra: { ip: '192.168.1.160', cores: 64, hardware: '256GB RAM, 64 cores, 21TB ZFS RAID-10' },
+        hydra: { ip: '192.168.1.160', cores: 20, k8s_allocatable_cores: 17, hardware: '251GB RAM, 20 vCPUs, 21TB ZFS RAID-10' },
         chimera: { ip: '192.168.1.150', cores: 48, hardware: '251GB RAM, 48 cores, 3x RTX 3090 (72GB VRAM)', ip_10g: '10.0.0.1' },
         cerberus: { ip: '192.168.1.242', cores: 48, hardware: '64GB RAM, 48 cores, 2x RTX 5090 (64GB VRAM)', ip_10g: '10.0.0.2' }
       };

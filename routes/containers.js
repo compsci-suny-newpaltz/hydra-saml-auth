@@ -36,7 +36,7 @@ const STUDENT_IMAGE = resourceConfig.defaults.image;
 const MAIN_NETWORK = 'hydra_students_net';
 const CODE_SERVER_PORT = 8443;
 const JUPYTER_PORT = 8888;
-const RESERVED_PORTS = [22, CODE_SERVER_PORT, JUPYTER_PORT, 8080, 9001];
+const RESERVED_PORTS = [22, CODE_SERVER_PORT, JUPYTER_PORT, 8080, 9001, 2375, 5432];
 const RESERVED_ENDPOINTS = ['vscode', 'jupyter', 'jenkins', 'supervisor'];
 const TRAEFIK_DYNAMIC_DIR = process.env.TRAEFIK_DYNAMIC_DIR || '/etc/traefik/dynamic';
 
@@ -1738,6 +1738,8 @@ router.get('/routes', async (req, res) => {
                 port: r.port,
                 public: r.public !== undefined ? r.public : r.default ? false : true,
                 default: r.default || false,
+                startCommand: r.startCommand || null,
+                stripPrefix: r.strip_prefix !== false,
                 url: `${publicBase}/${username}/${r.endpoint}/`
             }));
             return res.json({ success: true, routes: routesWithUrls, k8sMode: true });
@@ -1846,34 +1848,40 @@ router.post('/routes', async (req, res) => {
             }
 
             const isPublic = req.body.public !== false; // default to public
+            const stripPrefix = req.body.stripPrefix !== false; // default to true
             const startCommand = req.body.startCommand ? String(req.body.startCommand).trim() : null;
 
-            await k8sContainers.addRoute(username, endpoint, port, isPublic);
+            // Validate start command
+            if (startCommand) {
+                if (startCommand.length > 500) {
+                    return res.status(400).json({ success: false, message: 'Start command too long (max 500 chars)' });
+                }
+                if (/[\x00-\x08\x0e-\x1f]/.test(startCommand)) {
+                    return res.status(400).json({ success: false, message: 'Start command contains invalid characters' });
+                }
+            }
 
-            // Create supervisor.d config if start command provided
+            // addRoute saves to DB and creates K8s resources
+            const result = await k8sContainers.addRoute(username, endpoint, port, isPublic, startCommand, stripPrefix);
+
+            // Create supervisor.d config if start command provided and pod is running
             if (startCommand) {
                 try {
-                    const k8s = require('@kubernetes/client-node');
-                    const kc = new k8s.KubeConfig();
-                    kc.loadFromCluster();
-                    const exec = new k8s.Exec(kc);
-                    const { PassThrough } = require('stream');
-
-                    const confContent = `[program:${endpoint}]\ncommand=/bin/bash -c "${startCommand.replace(/"/g, '\\"')}"\ndirectory=/home/student\nuser=student\nautostart=true\nautorestart=true\nstartsecs=5\nstdout_logfile=/var/log/supervisor/${endpoint}.log\nstderr_logfile=/var/log/supervisor/${endpoint}_err.log\nstdout_logfile_maxbytes=1MB\nstderr_logfile_maxbytes=1MB\n`;
-
-                    const ws = new PassThrough();
-                    const es = new PassThrough();
-                    await exec.exec(
-                        runtimeConfig.k8s.namespace,
+                    await k8sContainers.writeSupervisorConfig(
+                        runtimeConfig.k8s.namespace, username, endpoint, startCommand
+                    );
+                    // Reload supervisor via k8s-client exec
+                    const k8sClient = require('../services/k8s-client');
+                    await k8sClient.execInPod(
                         `student-${username}`,
+                        ['sh', '-c', 'supervisorctl reread && supervisorctl update'],
                         'student',
-                        ['sh', '-c', `cat > /home/student/supervisor.d/${endpoint}.conf << 'SUPERVISOREOF'\n${confContent}SUPERVISOREOF\nsupervisorctl reread && supervisorctl update`],
-                        ws, es, null, false
+                        runtimeConfig.k8s.namespace
                     );
                     console.log(`[containers] Created supervisor.d/${endpoint}.conf for ${username}: ${startCommand}`);
                 } catch (supervisorErr) {
                     console.warn(`[containers] Could not create supervisor config for ${username}/${endpoint}:`, supervisorErr.message);
-                    // Non-fatal — route still works, just no auto-start
+                    // Non-fatal — supervisor config will be restored on next pod start
                 }
             }
 
@@ -1969,8 +1977,9 @@ router.post('/routes', async (req, res) => {
 
 // Delete a port route
 // DELETE /dashboard/api/containers/routes/:endpoint
-// Toggle SSO (public/private) for a custom route
+// Update a custom route
 // PATCH /dashboard/api/containers/routes/:endpoint
+// Accepts: { public?: boolean, startCommand?: string|null, stripPrefix?: boolean }
 router.patch('/routes/:endpoint', async (req, res) => {
     try {
         if (!req.isAuthenticated?.() || !req.user?.email) {
@@ -1978,22 +1987,77 @@ router.patch('/routes/:endpoint', async (req, res) => {
         }
 
         const endpoint = String(req.params.endpoint || '').trim().toLowerCase();
-        const isPublic = req.body.public;
-
-        if (typeof isPublic !== 'boolean') {
-            return res.status(400).json({ success: false, message: 'Missing "public" boolean field' });
-        }
-
         const username = String(req.user.email).split('@')[0];
 
-        if (runtimeConfig.isKubernetes()) {
-            const result = await k8sContainers.updateRoute(username, endpoint, isPublic);
-            return res.json({ success: true, route: result });
+        if (!runtimeConfig.isKubernetes()) {
+            return res.status(501).json({ success: false, message: 'Route editing not supported in Docker mode' });
         }
 
-        return res.status(501).json({ success: false, message: 'Route toggle not supported in Docker mode' });
+        const { updateCustomRoute, getCustomRoutesFromDB } = require('../services/db-init');
+        const dbUpdates = {};
+        let needsIngressRefresh = false;
+
+        // Handle public toggle
+        if (typeof req.body.public === 'boolean') {
+            dbUpdates.is_public = req.body.public;
+            needsIngressRefresh = true;
+        }
+
+        // Handle stripPrefix toggle
+        if (typeof req.body.stripPrefix === 'boolean') {
+            dbUpdates.strip_prefix = req.body.stripPrefix;
+            needsIngressRefresh = true;
+        }
+
+        // Handle startCommand update
+        if (req.body.startCommand !== undefined) {
+            const cmd = req.body.startCommand ? String(req.body.startCommand).trim() : null;
+            if (cmd && cmd.length > 500) {
+                return res.status(400).json({ success: false, message: 'Start command too long (max 500 chars)' });
+            }
+            if (cmd && /[\x00-\x08\x0e-\x1f]/.test(cmd)) {
+                return res.status(400).json({ success: false, message: 'Start command contains invalid characters' });
+            }
+            dbUpdates.start_command = cmd;
+
+            // Update supervisor.d config in pod
+            const k8sClient = require('../services/k8s-client');
+            const namespace = runtimeConfig.k8s.namespace;
+            try {
+                if (cmd) {
+                    await k8sContainers.writeSupervisorConfig(namespace, username, endpoint, cmd);
+                    await k8sClient.execInPod(`student-${username}`, ['sh', '-c', 'supervisorctl reread && supervisorctl update'], 'student', namespace);
+                } else {
+                    // Remove supervisor config if command cleared
+                    await k8sClient.execInPod(`student-${username}`, ['sh', '-c', `rm -f /home/student/supervisor.d/${endpoint}.conf && supervisorctl reread && supervisorctl update`], 'student', namespace);
+                }
+            } catch (e) {
+                // Non-fatal — pod may not be running
+            }
+        }
+
+        if (Object.keys(dbUpdates).length === 0) {
+            return res.status(400).json({ success: false, message: 'No fields to update' });
+        }
+
+        await updateCustomRoute(username, endpoint, dbUpdates);
+
+        // Refresh IngressRoute if public or stripPrefix changed
+        if (needsIngressRefresh) {
+            const isPublic = typeof req.body.public === 'boolean' ? req.body.public : undefined;
+            if (isPublic !== undefined) {
+                await k8sContainers.updateRoute(username, endpoint, isPublic);
+            } else {
+                // stripPrefix changed — need to rebuild IngressRoute
+                await k8sContainers.startContainer(username);
+            }
+        }
+
+        const routes = await getCustomRoutesFromDB(username);
+        const updated = routes.find(r => r.endpoint === endpoint);
+        return res.json({ success: true, route: updated });
     } catch (err) {
-        console.error('[containers] route toggle error:', err);
+        console.error('[containers] route update error:', err);
         return res.status(500).json({ success: false, message: err.message || 'Failed to update route' });
     }
 });

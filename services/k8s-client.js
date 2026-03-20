@@ -615,6 +615,55 @@ class K8sClient {
     return response.body.items;
   }
 
+  // ==================== EXEC OPERATIONS ====================
+
+  /**
+   * Execute a command in a pod container and return stdout
+   * @param {string} podName - Pod name
+   * @param {string[]} command - Command array (e.g. ['sh', '-c', 'echo hello'])
+   * @param {string} container - Container name
+   * @param {string} namespace - Namespace
+   * @returns {Promise<string>} stdout output
+   */
+  async execInPod(podName, command, container = 'student', namespace = this.namespace) {
+    this.init();
+    const exec = new k8s.Exec(this.kc);
+
+    return new Promise((resolve, reject) => {
+      let stdout = '';
+      let stderr = '';
+      const { PassThrough } = require('stream');
+      const stdoutStream = new PassThrough();
+      const stderrStream = new PassThrough();
+
+      stdoutStream.on('data', (chunk) => { stdout += chunk.toString(); });
+      stderrStream.on('data', (chunk) => { stderr += chunk.toString(); });
+
+      exec.exec(
+        namespace,
+        podName,
+        container,
+        command,
+        stdoutStream,
+        stderrStream,
+        null,
+        false
+      ).then((ws) => {
+        ws.on('close', () => {
+          resolve(stdout);
+        });
+        ws.on('error', (err) => {
+          reject(new Error(`Exec error: ${err.message}. stderr: ${stderr}`));
+        });
+        // Timeout after 15 seconds
+        setTimeout(() => {
+          try { ws.close(); } catch (e) { /* ignore */ }
+          resolve(stdout);
+        }, 15000);
+      }).catch(reject);
+    });
+  }
+
 }
 
 // Export singleton instance

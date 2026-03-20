@@ -128,6 +128,20 @@ CREATE TABLE IF NOT EXISTS user_whitelist (
     created_at TEXT DEFAULT (datetime('now'))
 );
 
+-- Custom routes table - persists student app routes and start commands
+CREATE TABLE IF NOT EXISTS custom_routes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL,
+    endpoint TEXT NOT NULL,
+    port INTEGER NOT NULL,
+    start_command TEXT DEFAULT NULL,
+    is_public INTEGER DEFAULT 1,
+    strip_prefix INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(username, endpoint),
+    UNIQUE(username, port)
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_requests_username ON resource_requests(username);
 CREATE INDEX IF NOT EXISTS idx_requests_status ON resource_requests(status);
@@ -141,6 +155,7 @@ CREATE INDEX IF NOT EXISTS idx_security_created ON security_events(created_at);
 CREATE INDEX IF NOT EXISTS idx_migration_username ON migration_progress(username);
 CREATE INDEX IF NOT EXISTS idx_migration_status ON migration_progress(status);
 CREATE INDEX IF NOT EXISTS idx_whitelist_email ON user_whitelist(email);
+CREATE INDEX IF NOT EXISTS idx_custom_routes_username ON custom_routes(username);
 `;
 
 // Initial node data from config
@@ -216,6 +231,18 @@ async function runMigrations(db) {
             console.log('[db-init] Adding sleep_state column to container_configs...');
             await db.run("ALTER TABLE container_configs ADD COLUMN sleep_state TEXT DEFAULT 'awake'");
             console.log('[db-init] Migration complete: sleep_state added');
+        }
+
+        // Add strip_prefix column to custom_routes if it exists but lacks the column
+        try {
+            const routeCols = await db.all("PRAGMA table_info(custom_routes)");
+            if (routeCols.length > 0 && !routeCols.some(c => c.name === 'strip_prefix')) {
+                console.log('[db-init] Adding strip_prefix column to custom_routes...');
+                await db.run('ALTER TABLE custom_routes ADD COLUMN strip_prefix INTEGER DEFAULT 1');
+                console.log('[db-init] Migration complete: strip_prefix added');
+            }
+        } catch (e) {
+            // Table may not exist yet — will be created by schema
         }
     } catch (error) {
         console.warn('[db-init] Migration warning:', error.message);
@@ -805,6 +832,101 @@ async function updateWhitelistEntry(email, updates) {
     return true;
 }
 
+// ==================== Custom Routes ====================
+
+/**
+ * Get all custom routes for a user from DB
+ */
+async function getCustomRoutesFromDB(username) {
+    const db = await getDb();
+    const rows = await db.all(
+        'SELECT endpoint, port, start_command, is_public, strip_prefix FROM custom_routes WHERE username = ? ORDER BY created_at',
+        [username]
+    );
+    return rows.map(r => ({
+        endpoint: r.endpoint,
+        port: r.port,
+        startCommand: r.start_command,
+        public: r.is_public === 1,
+        strip_prefix: r.strip_prefix !== 0
+    }));
+}
+
+/**
+ * Add a custom route to DB
+ */
+async function addCustomRoute(username, endpoint, port, startCommand = null, isPublic = true, stripPrefix = true) {
+    const db = await getDb();
+    await db.run(
+        `INSERT INTO custom_routes (username, endpoint, port, start_command, is_public, strip_prefix)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [username, endpoint, port, startCommand || null, isPublic ? 1 : 0, stripPrefix ? 1 : 0]
+    );
+    console.log(`[db-init] Added custom route for ${username}: ${endpoint} -> port ${port}`);
+}
+
+/**
+ * Remove a custom route from DB
+ */
+async function removeCustomRoute(username, endpoint) {
+    const db = await getDb();
+    const result = await db.run(
+        'DELETE FROM custom_routes WHERE username = ? AND endpoint = ?',
+        [username, endpoint]
+    );
+    if (result.changes > 0) {
+        console.log(`[db-init] Removed custom route for ${username}: ${endpoint}`);
+    }
+    return result.changes > 0;
+}
+
+/**
+ * Remove all custom routes for a user (used on container destroy)
+ */
+async function removeAllCustomRoutes(username) {
+    const db = await getDb();
+    const result = await db.run('DELETE FROM custom_routes WHERE username = ?', [username]);
+    if (result.changes > 0) {
+        console.log(`[db-init] Removed all ${result.changes} custom routes for ${username}`);
+    }
+    return result.changes;
+}
+
+/**
+ * Update a custom route in DB
+ */
+async function updateCustomRoute(username, endpoint, updates) {
+    const db = await getDb();
+    const fields = [];
+    const values = [];
+
+    if (updates.is_public !== undefined) {
+        fields.push('is_public = ?');
+        values.push(updates.is_public ? 1 : 0);
+    }
+    if (updates.start_command !== undefined) {
+        fields.push('start_command = ?');
+        values.push(updates.start_command);
+    }
+    if (updates.port !== undefined) {
+        fields.push('port = ?');
+        values.push(updates.port);
+    }
+    if (updates.strip_prefix !== undefined) {
+        fields.push('strip_prefix = ?');
+        values.push(updates.strip_prefix ? 1 : 0);
+    }
+
+    if (fields.length === 0) return false;
+
+    values.push(username, endpoint);
+    await db.run(
+        `UPDATE custom_routes SET ${fields.join(', ')} WHERE username = ? AND endpoint = ?`,
+        values
+    );
+    return true;
+}
+
 module.exports = {
     initializeSchema,
     getOrCreateUserQuota,
@@ -832,5 +954,11 @@ module.exports = {
     isWhitelisted,
     addToWhitelist,
     removeFromWhitelist,
-    updateWhitelistEntry
+    updateWhitelistEntry,
+    // Custom routes
+    getCustomRoutesFromDB,
+    addCustomRoute,
+    removeCustomRoute,
+    removeAllCustomRoutes,
+    updateCustomRoute
 };

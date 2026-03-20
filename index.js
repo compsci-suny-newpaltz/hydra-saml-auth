@@ -1042,9 +1042,10 @@ const ensureAuthenticated = (req, res, next) => {
       if (runtimeConfig.isKubernetes()) {
         setTimeout(async () => {
           try {
-            const { reconcileContainers } = require('./services/reconciler');
+            const { reconcileContainers, startPodWatcher } = require('./services/reconciler');
             const result = await reconcileContainers();
             console.log('[reconciler] Startup reconciliation complete:', result);
+            startPodWatcher();
           } catch (err) {
             console.error('[reconciler] Startup reconciliation failed:', err.message);
           }
