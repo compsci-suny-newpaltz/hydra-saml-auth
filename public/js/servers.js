@@ -356,17 +356,27 @@ function showPodPopover(cubeEl, student, pinned = false) {
   const statusColor = student.pod_status === 'running' ? '#10b981' :
                        student.pod_status === 'pending' ? '#f59e0b' : '#ef4444';
 
+  const cpuPct = student.cpu_pct || 0;
+  const memPct = student.mem_pct || 0;
+  const cpuColor = cpuPct > 80 ? '#ef4444' : cpuPct > 50 ? '#f59e0b' : '#10b981';
+  const memColor = memPct > 80 ? '#ef4444' : memPct > 50 ? '#f59e0b' : '#10b981';
+
   popover.innerHTML = `
     <div class="pod-popover-header">
       <span class="pod-popover-user">${student.username}</span>
       <span class="pod-popover-status" style="color:${statusColor}">${(student.pod_status || '').toUpperCase()}</span>
     </div>
     <div class="pod-popover-rows">
-      <div class="pod-popover-row"><span class="pop-label">IP:</span><span class="pop-value">${student.pod_ip || 'none'}</span></div>
       <div class="pod-popover-row"><span class="pop-label">NODE:</span><span class="pop-value">${student.node || '-'}</span></div>
-      <div class="pod-popover-row"><span class="pop-label">CPU:</span><span class="pop-value">${student.cpu_request || '-'}</span></div>
-      <div class="pod-popover-row"><span class="pop-label">MEM:</span><span class="pop-value">${student.used_gb ? student.used_gb.toFixed(1) + ' GB' : '-'}</span></div>
-      <div class="pod-popover-row"><span class="pop-label">PHASE:</span><span class="pop-value">${student.phase || '-'}</span></div>
+      <div class="pod-popover-row"><span class="pop-label">IP:</span><span class="pop-value">${student.pod_ip || 'none'}</span></div>
+      <div class="pod-popover-row">
+        <span class="pop-label">CPU:</span>
+        <span class="pop-value" style="color:${cpuColor}">${student.cpu_usage_m || 0}m / ${student.cpu_request || '-'} (${cpuPct}%)</span>
+      </div>
+      <div class="pod-popover-row">
+        <span class="pop-label">MEM:</span>
+        <span class="pop-value" style="color:${memColor}">${student.mem_usage_mi || 0}Mi / ${student.used_gb ? (student.used_gb * 1024).toFixed(0) + 'Mi' : '-'} (${memPct}%)</span>
+      </div>
     </div>
   `;
 

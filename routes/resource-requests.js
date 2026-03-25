@@ -226,7 +226,7 @@ function recommendNode(nodeMetrics, requestedResources) {
     return {
         recommended: recommendedName,
         reason: recommendedName === 'hydra'
-            ? `Hydra is the default node with ${recommendedNode.capacity.availableSlots} slots available`
+            ? `Hydra is the default node (${recommendedNode.capacity.currentContainers}/${recommendedNode.capacity.maxContainers} pods)`
             : `${recommendedNode.label} has ${recommendedNode.capacity.utilizationPercent}% utilization`,
         alternatives: availableNodes.slice(1, 3).map(([name]) => name),
         estimatedWait: 'Immediate'

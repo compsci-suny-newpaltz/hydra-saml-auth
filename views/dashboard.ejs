@@ -691,7 +691,7 @@
             <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 sm:gap-3 text-xs sm:text-sm">
               <div class="flex items-center gap-2">
                 <i class="fas fa-microchip text-blue-500"></i>
-                <span><strong id="res-cpu">-</strong> CPU</span>
+                <span><strong id="res-cpu">-</strong> CPU cores</span>
               </div>
               <div class="flex items-center gap-2">
                 <i class="fas fa-memory text-green-500"></i>
@@ -946,7 +946,7 @@
               <div class="grid grid-cols-2 gap-2 text-sm">
                 <div><span class="text-gray-500">Node:</span> <span id="current-node" class="font-medium">-</span></div>
                 <div><span class="text-gray-500">Memory:</span> <span id="current-memory" class="font-medium">-</span></div>
-                <div><span class="text-gray-500">CPUs:</span> <span id="current-cpus" class="font-medium">-</span></div>
+                <div><span class="text-gray-500">CPU Limit:</span> <span id="current-cpus" class="font-medium">-</span></div>
                 <div><span class="text-gray-500">Storage:</span> <span id="current-storage" class="font-medium">-</span></div>
               </div>
             </div>
@@ -1000,7 +1000,7 @@
                 <div class="h-1.5 bg-gray-200 rounded-full overflow-hidden mb-1">
                   <div id="hydra-capacity-bar" class="h-full bg-gray-400 transition-all" style="width: 0%"></div>
                 </div>
-                <p class="text-xs text-gray-600"><span id="hydra-slots">--</span> slots free</p>
+                <p class="text-xs text-gray-600"><span id="hydra-slots">--</span> available</p>
               </div>
               <!-- Chimera -->
               <div id="node-card-chimera" class="border rounded p-2 cursor-pointer hover:border-purple-400 transition-colors" onclick="selectNode('chimera')">
@@ -1013,7 +1013,7 @@
                   <div id="chimera-capacity-bar" class="h-full bg-gray-400 transition-all" style="width: 0%"></div>
                 </div>
                 <div class="flex justify-between text-xs text-gray-600">
-                  <span><span id="chimera-slots">--</span> slots</span>
+                  <span><span id="chimera-slots">--</span> avail</span>
                   <span><span id="chimera-gpu-util">--</span>% GPU</span>
                 </div>
               </div>
@@ -1028,7 +1028,7 @@
                   <div id="cerberus-capacity-bar" class="h-full bg-gray-400 transition-all" style="width: 0%"></div>
                 </div>
                 <div class="flex justify-between text-xs text-gray-600">
-                  <span><span id="cerberus-slots">--</span> slots</span>
+                  <span><span id="cerberus-slots">--</span> avail</span>
                   <span><span id="cerberus-gpu-util">--</span>% GPU</span>
                 </div>
               </div>
@@ -1440,16 +1440,77 @@
             <p class="text-xs text-gray-500 mt-1">Add a route, then click <strong>Edit</strong> to configure start command and URL prefix settings.</p>
           </div>
           <div id="routing-message" class="mt-3"></div>
-          <div class="bg-gray-50 border border-gray-200 rounded p-3 mt-3">
-            <p class="text-sm font-medium text-gray-700"><i class="fas fa-docker text-blue-500"></i> Tip: Use Docker for heavy apps</p>
-            <p class="text-xs text-gray-600 mt-1">
-              Your container has Docker-in-Docker. For apps that need a build step (Nuxt, Next.js, etc.),
-              create a <code class="bg-gray-100 px-1">Dockerfile</code> and <code class="bg-gray-100 px-1">compose.yaml</code>, then set your start command to:
-              <code class="bg-gray-100 px-1 block mt-1">cd ~/myapp && docker compose up -d --build</code>
-              Docker runs inside your container automatically — no extra setup needed.
-              Avoid mapping to reserved ports (22, 8080, 8443, 8888, 9001).
-            </p>
-          </div>
+          <details class="mt-3 border rounded group">
+            <summary class="p-3 cursor-pointer hover:bg-gray-50 flex items-center justify-between text-sm font-medium text-gray-700">
+              <span><i class="fas fa-book text-blue-500"></i> How to Host a Web App</span>
+              <i class="fas fa-chevron-down text-gray-400 group-open:rotate-180 transition-transform text-xs"></i>
+            </summary>
+            <div class="p-3 pt-0 space-y-3 text-xs text-gray-600">
+
+              <!-- Diagram -->
+              <div class="bg-white border rounded p-3 font-mono text-[10px] leading-relaxed text-center text-gray-500 overflow-x-auto">
+<pre class="inline-block text-left">
+Browser
+  |
+  v
+hydra.newpaltz.edu/students/<%= user.email.split('@')[0] %>/myapp/
+  |
+  v
+[ Traefik ] --strip prefix?--> [ Your Container :PORT ]
+  |                                    |
+  | strip ON (default)                 | strip OFF
+  | App sees: /                        | App sees: /students/.../myapp/
+  | Good for: static sites             | Good for: Nuxt, Next.js (SSR)
+  v                                    v
+Assets load from /                 Assets load from /students/.../myapp/_nuxt/
+</pre>
+              </div>
+
+              <!-- Option 1: Simple static -->
+              <div class="bg-blue-50 border border-blue-200 rounded p-2.5">
+                <p class="font-semibold text-blue-800 text-xs mb-1"><i class="fas fa-file-code"></i> Option 1: Static App (React, Vue, plain HTML)</p>
+                <ol class="list-decimal list-inside space-y-0.5 text-blue-700">
+                  <li>Build your app: <code class="bg-blue-100 px-1">npm run build</code></li>
+                  <li>Add a route (e.g. endpoint <code class="bg-blue-100 px-1">mysite</code>, port <code class="bg-blue-100 px-1">3000</code>)</li>
+                  <li>Click <strong>Edit</strong> → set start command: <code class="bg-blue-100 px-1">cd ~/myapp && npx serve -s build -l 3000</code></li>
+                  <li>Leave "Strip URL prefix" checked</li>
+                </ol>
+                <p class="text-blue-600 mt-1">Your app auto-starts on every container restart.</p>
+              </div>
+
+              <!-- Option 2: Docker -->
+              <div class="bg-purple-50 border border-purple-200 rounded p-2.5">
+                <p class="font-semibold text-purple-800 text-xs mb-1"><i class="fab fa-docker"></i> Option 2: Docker Compose (Nuxt, Next.js, databases)</p>
+                <p class="text-purple-700 mb-1">Best for apps that need a build step, a database, or SSR.</p>
+                <ol class="list-decimal list-inside space-y-0.5 text-purple-700">
+                  <li>Create a <code class="bg-purple-100 px-1">Dockerfile</code> and <code class="bg-purple-100 px-1">compose.yaml</code> in your project</li>
+                  <li>Add a route (e.g. endpoint <code class="bg-purple-100 px-1">myapp</code>, port <code class="bg-purple-100 px-1">3000</code>)</li>
+                  <li>Click <strong>Edit</strong> → set start command: <code class="bg-purple-100 px-1">cd ~/myapp && docker compose up -d --build</code></li>
+                  <li><strong>Uncheck</strong> "Strip URL prefix"</li>
+                  <li>In your framework config, set the base path:</li>
+                </ol>
+                <div class="mt-1.5 bg-purple-100 rounded p-2 space-y-0.5 font-mono text-[10px] text-purple-800">
+                  <p><strong>Nuxt:</strong> app: { baseURL: '/students/<%= user.email.split('@')[0] %>/<span class="italic text-purple-500">{your-endpoint}</span>/' }</p>
+                  <p><strong>Next.js:</strong> basePath: '/students/<%= user.email.split('@')[0] %>/<span class="italic text-purple-500">{your-endpoint}</span>'</p>
+                  <p><strong>Vite:</strong> base: '/students/<%= user.email.split('@')[0] %>/<span class="italic text-purple-500">{your-endpoint}</span>/'</p>
+                </div>
+                <p class="text-purple-600 mt-0.5">Replace <span class="italic">{your-endpoint}</span> with the endpoint name you chose above.</p>
+                <p class="text-purple-600 mt-1">Docker runs inside your container — no extra setup needed.</p>
+              </div>
+
+              <!-- Reserved ports -->
+              <div class="bg-gray-100 rounded p-2 text-[10px]">
+                <p class="font-semibold text-gray-700 mb-0.5">Reserved ports (cannot be used):</p>
+                <p class="font-mono text-gray-500">22 (SSH) &middot; 2375 (Docker) &middot; 5432 (PostgreSQL) &middot; 8080 (Jenkins) &middot; 8443 (VS Code) &middot; 8888 (Jupyter) &middot; 9001 (Supervisor)</p>
+              </div>
+
+              <!-- Websockets note -->
+              <div class="bg-gray-100 rounded p-2 text-[10px]">
+                <p class="font-semibold text-gray-700 mb-0.5">Websockets:</p>
+                <p class="text-gray-500">Websockets work automatically. If using SSR with websockets (Nuxt, Next.js), make sure "Strip URL prefix" is <strong>unchecked</strong> and your framework's baseURL is set.</p>
+              </div>
+            </div>
+          </details>
         </div>
 
         <!-- Server Status Section (Collapsible) -->
@@ -2218,7 +2279,8 @@
           // Update resource display
           if (data.resources) {
             lastKnownResources = data.resources; // Store for resource modal
-            document.getElementById('res-cpu').textContent = data.resources.cpu || '-';
+            const rawCpu = data.resources.cpu || 0;
+            document.getElementById('res-cpu').textContent = rawCpu ? Math.max(0.5, rawCpu * 0.5) : '-';
             document.getElementById('res-ram').textContent = data.resources.memory_gb ? data.resources.memory_gb + 'GB' : '-';
             document.getElementById('res-storage').textContent = data.resources.storage_gb ? data.resources.storage_gb + 'GB' : '-';
             document.getElementById('res-gpu').textContent = data.resources.gpu_count || '0';
@@ -2995,7 +3057,8 @@
             (resources.memory_gb || dbConfig.memory_gb)
               ? (resources.memory_gb || dbConfig.memory_gb) + ' GB'
               : '-';
-          document.getElementById('current-cpus').textContent = resources.cpu || dbConfig.cpus || '-';
+          const rawCpus = resources.cpu || dbConfig.cpus || 0;
+          document.getElementById('current-cpus').textContent = rawCpus ? (Math.max(0.5, rawCpus * 0.5) + ' cores') : '-';
           document.getElementById('current-storage').textContent =
             (resources.storage_gb || dbConfig.storage_gb)
               ? (resources.storage_gb || dbConfig.storage_gb) + ' GB'

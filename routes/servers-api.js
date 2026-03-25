@@ -377,9 +377,11 @@ async function generateStorageClusterData(showPodDetails = false) {
     cerberus: { cpu: 48, memory_gb: 62, pod_limit: 110 }
   };
 
-  const TOTAL_CPU_CORES = 20 + 48 + 48;  // 116
-  const TOTAL_MEMORY_GB = 251 + 251 + 62; // 564
-  const TOTAL_POD_LIMIT = 110 + 110 + 110; // 330
+  // Realistic capacity based on allocatable resources, not theoretical K8s pod limits
+  const TOTAL_CPU_CORES = 17 + 48 + 48;  // 113 allocatable
+  const TOTAL_MEMORY_GB = 243 + 251 + 62; // 556 allocatable
+  // Max pods based on default resource requests (1.3GB mem per pod)
+  const TOTAL_POD_LIMIT = Math.floor(TOTAL_MEMORY_GB / 1.3); // ~427
   const TOTAL_STORAGE_TB = 21;
 
   // Resource requests per pod state
@@ -394,10 +396,11 @@ async function generateStorageClusterData(showPodDetails = false) {
       return { students: [], total_pods: 0, running_count: 0, max_capacity: 0, empty_slots: 0 };
     }
 
-    // Get all student pods and PVCs from K8s
-    const [pods, pvcs] = await Promise.all([
+    // Get all student pods, PVCs, and live metrics from K8s
+    const [pods, pvcs, podMetrics] = await Promise.all([
       k8sClient.listPods('app.kubernetes.io/name=student-container', 'hydra-students'),
-      k8sClient.listPVCs(undefined, 'hydra-students').catch(() => [])
+      k8sClient.listPVCs(undefined, 'hydra-students').catch(() => []),
+      k8sClient.getPodMetrics('hydra-students').catch(() => ({}))
     ]);
 
     // Build a map of pod data by username
@@ -441,7 +444,19 @@ async function generateStorageClusterData(showPodDetails = false) {
         memoryGb = parseFloat(memoryRequest) / 1024;
       }
 
-      podMap[username] = { pod_status, node, memoryGb, cpuRequest, phase, podIP: pod.status?.podIP || null };
+      // Get live usage from metrics-server
+      const metrics = podMetrics[podName] || {};
+      const memLimitMi = memoryGb * 1024;
+      const cpuLimitM = cpuCores * 1000;
+
+      podMap[username] = {
+        pod_status, node, memoryGb, cpuRequest, phase,
+        podIP: pod.status?.podIP || null,
+        cpu_usage_m: metrics.cpu_millicores || 0,
+        mem_usage_mi: metrics.memory_mi || 0,
+        cpu_pct: cpuLimitM > 0 ? Math.round((metrics.cpu_millicores || 0) / cpuLimitM * 100) : 0,
+        mem_pct: memLimitMi > 0 ? Math.round((metrics.memory_mi || 0) / memLimitMi * 100) : 0
+      };
     }
 
     // Build student list from PVCs (all users with storage) merged with pod status
@@ -467,7 +482,11 @@ async function generateStorageClusterData(showPodDetails = false) {
           quota_gb: BASE_STORAGE_GB,
           phase: podData?.phase || 'Offline',
           pod_ip: podData?.podIP || null,
-          cpu_request: podData?.cpuRequest || '-'
+          cpu_request: podData?.cpuRequest || '-',
+          cpu_pct: podData?.cpu_pct || 0,
+          mem_pct: podData?.mem_pct || 0,
+          cpu_usage_m: podData?.cpu_usage_m || 0,
+          mem_usage_mi: podData?.mem_usage_mi || 0
         });
       } else {
         students.push({ pod_status });
@@ -486,7 +505,11 @@ async function generateStorageClusterData(showPodDetails = false) {
           quota_gb: BASE_STORAGE_GB,
           phase: podData.phase,
           pod_ip: podData.podIP,
-          cpu_request: podData.cpuRequest
+          cpu_request: podData.cpuRequest,
+          cpu_pct: podData.cpu_pct || 0,
+          mem_pct: podData.mem_pct || 0,
+          cpu_usage_m: podData.cpu_usage_m || 0,
+          mem_usage_mi: podData.mem_usage_mi || 0
         });
       } else {
         students.push({ pod_status: podData.pod_status });

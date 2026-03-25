@@ -154,13 +154,6 @@ function buildPodSpec(username, email, config) {
           { name: 'home', mountPath: '/home/student' },
           { name: 'docker-socket', mountPath: '/var/run/docker', readOnly: false }
         ],
-        lifecycle: {
-          postStart: {
-            exec: {
-              command: ['sh', '-c', 'ln -sf /var/run/docker/docker.sock /var/run/docker.sock']
-            }
-          }
-        },
         // Container runs as root initially, then drops to user 1000 via entrypoint
         securityContext: {
           allowPrivilegeEscalation: true,
@@ -183,12 +176,13 @@ function buildPodSpec(username, email, config) {
         lifecycle: {
           postStart: {
             exec: {
-              command: ['/bin/sh', '-c', 'sed -i \'s|port=127.0.0.1:9001|port=0.0.0.0:9001|\' /etc/supervisor/conf.d/supervisord.conf; sed -i \'/^username=student/d\' /etc/supervisor/conf.d/supervisord.conf; sed -i \'/^password=%(ENV_PASSWORD)s/d\' /etc/supervisor/conf.d/supervisord.conf; sed -i "s/^PasswordAuthentication yes/PasswordAuthentication no/" /etc/ssh/sshd_config; sed -i "s/^#*AllowUsers/#AllowUsers/" /etc/ssh/sshd_config; echo "StrictModes no" >> /etc/ssh/sshd_config; true']
+              command: ['/bin/sh', '-c', 'mkdir -p /home/student/.docker-data; ln -sf /var/run/docker/docker.sock /var/run/docker.sock; sed -i \'s|port=127.0.0.1:9001|port=0.0.0.0:9001|\' /etc/supervisor/conf.d/supervisord.conf; sed -i \'/^username=student/d\' /etc/supervisor/conf.d/supervisord.conf; sed -i \'/^password=%(ENV_PASSWORD)s/d\' /etc/supervisor/conf.d/supervisord.conf; sed -i "s/^PasswordAuthentication yes/PasswordAuthentication no/" /etc/ssh/sshd_config; sed -i "s/^#*AllowUsers/#AllowUsers/" /etc/ssh/sshd_config; echo "StrictModes no" >> /etc/ssh/sshd_config; true']
             }
           }
         }
       },
       // Docker-in-Docker sidecar — isolated Docker daemon per student
+      // DinD storage is on the student PVC so images/layers survive pod restarts
       {
         name: 'dind',
         image: 'docker:27-dind',
@@ -196,24 +190,16 @@ function buildPodSpec(username, email, config) {
         securityContext: {
           privileged: true
         },
-        args: ['--host', 'unix:///var/run/docker/docker.sock'],
+        args: ['--host', 'unix:///var/run/docker/docker.sock', '--data-root', '/home/student/.docker-data'],
         env: [
           { name: 'DOCKER_TLS_CERTDIR', value: '' }
         ],
         volumeMounts: [
           { name: 'docker-socket', mountPath: '/var/run/docker' },
-          { name: 'dind-storage', mountPath: '/var/lib/docker' }
+          { name: 'home', mountPath: '/home/student' }
         ],
-        resources: {
-          requests: {
-            memory: '256Mi',
-            cpu: '100m'
-          },
-          limits: {
-            memory: '1Gi',
-            cpu: '1'
-          }
-        }
+        // No resource limits — DinD shares the pod's cgroup limits with the student container
+        resources: {}
       }],
       volumes: [
         {
@@ -224,10 +210,6 @@ function buildPodSpec(username, email, config) {
         },
         {
           name: 'docker-socket',
-          emptyDir: {}
-        },
-        {
-          name: 'dind-storage',
           emptyDir: {}
         }
       ],

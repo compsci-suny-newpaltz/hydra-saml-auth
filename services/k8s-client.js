@@ -615,6 +615,44 @@ class K8sClient {
     return response.body.items;
   }
 
+  // ==================== METRICS OPERATIONS ====================
+
+  /**
+   * Get pod metrics from metrics-server (kubectl top pods equivalent)
+   * @returns {Promise<Object>} Map of podName -> { cpu_millicores, memory_mi }
+   */
+  async getPodMetrics(namespace = this.namespace) {
+    this.init();
+    try {
+      const response = await this.kc.makeApiClient(k8s.CustomObjectsApi).listNamespacedCustomObject(
+        'metrics.k8s.io', 'v1beta1', namespace, 'pods'
+      );
+      const metrics = {};
+      for (const item of (response.body?.items || [])) {
+        const name = item.metadata?.name;
+        if (!name) continue;
+        let totalCpuM = 0, totalMemKi = 0;
+        for (const c of (item.containers || [])) {
+          const cpu = c.usage?.cpu || '0';
+          if (cpu.endsWith('n')) totalCpuM += parseInt(cpu) / 1e6;
+          else if (cpu.endsWith('m')) totalCpuM += parseInt(cpu);
+          else totalCpuM += parseFloat(cpu) * 1000;
+          const mem = c.usage?.memory || '0';
+          if (mem.endsWith('Ki')) totalMemKi += parseInt(mem);
+          else if (mem.endsWith('Mi')) totalMemKi += parseInt(mem) * 1024;
+          else if (mem.endsWith('Gi')) totalMemKi += parseFloat(mem) * 1024 * 1024;
+        }
+        metrics[name] = {
+          cpu_millicores: Math.round(totalCpuM),
+          memory_mi: Math.round(totalMemKi / 1024)
+        };
+      }
+      return metrics;
+    } catch (e) {
+      return {};
+    }
+  }
+
   // ==================== EXEC OPERATIONS ====================
 
   /**
