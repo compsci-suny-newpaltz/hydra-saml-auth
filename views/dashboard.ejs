@@ -625,6 +625,19 @@
               </form>
               <div id="change-password-message" class="mt-3"></div>
             </div>
+
+            <div class="mt-4 border-t pt-4">
+              <h4 class="font-semibold mb-2">API Key</h4>
+              <p class="text-sm text-gray-600 mb-3">Use your API key to access OpenWebUI models programmatically (OpenAI-compatible API).</p>
+              <div id="webui-api-key-status" class="mb-3"></div>
+              <div id="webui-api-key-display" class="hidden mb-3 p-3 bg-gray-100 rounded border font-mono text-sm break-all"></div>
+              <button onclick="generateWebuiApiKey()"
+                class="inline-flex items-center px-4 py-2 rounded bg-purple-600 text-white hover:bg-purple-700">
+                <i class="fas fa-key mr-2"></i> Generate New API Key
+              </button>
+              <p class="text-xs text-gray-500 mt-2">Generates a new key and revokes any existing one. Use with: <code>Authorization: Bearer sk-...</code></p>
+              <div id="webui-api-key-message" class="mt-3"></div>
+            </div>
           </div>
         </section>
 
@@ -4050,6 +4063,8 @@ Assets load from /                 Assets load from /students/.../myapp/_nuxt/
             document.getElementById('webui-account-exists').classList.remove('hidden');
             document.getElementById('webui-username').textContent = data.username;
             document.getElementById('webui-role').textContent = data.role;
+            // Check API key status
+            checkWebuiApiKey();
           } else {
             // Show create account section
             document.getElementById('webui-create-account').classList.remove('hidden');
@@ -4061,6 +4076,55 @@ Assets load from /                 Assets load from /students/.../myapp/_nuxt/
             '<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2">Error checking account status. Please try again later.</p>';
         });
     }
+
+    // OpenWebUI API key helpers
+    function checkWebuiApiKey() {
+      const email = '<%= user ? user.email : "" %>';
+      const statusEl = document.getElementById('webui-api-key-status');
+      fetch('/dashboard/api/webui/get-api-key', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.has_key) {
+            statusEl.innerHTML = `<p class="text-green-700"><i class="fas fa-check-circle"></i> API key active: <code>${data.api_key_masked}</code></p>`;
+          } else {
+            statusEl.innerHTML = '<p class="text-gray-500">No API key generated yet.</p>';
+          }
+        })
+        .catch(() => {
+          statusEl.innerHTML = '<p class="text-gray-400">Could not check API key status.</p>';
+        });
+    }
+
+    window.generateWebuiApiKey = function () {
+      const email = '<%= user ? user.email : "" %>';
+      const msg = document.getElementById('webui-api-key-message');
+      const display = document.getElementById('webui-api-key-display');
+      msg.innerHTML = '<p class="text-gray-600">Generating...</p>';
+
+      fetch('/dashboard/api/webui/generate-api-key', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success && data.api_key) {
+            display.textContent = data.api_key;
+            display.classList.remove('hidden');
+            msg.innerHTML = '<p class="text-green-700 bg-green-100 border border-green-200 rounded p-2 text-sm"><i class="fas fa-check-circle"></i> API key generated! Copy it now — it won\'t be shown again in full.</p>';
+            checkWebuiApiKey();
+          } else {
+            msg.innerHTML = `<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2 text-sm">${data.message || 'Failed to generate API key'}</p>`;
+          }
+        })
+        .catch(err => {
+          msg.innerHTML = '<p class="text-red-700 bg-red-100 border border-red-200 rounded p-2 text-sm">Error generating API key.</p>';
+        });
+    };
 
     // n8n helpers
     function checkN8nStatus() {

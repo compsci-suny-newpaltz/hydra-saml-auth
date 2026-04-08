@@ -65,4 +65,34 @@ router.post('/change-password', ensureAuthenticated, async (req, res) => {
   }
 });
 
+// Generate an OpenWebUI API key for the logged-in user
+router.post('/generate-api-key', ensureAuthenticated, async (req, res) => {
+  try {
+    const { data } = await axios.post(`${OPENWEBUI_API_BASE}/generate-api-key`, req.body, {
+      headers: { 'x-api-key': OPENWEBUI_API_KEY }
+    });
+    res.json(data);
+  } catch (error) {
+    const status = error.response?.status || 500;
+    const data = error.response?.data || { success: false, message: 'Error generating API key' };
+    console.error('[webui-api] generate-api-key proxy error:', error.message);
+    res.status(status).json(data);
+  }
+});
+
+// Check if user has an OpenWebUI API key
+router.post('/get-api-key', ensureAuthenticated, async (req, res) => {
+  try {
+    const { data } = await axios.post(`${OPENWEBUI_API_BASE}/get-api-key`, req.body, {
+      headers: { 'x-api-key': OPENWEBUI_API_KEY }
+    });
+    res.json(data);
+  } catch (error) {
+    const status = error.response?.status || 500;
+    const data = error.response?.data || { success: false, message: 'Error checking API key' };
+    console.error('[webui-api] get-api-key proxy error:', error.message);
+    res.status(status).json(data);
+  }
+});
+
 module.exports = router;

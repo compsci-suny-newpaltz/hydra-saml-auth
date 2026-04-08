@@ -98,8 +98,16 @@ app.post(`${base}/create-account`, async (req, res) => {
       [userId, email, hashedPassword, 1]
     );
 
+    // Auto-generate an API key for the new user
+    const apiKey = 'sk-' + crypto.randomBytes(24).toString('hex');
+    const keyId = `key_${userId}`;
+    await db.run(
+      'INSERT INTO api_key (id, user_id, key, data, expires_at, last_used_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [keyId, userId, apiKey, null, null, null, ts, ts]
+    );
+
     await db.run('COMMIT');
-    return res.json({ success: true, message: 'Account created successfully' });
+    return res.json({ success: true, message: 'Account created successfully', api_key: apiKey });
   } catch (error) {
     try { await db.run('ROLLBACK'); } catch { }
     console.error('[openwebui_middleman] create-account error:', error);
@@ -130,6 +138,64 @@ app.post(`${base}/change-password`, async (req, res) => {
     return res.status(500).json({ success: false, message: 'Error updating password' });
   }
   // Note: Don't close db - singleton pattern in db.js keeps connection open
+});
+
+// POST /openwebui/api/generate-api-key { email }
+app.post(`${base}/generate-api-key`, async (req, res) => {
+  const db = await getDb();
+  try {
+    const { email } = req.body || {};
+    if (!email) return res.status(400).json({ success: false, message: 'Missing email' });
+
+    const user = await db.get('SELECT id FROM user WHERE email = ?', [email]);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found in OpenWebUI' });
+    }
+
+    // Delete any existing API key for this user
+    await db.run('DELETE FROM api_key WHERE user_id = ?', [user.id]);
+
+    // Generate a new API key
+    const apiKey = 'sk-' + crypto.randomBytes(24).toString('hex');
+    const keyId = `key_${user.id}`;
+    const ts = Math.floor(Date.now() / 1000);
+
+    await db.run(
+      'INSERT INTO api_key (id, user_id, key, data, expires_at, last_used_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [keyId, user.id, apiKey, null, null, null, ts, ts]
+    );
+
+    return res.json({ success: true, api_key: apiKey });
+  } catch (error) {
+    console.error('[openwebui_middleman] generate-api-key error:', error);
+    return res.status(500).json({ success: false, message: 'Error generating API key' });
+  }
+});
+
+// GET /openwebui/api/get-api-key { email }
+app.post(`${base}/get-api-key`, async (req, res) => {
+  const db = await getDb();
+  try {
+    const { email } = req.body || {};
+    if (!email) return res.status(400).json({ success: false, message: 'Missing email' });
+
+    const user = await db.get('SELECT id FROM user WHERE email = ?', [email]);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const key = await db.get('SELECT key, created_at FROM api_key WHERE user_id = ?', [user.id]);
+    if (!key) {
+      return res.json({ success: true, has_key: false });
+    }
+
+    // Only show first 8 + last 4 chars
+    const masked = key.key.substring(0, 8) + '...' + key.key.substring(key.key.length - 4);
+    return res.json({ success: true, has_key: true, api_key_masked: masked, created_at: key.created_at });
+  } catch (error) {
+    console.error('[openwebui_middleman] get-api-key error:', error);
+    return res.status(500).json({ success: false, message: 'Error checking API key' });
+  }
 });
 
 app.listen(PORT, '0.0.0.0', () => {
