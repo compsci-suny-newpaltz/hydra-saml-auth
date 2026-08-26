@@ -22,7 +22,7 @@ spec:
     # ---- SSO-gated -------------------------------------------------------
     - kind: Rule
       priority: 200
-      match: "Host(`hydra.newpaltz.edu`) && (PathPrefix(`/ilcc/downloads`) || PathPrefix(`/ilcc/materials`) || PathPrefix(`/ilcc/autograder`) || PathPrefix(`/ilcc/my-submissions`) || Path(`/ilcc/api/me`) || PathPrefix(`/ilcc/api/staff`) || PathPrefix(`/ilcc/api/grader`) || PathPrefix(`/ilcc/api/materials`) || PathPrefix(`/ilcc/api/submissions`) || PathPrefix(`/ilcc/api/assignments`) || PathRegexp(`^/ilcc/api/downloads/[^/]+$`))"
+      match: "Host(`hydra.newpaltz.edu`) && (PathPrefix(`/ilcc/downloads`) || PathPrefix(`/ilcc/materials`) || PathPrefix(`/ilcc/autograder`) || PathPrefix(`/ilcc/my-submissions`) || Path(`/ilcc/api/me`) || PathPrefix(`/ilcc/api/staff`) || PathPrefix(`/ilcc/api/grader`) || PathPrefix(`/ilcc/api/materials`) || PathPrefix(`/ilcc/api/submissions`) || PathPrefix(`/ilcc/api/assignments`) || PathRegexp(`^/ilcc/api/downloads/[^/]+\\.(zip|pdf)$`))"
       # NOTE: must be ONE line — Traefik's rule parser rejects YAML folded blocks.
       middlewares:
         - name: redirect-https

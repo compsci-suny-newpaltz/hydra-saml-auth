@@ -104,7 +104,9 @@ chk "health 200"            "curl -sf ${PUBLIC}/api/health | grep -q '\"status\"
 chk "spa has /ilcc/assets"  "curl -s ${PUBLIC}/ | grep -q '/ilcc/assets/'"
 chk "setup page 200"        "[ \"\$(curl -s -o /dev/null -w '%{http_code}' ${PUBLIC}/setup)\" = 200 ]"
 chk "manifest public"       "curl -sf ${PUBLIC}/api/downloads/manifest | grep -q '\"files\"'"
-chk "download → SAML 302"   "[ \"\$(curl -s -o /dev/null -w '%{http_code}' ${PUBLIC}/api/downloads/cuh63Linux.zip)\" = 302 ]"
-chk "autograder → SAML 302" "[ \"\$(curl -s -o /dev/null -w '%{http_code}' ${PUBLIC}/autograder)\" = 302 ]"
+# forward-auth answers 401 (not a redirect); the app renders a Sign-in link. The
+# tell that the gate is at Traefik (not the app) is the absence of helmet headers.
+chk "download gated at proxy"   "curl -sI ${PUBLIC}/api/downloads/cuh63Linux.zip | grep -q '^HTTP/[0-9.]* 401' && ! curl -sI ${PUBLIC}/api/downloads/cuh63Linux.zip | grep -qi x-content-type-options"
+chk "autograder gated at proxy" "curl -sI ${PUBLIC}/autograder | grep -q '^HTTP/[0-9.]* 401' && ! curl -sI ${PUBLIC}/autograder | grep -qi x-content-type-options"
 chk "ws /api/run handshake" "timeout 10 node -e \"const w=new WebSocket('wss://hydra.newpaltz.edu/ilcc/api/run');w.onopen=()=>{w.close();process.exit(0)};w.onerror=()=>process.exit(1)\""
 [[ $fail -eq 0 ]] && echo "==> Deployed ${REGISTRY}/${IMAGE}:${TAG} ($SHA) → ${PUBLIC}" || { echo "==> Deployed but smoke FAILED — check: kubectl -n ${NS} logs deploy/ilcc"; exit 1; }
