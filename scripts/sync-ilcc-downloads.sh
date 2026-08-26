@@ -16,7 +16,7 @@ declare -A FILES=(
   ["cuh63MacArm.zip"]="cuh63MacArm.zip"
   ["cuh63Windows.zip"]="cuh63Windows.zip"
   ["executables.zip"]="executables.zip"
-  ["C and C++ Under the Hood 2nd Edition (1).pdf"]="cuh-2e.pdf"
+  ["cuh-2e.pdf"]="cuh-2e.pdf"   # OCR-searchable copy (cuh-2e-ocr.pdf built by ocrmypdf); original scan is "C and C++ Under the Hood 2nd Edition (1).pdf"
   ["cuh63.zip"]="cuh63.zip"            # unified package, if built (scripts/build-unified-cuh63.sh)
 )
 
