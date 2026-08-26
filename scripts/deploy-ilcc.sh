@@ -92,9 +92,12 @@ if [[ $SYNC -eq 1 || "$COUNT" -eq 0 ]]; then
 fi
 
 # ---- 7. smoke ------------------------------------------------------------
-echo "==> Waiting for the new pod to answer through Traefik"
-for i in $(seq 1 40); do
-  curl -sf --max-time 5 "${PUBLIC}/api/ready" >/dev/null 2>&1 && break
+echo "==> Waiting for the NEW pod to answer through Traefik"
+# During a Recreate rollout the old pod may still answer /api/ready; wait for the
+# uptime to reset (new process) AND ready to be true.
+for i in $(seq 1 60); do
+  up=$(curl -sf --max-time 5 "${PUBLIC}/api/health" 2>/dev/null | sed -n 's/.*"uptimeSec":\([0-9]*\).*/\1/p')
+  if [[ -n "$up" && "$up" -lt 90 ]] && curl -sf --max-time 5 "${PUBLIC}/api/ready" >/dev/null 2>&1; then break; fi
   sleep 3
 done
 echo "==> Smoke"
