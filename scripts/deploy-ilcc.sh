@@ -8,7 +8,7 @@
 #   scripts/deploy-ilcc.sh --no-cache
 set -euo pipefail
 
-REPO="https://github.com/ndg8743/web_ilcc.git"
+REPO="https://github.com/compsci-suny-newpaltz/ilcc.git"
 SRC="/home/infra/web_ilcc"
 REGISTRY="docker.io/ndg8743"
 IMAGE="ilcc"

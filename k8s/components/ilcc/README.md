@@ -1,6 +1,6 @@
 # ilcc — web LCC assembler/debugger + course downloads + autograder
 
-Prod: **https://hydra.newpaltz.edu/ilcc** · source: `ndg8743/web_ilcc` (`main`) · namespace `hydra-infra` (exists).
+Prod: **https://hydra.newpaltz.edu/ilcc** · source: `compsci-suny-newpaltz/ilcc` (`main`) · namespace `hydra-infra` (exists).
 
 First component to check in its IngressRoute/Middleware YAML — apply with `kubectl apply -k .`.
 
