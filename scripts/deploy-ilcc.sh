@@ -108,5 +108,6 @@ chk "manifest public"       "curl -sf ${PUBLIC}/api/downloads/manifest | grep -q
 # tell that the gate is at Traefik (not the app) is the absence of helmet headers.
 chk "download gated at proxy"   "curl -sI ${PUBLIC}/api/downloads/cuh63Linux.zip | grep -q '^HTTP/[0-9.]* 401' && ! curl -sI ${PUBLIC}/api/downloads/cuh63Linux.zip | grep -qi x-content-type-options"
 chk "autograder gated at proxy" "curl -sI ${PUBLIC}/autograder | grep -q '^HTTP/[0-9.]* 401' && ! curl -sI ${PUBLIC}/autograder | grep -qi x-content-type-options"
-chk "ws /api/run handshake" "timeout 10 node -e \"const w=new WebSocket('wss://hydra.newpaltz.edu/ilcc/api/run');w.onopen=()=>{w.close();process.exit(0)};w.onerror=()=>process.exit(1)\""
+# Node 22 has a global WebSocket; on Node 20 fall back to the app's own `ws` dep.
+chk "ws /api/run handshake" "timeout 10 node -e \"const W=globalThis.WebSocket||require('${SRC}/server/node_modules/ws');const w=new W('wss://hydra.newpaltz.edu/ilcc/api/run');w.onopen=()=>{w.close();process.exit(0)};w.onerror=()=>process.exit(1)\""
 [[ $fail -eq 0 ]] && echo "==> Deployed ${REGISTRY}/${IMAGE}:${TAG} ($SHA) → ${PUBLIC}" || { echo "==> Deployed but smoke FAILED — check: kubectl -n ${NS} logs deploy/ilcc"; exit 1; }
