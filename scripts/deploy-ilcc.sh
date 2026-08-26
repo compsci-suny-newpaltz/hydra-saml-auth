@@ -92,6 +92,11 @@ if [[ $SYNC -eq 1 || "$COUNT" -eq 0 ]]; then
 fi
 
 # ---- 7. smoke ------------------------------------------------------------
+echo "==> Waiting for the new pod to answer through Traefik"
+for i in $(seq 1 40); do
+  curl -sf --max-time 5 "${PUBLIC}/api/ready" >/dev/null 2>&1 && break
+  sleep 3
+done
 echo "==> Smoke"
 fail=0
 chk() { if eval "$2"; then echo "  ok   $1"; else echo "  FAIL $1"; fail=1; fi; }
