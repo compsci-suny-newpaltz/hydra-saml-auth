@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ilcc-config
+  namespace: hydra-infra
+  labels:
+    app: ilcc
+data:
+  NODE_ENV: "production"
+  PORT: "3000"
+  LOG_LEVEL: "info"
+  PUBLIC_BASE: "/ilcc"
+  DATA_DIR: "/data"
+  DB_PATH: "/data/ilcc.db"
+  DOWNLOADS_DIR: "/data/downloads"
+  TRUSTED_PROXY_CIDR: "10.42.0.0/16,127.0.0.1/32"
+  MAX_CODE_BYTES: "65536"
+  WS_MAX_PAYLOAD: "131072"
+  SESSION_IDLE_MS: "300000"
+  MAX_SESSIONS_PER_IP: "6"
+  GRADER_TIMEOUT_MS: "5000"
+  MAX_ZIP_MB: "50"

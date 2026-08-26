@@ -1,0 +1,27 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: ilcc-strip
+  namespace: hydra-infra
+  labels:
+    app: ilcc
+spec:
+  stripPrefix:
+    prefixes:
+      - /ilcc
+---
+# Runs AFTER hydra-forward-auth on the SSO rule. The app only honours
+# X-Hydra-* identity headers when this secret is present, so nothing that
+# reaches the pod directly can forge a login. Value must match
+# ilcc-secret/HYDRA_PROXY_SECRET. deploy-ilcc.sh keeps them in sync.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: ilcc-proxy-secret
+  namespace: hydra-infra
+  labels:
+    app: ilcc
+spec:
+  headers:
+    customRequestHeaders:
+      X-Hydra-Proxy-Secret: "CHANGE-ME"

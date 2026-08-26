@@ -1,0 +1,51 @@
+# Nightly SQLite backup onto the same PVC (keep 14). Uses the app image
+# (has sqlite3) so nothing extra needs side-loading. Must run on hydra —
+# the RWO local-path PV only attaches there.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ilcc-db-backup
+  namespace: hydra-infra
+  labels:
+    app: ilcc
+spec:
+  schedule: "15 3 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        spec:
+          restartPolicy: Never
+          nodeSelector:
+            kubernetes.io/hostname: hydra
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+            fsGroup: 1000
+          containers:
+            - name: backup
+              image: docker.io/ndg8743/ilcc:latest
+              imagePullPolicy: Never
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  set -e
+                  mkdir -p /data/backups
+                  out=/data/backups/ilcc-$(date +%F).db
+                  sqlite3 /data/ilcc.db ".backup '$out'"
+                  gzip -f "$out"
+                  ls -1t /data/backups/ilcc-*.db.gz | tail -n +15 | xargs -r rm -f
+                  echo "backup ok: $out.gz ($(du -h "$out.gz" | cut -f1))"
+              volumeMounts:
+                - name: data
+                  mountPath: /data
+              resources:
+                requests: { cpu: 50m, memory: 64Mi }
+                limits:   { cpu: 200m, memory: 128Mi }
+          volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: ilcc-data

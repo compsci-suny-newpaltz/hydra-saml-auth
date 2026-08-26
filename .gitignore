@@ -24,3 +24,4 @@ data/ssh-keys/
 k8s/components/cs-lab/secret.yaml
 k8s/components/n8n/secret.yaml
 k8s/backup-pre-traefik-v3-20260316/secrets-hydra-system.yaml
+k8s/components/ilcc/secret.yaml

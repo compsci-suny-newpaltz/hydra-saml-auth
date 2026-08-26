@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ilcc
+  namespace: hydra-infra
+  labels:
+    app: ilcc
+spec:
+  type: ClusterIP
+  selector:
+    app: ilcc
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

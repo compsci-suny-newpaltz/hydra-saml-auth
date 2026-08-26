@@ -1,0 +1,30 @@
+# Both on hydra-local (local-path on the hydra node): SQLite must not sit on
+# NFS (WAL + locking), and every other hydra-infra app uses hydra-local.
+# reclaimPolicy is Delete — see README.md for pinning the PVs to Retain.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ilcc-data
+  namespace: hydra-infra
+  labels:
+    app: ilcc
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: hydra-local
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ilcc-downloads
+  namespace: hydra-infra
+  labels:
+    app: ilcc
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: hydra-local
+  resources:
+    requests:
+      storage: 1Gi

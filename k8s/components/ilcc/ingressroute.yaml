@@ -1,0 +1,63 @@
+# Two rules. Traefik picks the highest priority whose match succeeds, so the
+# SSO rule must list every path that needs a login; everything else under
+# /ilcc is public (editor, docs, setup, faq, demos, run/debug WebSockets).
+#
+# Middleware order matters: forward-auth must see the UNSTRIPPED path (so
+# its return URL is right), then the secret header is injected, then the
+# prefix is stripped for the app.
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: ilcc
+  namespace: hydra-infra
+  labels:
+    app: ilcc
+spec:
+  entryPoints:
+    - web
+    - websecure
+  tls:
+    certResolver: letsencrypt
+  routes:
+    # ---- SSO-gated -------------------------------------------------------
+    - kind: Rule
+      priority: 200
+      match: >-
+        Host(`hydra.newpaltz.edu`) && (
+          PathPrefix(`/ilcc/downloads`)       ||
+          PathPrefix(`/ilcc/materials`)       ||
+          PathPrefix(`/ilcc/autograder`)      ||
+          PathPrefix(`/ilcc/my-submissions`)  ||
+          Path(`/ilcc/api/me`)                ||
+          PathPrefix(`/ilcc/api/staff`)       ||
+          PathPrefix(`/ilcc/api/grader`)      ||
+          PathPrefix(`/ilcc/api/materials`)   ||
+          PathPrefix(`/ilcc/api/submissions`) ||
+          PathPrefix(`/ilcc/api/assignments`) ||
+          PathRegexp(`^/ilcc/api/downloads/[^/]+$`)
+        )
+      middlewares:
+        - name: redirect-https
+          namespace: hydra-system
+        - name: hydra-forward-auth
+          namespace: hydra-system
+        - name: ilcc-proxy-secret
+        - name: ilcc-strip
+      services:
+        - name: ilcc
+          port: 80
+
+    # ---- public ----------------------------------------------------------
+    # Includes /ilcc/api/downloads/manifest (metadata only) and all WebSockets.
+    - kind: Rule
+      priority: 100
+      match: Host(`hydra.newpaltz.edu`) && (Path(`/ilcc`) || PathPrefix(`/ilcc/`))
+      middlewares:
+        - name: redirect-https
+          namespace: hydra-system
+        - name: strip-session-cookie
+          namespace: hydra-system
+        - name: ilcc-strip
+      services:
+        - name: ilcc
+          port: 80

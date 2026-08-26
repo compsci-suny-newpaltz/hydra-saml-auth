@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ilcc
+  namespace: hydra-infra
+  labels:
+    app: ilcc
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate          # RWO PVCs
+  selector:
+    matchLabels:
+      app: ilcc
+  template:
+    metadata:
+      labels:
+        app: ilcc
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: hydra
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: ilcc
+          image: docker.io/ndg8743/ilcc:latest   # deploy-ilcc.sh sets a dated tag
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 3000
+              name: http
+          envFrom:
+            - configMapRef:
+                name: ilcc-config
+            - secretRef:
+                name: ilcc-secret
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: downloads
+              mountPath: /data/downloads
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "768Mi"    # grader runs programs in-process; headroom for a class submitting at once
+              cpu: "1"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          # Pod sees paths AFTER Traefik strips /ilcc.
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /api/ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: ilcc-data
+        - name: downloads
+          persistentVolumeClaim:
+            claimName: ilcc-downloads
