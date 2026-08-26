@@ -487,10 +487,17 @@ const ensureAuthenticated = (req, res, next) => {
       try {
         const payload = verifyAccessToken(token);
 
-        // Set headers for Traefik to forward to backend
-        res.set('X-Forwarded-User', payload.email || payload.sub);
+        // Set headers for Traefik to forward to backend.
+        // The hydra-forward-auth Middleware's authResponseHeaders lists X-Hydra-*;
+        // X-Forwarded-* are kept for any consumer that read them directly.
+        const user = payload.email || payload.sub;
+        const roles = (payload.roles || []).join(',');
+        res.set('X-Hydra-User', user);
+        res.set('X-Hydra-Email', payload.email);
+        res.set('X-Hydra-Roles', roles);
+        res.set('X-Forwarded-User', user);
         res.set('X-Forwarded-Email', payload.email);
-        res.set('X-Forwarded-Roles', (payload.roles || []).join(','));
+        res.set('X-Forwarded-Roles', roles);
 
         // Return 200 to allow request
         return res.status(200).send('OK');
