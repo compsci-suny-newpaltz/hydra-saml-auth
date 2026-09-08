@@ -1,0 +1,40 @@
+# GitHub push → auto-redeploy. Traefik forwards /hooks/ilcc-deploy to the
+# HOST service ilcc-webhook.service (:9310, HMAC-verified — see
+# scripts/ilcc-webhook.js), which runs scripts/deploy-ilcc.sh. Deploys need
+# buildah/ctr/kubectl, so this must run on the host, not in a pod.
+apiVersion: v1
+kind: Service
+metadata:
+  name: ilcc-webhook
+  namespace: hydra-infra
+  labels: { app: ilcc }
+spec:
+  type: ExternalName
+  externalName: 192.168.1.160
+  ports:
+    - port: 9310
+      targetPort: 9310
+      protocol: TCP
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: ilcc-webhook
+  namespace: hydra-infra
+  labels: { app: ilcc }
+spec:
+  entryPoints:
+    - web
+    - websecure
+  tls:
+    certResolver: letsencrypt
+  routes:
+    - kind: Rule
+      priority: 300
+      match: Host(`hydra.newpaltz.edu`) && PathPrefix(`/hooks/ilcc-deploy`)
+      middlewares:
+        - name: redirect-https
+          namespace: hydra-system
+      services:
+        - name: ilcc-webhook
+          port: 9310

@@ -1,0 +1,16 @@
+[Unit]
+Description=GitHub webhook -> redeploy ilcc (hydra.newpaltz.edu/ilcc)
+After=network-online.target rke2-server.service
+Wants=network-online.target
+
+[Service]
+User=infra
+EnvironmentFile=/etc/ilcc-webhook.env
+Environment=KUBECONFIG=/etc/rancher/rke2/rke2.yaml
+Environment=PATH=/usr/local/bin:/usr/bin:/bin:/var/lib/rancher/rke2/bin
+ExecStart=/usr/bin/node /home/infra/hydra-saml-auth/scripts/ilcc-webhook.js
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -8,5 +8,6 @@ resources:
   - service.yaml
   - middleware.yaml
   - ingressroute.yaml
+  - webhook.yaml
   - cronjob-backup.yaml
 # secret.yaml is applied by hand (see secret.yaml.example) and gitignored.
