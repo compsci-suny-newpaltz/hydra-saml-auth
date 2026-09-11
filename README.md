@@ -148,23 +148,28 @@ The platform runs on RKE2 (Rancher Kubernetes Engine 2) with orchestration mode 
 graph TD
     Internet((Internet))
 
-    Internet --> Traefik
+    Internet -->|"TLS (Let's Encrypt via TLS-ALPN-01)"| Traefik
 
     subgraph Hydra["Hydra (192.168.1.160) — Control Plane"]
-        Traefik["Traefik Ingress\n:80 / :443\nTLS · ACME · ForwardAuth"]
-        Auth["hydra-saml-auth\n:6969\nSAML · JWT · Dashboard"]
+        Traefik["Traefik v3 Ingress\n:80 / :443\nIngressRoute CRDs"]
+        Auth["hydra-saml-auth\n:6969\nSAML · JWT · Dashboard\ncontainer manager"]
         CSLab["CS Lab Website\n:5001"]
         DB[(SQLite)]
-        Students["Student Pods\nstudent-{user}\nVS Code · Jupyter"]
+        Students["Student Pods\nstudent-{user}\nVS Code · Jupyter · DinD"]
+        ILCC["ILCC\n/ilcc\nassembler · debugger\ndownloads · autograder"]
         n8n["n8n Automation\n:5678"]
         Hackathons["Hackathons\n:45821"]
+        Hook["ilcc-webhook.service\n(host) :9310\nGitHub push → deploy-ilcc.sh"]
 
-        Traefik --> Auth
+        Traefik -->|"/auth /dashboard"| Auth
+        Traefik -.->|"forward-auth: /auth/verify\n→ X-Hydra-User/Email/Roles"| Auth
+        Traefik -->|"/students/{user}/*"| Students
+        Traefik -->|"/ilcc/*"| ILCC
+        Traefik -->|"/hooks/ilcc-deploy"| Hook
         Traefik --> CSLab
-        Traefik --> Students
-        Traefik --> n8n
         Traefik --> Hackathons
         Auth --> DB
+        Auth -->|"pod/svc/route CRUD"| Students
     end
 
     subgraph Chimera["Chimera (192.168.1.150) — Inference"]
@@ -180,6 +185,27 @@ graph TD
     Traefik -->|"gpt.hydra.newpaltz.edu"| OpenWebUI
     Traefik -->|"n8n.hydra.newpaltz.edu"| n8n
 ```
+
+### Request & auth flow
+
+1. Traefik terminates TLS and matches an `IngressRoute` by path/host.
+2. Protected routes carry the `hydra-forward-auth` middleware: Traefik calls hydra-auth `/auth/verify` first. A valid SAML session (RS256 JWT cookie) returns **401 on failure** (apps handle the login redirect) and on success injects `X-Hydra-User` / `X-Hydra-Email` / `X-Hydra-Roles` (roles include the SAML affiliation, e.g. `faculty`).
+3. Apps only trust those headers from the pod CIDR (10.42.0.0/16) **and** with a per-app shared secret injected by a Traefik middleware after forward-auth — in-cluster callers can't forge identity.
+
+### Hosted apps
+
+| App | Path / host | Notes |
+|-----|-------------|-------|
+| Dashboard + container manager | `/dashboard`, `/auth` | this repo |
+| Student pods | `/students/{user}/…` | vscode / jupyter / custom routes per pod |
+| ILCC | `/ilcc` | [compsci-suny-newpaltz/ilcc](https://github.com/compsci-suny-newpaltz/ilcc) — LCC assembler/debugger, course downloads, materials viewer, autograder; **auto-deploys on push to main** via `/hooks/ilcc-deploy` webhook (`scripts/ilcc-webhook.js`) |
+| CS Lab site, Hackathons, FlapJS | various | static/small apps |
+| OpenWebUI / Ollama | `gpt.hydra.newpaltz.edu` | GPU inference on Chimera |
+| n8n | `n8n.hydra.newpaltz.edu` | workflow automation |
+
+### Image pipeline (no registry)
+
+`buildah bud` on Hydra → export docker-archive → import into RKE2 containerd (`ctr -n k8s.io images import`, then label `io.cri-containerd.image=managed`) → deploy with a versioned tag and `imagePullPolicy: Never`. Wrapped by `scripts/deploy-*.sh` (build → import → rollout → smoke tests).
 
 ### Network
 
