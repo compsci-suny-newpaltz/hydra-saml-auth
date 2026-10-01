@@ -42,6 +42,7 @@ let isRunning = false;
  * @returns {Promise<Object|null>} Metrics data or null on failure
  */
 async function fetchRemoteMetrics(nodeName) {
+  if (!require('../config/resources').isNodeEnabled(nodeName)) return null; // DISABLED_NODES
   const nodeConfig = config[nodeName];
   if (!nodeConfig || !nodeConfig.port) {
     return null;

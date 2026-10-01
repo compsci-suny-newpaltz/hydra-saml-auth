@@ -346,6 +346,7 @@ module.exports = {
 
   // Get presets available for a specific node
   getPresetsForNode(nodeName) {
+    if (!this.isNodeEnabled(nodeName)) return [];
     return Object.values(this.presets).filter(
       preset => preset.allowedNodes.includes(nodeName) && !preset.internal
     );
@@ -354,6 +355,26 @@ module.exports = {
   // Get node configuration
   getNodeConfig(nodeName) {
     return this.nodes[nodeName] || null;
+  },
+
+  // ─── Disabled nodes ───────────────────────────────────────────────────────
+  // DISABLED_NODES="chimera,..." hides a node from students and the status
+  // pages (dashboard node picker, GPU presets, /servers, metrics, resource
+  // requests) without touching its config. Clear the env var to bring it back.
+  isNodeEnabled(nodeName) {
+    const n = this.nodes[nodeName];
+    return !!n && !n.disabled;
+  },
+  enabledNodeNames() {
+    return Object.keys(this.nodes).filter(n => this.isNodeEnabled(n));
+  },
+  disabledNodeNames() {
+    return Object.keys(this.nodes).filter(n => this.nodes[n].disabled);
+  },
+  // A preset is available if at least one of its allowed nodes is enabled.
+  isPresetAvailable(presetId) {
+    const p = this.presets[presetId];
+    return !!p && (p.allowedNodes || []).some(n => this.isNodeEnabled(n));
   },
 
   // Convert memory GB to bytes for Docker
@@ -389,3 +410,13 @@ module.exports = {
     };
   }
 };
+
+// Apply DISABLED_NODES (comma-separated, case-insensitive) at load time.
+for (const name of (process.env.DISABLED_NODES || '').split(',').map(n => n.trim().toLowerCase()).filter(Boolean)) {
+  if (module.exports.nodes[name]) {
+    module.exports.nodes[name].disabled = true;
+    console.warn(`[resources] node '${name}' is DISABLED via DISABLED_NODES — hidden from students and status pages`);
+  } else {
+    console.warn(`[resources] DISABLED_NODES names unknown node '${name}'`);
+  }
+}

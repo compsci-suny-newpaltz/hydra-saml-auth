@@ -15,6 +15,12 @@ function ensureAuthenticated(req, res, next) {
   res.status(401).json({ success: false, message: 'Not authenticated' });
 }
 
+// The OpenWebUI account acted on is ALWAYS the logged-in user's. The client
+// used to send `email` in the body, which let any user act on any account.
+function forUser(req) {
+  return { ...req.body, email: req.user.email };
+}
+
 // Validate config at load time
 if (!OPENWEBUI_API_KEY) {
   console.warn('[webui-api] Missing OPENWEBUI_API_KEY. Requests will fail with 500.');
@@ -23,7 +29,7 @@ if (!OPENWEBUI_API_KEY) {
 // Check if user exists in OpenWebUI
 router.post('/check-user', ensureAuthenticated, async (req, res) => {
   try {
-    const { data } = await axios.post(`${OPENWEBUI_API_BASE}/check-user`, req.body, {
+    const { data } = await axios.post(`${OPENWEBUI_API_BASE}/check-user`, forUser(req), {
       headers: { 'x-api-key': OPENWEBUI_API_KEY }
     });
     res.json(data);
@@ -38,7 +44,7 @@ router.post('/check-user', ensureAuthenticated, async (req, res) => {
 // Create a new OpenWebUI account
 router.post('/create-account', ensureAuthenticated, async (req, res) => {
   try {
-    const { data } = await axios.post(`${OPENWEBUI_API_BASE}/create-account`, req.body, {
+    const { data } = await axios.post(`${OPENWEBUI_API_BASE}/create-account`, forUser(req), {
       headers: { 'x-api-key': OPENWEBUI_API_KEY }
     });
     res.json(data);
@@ -53,7 +59,7 @@ router.post('/create-account', ensureAuthenticated, async (req, res) => {
 // Change password for an existing account
 router.post('/change-password', ensureAuthenticated, async (req, res) => {
   try {
-    const { data } = await axios.post(`${OPENWEBUI_API_BASE}/change-password`, req.body, {
+    const { data } = await axios.post(`${OPENWEBUI_API_BASE}/change-password`, forUser(req), {
       headers: { 'x-api-key': OPENWEBUI_API_KEY }
     });
     res.json(data);
@@ -68,7 +74,7 @@ router.post('/change-password', ensureAuthenticated, async (req, res) => {
 // Generate an OpenWebUI API key for the logged-in user
 router.post('/generate-api-key', ensureAuthenticated, async (req, res) => {
   try {
-    const { data } = await axios.post(`${OPENWEBUI_API_BASE}/generate-api-key`, req.body, {
+    const { data } = await axios.post(`${OPENWEBUI_API_BASE}/generate-api-key`, forUser(req), {
       headers: { 'x-api-key': OPENWEBUI_API_KEY }
     });
     res.json(data);
@@ -83,7 +89,7 @@ router.post('/generate-api-key', ensureAuthenticated, async (req, res) => {
 // Check if user has an OpenWebUI API key
 router.post('/get-api-key', ensureAuthenticated, async (req, res) => {
   try {
-    const { data } = await axios.post(`${OPENWEBUI_API_BASE}/get-api-key`, req.body, {
+    const { data } = await axios.post(`${OPENWEBUI_API_BASE}/get-api-key`, forUser(req), {
       headers: { 'x-api-key': OPENWEBUI_API_KEY }
     });
     res.json(data);

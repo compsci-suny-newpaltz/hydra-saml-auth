@@ -37,6 +37,9 @@ spec:
                   key: JWT_SECRET
             - name: JWT_PUBLIC_KEY_PATH
               value: "/app/server/keys/jwt-public.pem"
+            # Website admins who are not faculty (same people as hydra-auth ADMIN_USERS)
+            - name: ADMIN_WHITELIST
+              value: "gopeen1@newpaltz.edu,manzim1@newpaltz.edu,arenellc1@newpaltz.edu"
           ports:
             - name: http
               containerPort: 5001

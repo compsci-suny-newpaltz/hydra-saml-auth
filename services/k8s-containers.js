@@ -69,6 +69,9 @@ function buildPodSpec(username, email, config) {
         runAsUser: 0,  // Start as root for entrypoint (drops to 1000 after init)
         runAsGroup: 0,
         fsGroup: 1000,
+        // Skip the recursive chown kubelet does for fsGroup: on large NFS homes it
+        // exceeded the 2-min volume timeout on every attempt and the pod never started.
+        fsGroupChangePolicy: 'OnRootMismatch',
         seccompProfile: {
           type: 'RuntimeDefault'
         }
@@ -109,6 +112,9 @@ function buildPodSpec(username, email, config) {
         env: [
           { name: 'USERNAME', value: username },
           { name: 'USER_EMAIL', value: email },
+          // CUDA base image sets NVIDIA_VISIBLE_DEVICES=all → runtime would inject every
+          // GPU on the node. "void" leaves injection to the CDI allocation (device plugin).
+          ...(gpuCount > 0 ? [{ name: 'NVIDIA_VISIBLE_DEVICES', value: 'void' }] : []),
           { name: 'HOME', value: '/home/student' },
           { name: 'JUPYTER_APPROVED', value: config.jupyter_approved ? 'true' : 'false' },
           { name: 'JENKINS_APPROVED', value: config.jenkins_approved ? 'true' : 'false' },
@@ -143,7 +149,10 @@ function buildPodSpec(username, email, config) {
         resources: {
           requests: {
             memory: `${Math.round(memoryMb * 0.5)}Mi`,
-            cpu: `${Math.round(cpus * 250)}m`
+            // 100m per configured core — scheduler reservation only. Actual usage is 1-3m/pod;
+            // the runtime ceiling is limits.cpu below. Lowered from 250m (2026-08) to relieve
+            // Hydra scheduler pressure (was 99% requested, ~3% used).
+            cpu: `${Math.round(cpus * 100)}m`
           },
           limits: {
             memory: `${memoryMb}Mi`,
@@ -190,16 +199,20 @@ function buildPodSpec(username, email, config) {
         securityContext: {
           privileged: true
         },
-        args: ['--host', 'unix:///var/run/docker/docker.sock', '--data-root', '/home/student/.docker-data'],
+        args: ['--host', 'unix:///var/run/docker/docker.sock'],
         env: [
           { name: 'DOCKER_TLS_CERTDIR', value: '' }
         ],
         volumeMounts: [
           { name: 'docker-socket', mountPath: '/var/run/docker' },
-          { name: 'home', mountPath: '/home/student' }
+          { name: 'dind-storage', mountPath: '/var/lib/docker' }
         ],
-        // No resource limits — DinD shares the pod's cgroup limits with the student container
-        resources: {}
+        // Explicit small request so the LimitRange doesn't inject its 250m default.
+        // Limits are intentionally left unset — the LimitRange fills in 1 CPU / 2Gi, matching
+        // the ceiling students already had. DinD is idle unless a docker build is running.
+        resources: {
+          requests: { cpu: '50m', memory: '64Mi' }
+        }
       }],
       volumes: [
         {
@@ -210,6 +223,10 @@ function buildPodSpec(username, email, config) {
         },
         {
           name: 'docker-socket',
+          emptyDir: {}
+        },
+        {
+          name: 'dind-storage',
           emptyDir: {}
         }
       ],
@@ -903,6 +920,26 @@ async function getContainerStatus(username) {
   const phase = pod.status?.phase || 'Unknown';
   const containerStatus = pod.status?.containerStatuses?.[0];
 
+  // Detect resource drift between actual pod limits and DB config.
+  // Safe — detectResourceDrift returns null if either side is incomplete,
+  // and the DB lookup is wrapped so a missing row never breaks status.
+  let resourceDrift = null;
+  try {
+    const { getDb } = require('../db');
+    const { detectResourceDrift } = require('./reconciler');
+    const db = await getDb();
+    const dbRow = await db.get(
+      'SELECT * FROM container_configs WHERE username = ?',
+      [username]
+    );
+    if (dbRow) {
+      resourceDrift = detectResourceDrift(pod, dbRow);
+    }
+  } catch (err) {
+    // Drift detection is best-effort; never break status responses.
+    resourceDrift = null;
+  }
+
   return {
     exists: true,
     status: phase.toLowerCase(),
@@ -911,7 +948,8 @@ async function getContainerStatus(username) {
     restartCount: containerStatus?.restartCount || 0,
     startedAt: containerStatus?.state?.running?.startedAt,
     node: pod.spec?.nodeName,
-    ip: pod.status?.podIP
+    ip: pod.status?.podIP,
+    resourceDrift
   };
 }
 
@@ -1268,7 +1306,7 @@ async function getRoutes(username) {
  * Add a custom route for a student
  * Saves to DB first, then updates K8s resources
  */
-async function addRoute(username, endpoint, port, isPublic = true, startCommand = null, stripPrefix = true) {
+async function addRoute(username, endpoint, port, isPublic = true, startCommand = null, stripPrefix = false) {
   const namespace = runtimeConfig.k8s.namespace;
   const { addCustomRoute, removeCustomRoute } = require('./db-init');
 

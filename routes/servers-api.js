@@ -1,5 +1,6 @@
 // routes/servers-api.js - Server metrics and GPU queue API
 const express = require('express');
+const resourceConfig = require('../config/resources');
 const router = express.Router();
 
 // Import metrics collector
@@ -51,15 +52,9 @@ async function isAdminRequest(req) {
     if (!token || !publicKey || !joseModule) return false;
 
     const { payload } = await joseModule.jwtVerify(token, publicKey, { algorithms: ['RS256'] });
-    const affiliation = (payload.affiliation || '').toLowerCase();
-    const isFaculty = affiliation === 'faculty';
-
-    // Check admin whitelist (ADMIN_USERS env var from configmap)
-    const adminWhitelist = (process.env.ADMIN_USERS || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
-    const email = (payload.email || '').toLowerCase();
-    const isWhitelisted = adminWhitelist.includes(email);
-
-    return isFaculty || isWhitelisted;
+    // Admin only (faculty is not admin) — see middleware/roles.js
+    const { resolveRoles } = require('../middleware/roles');
+    return (await resolveRoles(payload)).isAdmin;
   } catch (e) {
     return false;
   }
@@ -111,6 +106,7 @@ router.get('/status', async (req, res) => {
     if (!serverData) {
       serverData = {};
     }
+    for (const n of resourceConfig.disabledNodeNames()) delete serverData[n]; // DISABLED_NODES
 
     // Inject admin-only node details (IPs, hardware)
     if (showPodDetails && serverData) {
@@ -153,10 +149,11 @@ router.get('/gpu-queue', async (req, res) => {
     const isAdmin = await isAdminRequest(req);
 
     // GPU node definitions
-    const gpuNodes = {
-      chimera: { total_gpus: 3, gpu_model: 'RTX 3090', vram_per_gpu: 24 },
-      cerberus: { total_gpus: 2, gpu_model: 'RTX 5090', vram_per_gpu: 32 }
-    };
+    const gpuNodes = {};
+    for (const n of resourceConfig.enabledNodeNames()) {
+      const c = resourceConfig.nodes[n];
+      if (c.gpuEnabled) gpuNodes[n] = { total_gpus: c.gpuCount, gpu_model: c.gpuModel, vram_per_gpu: c.gpuVramPerCard };
+    }
 
     const queue_summary = {};
 
@@ -242,7 +239,7 @@ router.get('/gpu-queue', async (req, res) => {
 router.get('/:name/metrics', async (req, res) => {
   const { name } = req.params;
 
-  if (!['hydra', 'chimera', 'cerberus'].includes(name)) {
+  if (!resourceConfig.isNodeEnabled(name)) {
     return res.status(404).json({ error: 'Unknown server' });
   }
 
@@ -270,6 +267,30 @@ router.get('/:name/metrics', async (req, res) => {
     res.status(500).json({ error: 'Failed to retrieve server metrics' });
   }
 });
+
+/**
+ * Node readiness from Kubernetes (authoritative for online/offline), cached 30s.
+ * Returns { name: boolean } or null when the API is unavailable.
+ */
+let readinessCache = { at: 0, value: null };
+async function nodeReadiness() {
+  if (router._readinessProvider) return router._readinessProvider();
+  if (Date.now() - readinessCache.at < 30000) return readinessCache.value;
+  let value = null;
+  try {
+    if (k8sClient) {
+      value = {};
+      for (const n of await k8sClient.listNodes()) {
+        const ready = (n.status?.conditions || []).find(c => c.type === 'Ready');
+        value[n.metadata.name] = ready?.status === 'True';
+      }
+    }
+  } catch (e) {
+    console.warn('[servers-api] node readiness unavailable:', e.message);
+  }
+  readinessCache = { at: Date.now(), value };
+  return value;
+}
 
 /**
  * Format metrics from the collector into API response format
@@ -353,6 +374,22 @@ async function formatCollectedMetrics(metrics, showPodDetails = false) {
     };
   }
 
+
+  // Online/offline is decided by Kubernetes node readiness. The metrics agent
+  // only supplies numbers; a Ready node whose agent is down is still ONLINE.
+  const readiness = await nodeReadiness();
+  if (readiness) {
+    for (const name of resourceConfig.enabledNodeNames()) {
+      if (!(name in readiness)) continue;
+      if (!result[name]) {
+        const cfg = resourceConfig.nodes[name];
+        result[name] = { status: 'online', role: cfg.role, gpus: [], cpu_percent: 0, ram_used_gb: 0,
+                         ram_total_gb: 0, disk_used_gb: 0, disk_total_gb: 0, containers_running: 0, queue_depth: 0 };
+      }
+      if (!readiness[name]) result[name].status = 'offline';
+      else if (result[name].status === 'offline') result[name].status = 'online';
+    }
+  }
   return result;
 }
 
@@ -701,4 +738,5 @@ router.get('/services', async (req, res) => {
   }
 });
 
+router.formatCollectedMetrics = formatCollectedMetrics;
 module.exports = router;

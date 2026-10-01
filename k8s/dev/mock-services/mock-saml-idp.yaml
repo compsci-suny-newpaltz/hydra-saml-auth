@@ -67,7 +67,17 @@ data:
                 'givenName' => ['Admin'],
                 'sn' => ['User'],
                 'displayName' => ['Admin User'],
-                'groups' => ['faculty', 'staff'],
+                'groups' => ['staff'],
+                'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/eduPersonPrimaryAffiliation' => ['staff'],      // admin via ADMIN_USERS, not via affiliation
+            ],
+            'faculty:password' => [
+                'uid' => ['faculty'],
+                'email' => ['faculty@example.com'],
+                'givenName' => ['Fac'],
+                'sn' => ['Ulty'],
+                'displayName' => ['Faculty User'],
+                'groups' => ['faculty'],
+                'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/eduPersonPrimaryAffiliation' => ['faculty'],    // faculty, NOT admin — exercises the role split
             ],
             'student:password' => [
                 'uid' => ['student'],
@@ -76,6 +86,7 @@ data:
                 'sn' => ['Student'],
                 'displayName' => ['Test Student'],
                 'groups' => ['students'],
+                'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/eduPersonPrimaryAffiliation' => ['student'],
             ],
         ],
     ];

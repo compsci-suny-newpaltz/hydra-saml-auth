@@ -4,36 +4,11 @@
 const express = require('express');
 const router = express.Router();
 const infraService = require('../services/k8s-infra');
-const { isWhitelisted } = require('../services/db-init');
+const { requireAdmin } = require('../middleware/roles');
+const { safeBranch, safeGitHubUrl } = require('../services/git-input');
 
-const ADMIN_USERS = (process.env.ADMIN_USERS || '').split(',').map(u => u.trim().toLowerCase()).filter(Boolean);
-
-// ==================== AUTH MIDDLEWARE ====================
-
-async function requireAdmin(req, res, next) {
-  if (!req.isAuthenticated?.() || !req.user?.email) {
-    return res.status(401).json({ error: 'Authentication required' });
-  }
-
-  const email = req.user.email.toLowerCase();
-  const isFaculty = (req.user.affiliation || '').toLowerCase() === 'faculty';
-  const isEnvWhitelisted = ADMIN_USERS.includes(email);
-
-  let isDbWhitelisted = false;
-  try {
-    isDbWhitelisted = await isWhitelisted(email);
-  } catch (e) {
-    console.warn('[infra-api] Error checking whitelist:', e.message);
-  }
-
-  if (!isFaculty && !isEnvWhitelisted && !isDbWhitelisted) {
-    return res.status(403).json({ error: 'Admin access required' });
-  }
-
-  next();
-}
-
-router.use(requireAdmin);
+// Admin only (ADMIN_USERS env or whitelist role 'admin'). Faculty is not admin.
+router.use(requireAdmin());
 
 // ==================== LIST / GET ====================
 
@@ -180,32 +155,34 @@ router.post('/deploy/manifest', async (req, res) => {
 // POST /deploy/github — deploy from GitHub repo (clone + look for compose/manifests)
 router.post('/deploy/github', async (req, res) => {
   try {
-    const { repoUrl, branch, name } = req.body;
-    if (!repoUrl) {
+    const { name } = req.body;
+    if (!req.body.repoUrl) {
       return res.status(400).json({ error: 'Missing required field: repoUrl' });
     }
 
-    // Validate GitHub URL
-    if (!/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+/.test(repoUrl)) {
-      return res.status(400).json({ error: 'Invalid GitHub URL' });
+    // Strict validation: these values become git argv (never a shell string).
+    const repoUrl = safeGitHubUrl(String(req.body.repoUrl).trim());
+    if (!repoUrl) {
+      return res.status(400).json({ error: 'Invalid GitHub URL (expected https://github.com/<owner>/<repo>)' });
+    }
+    const branch = req.body.branch ? safeBranch(String(req.body.branch).trim()) : null;
+    if (req.body.branch && !branch) {
+      return res.status(400).json({ error: 'Invalid branch name' });
     }
 
     const serviceName = name || repoUrl.split('/').pop().replace(/\.git$/, '').toLowerCase();
     const createdBy = req.user.email.split('@')[0];
 
     // Clone repo to temp dir, look for docker-compose.yml or k8s manifests
-    const { execSync } = require('child_process');
+    const { execFileSync } = require('child_process');
     const os = require('os');
     const fs = require('fs');
     const path = require('path');
 
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'hydra-deploy-'));
     try {
-      const branchArg = branch ? `--branch ${branch}` : '';
-      execSync(`git clone --depth 1 ${branchArg} ${repoUrl} ${tmpDir}`, {
-        timeout: 30000,
-        stdio: 'pipe'
-      });
+      const args = ['clone', '--depth', '1', ...(branch ? ['--branch', branch] : []), '--', repoUrl, tmpDir];
+      execFileSync('git', args, { timeout: 30000, stdio: 'pipe' });
 
       // Look for docker-compose.yml first
       const composeFiles = ['docker-compose.yml', 'docker-compose.yaml', 'compose.yml', 'compose.yaml'];
@@ -240,7 +217,7 @@ router.post('/deploy/github', async (req, res) => {
 
       res.status(400).json({ error: 'No docker-compose.yml or k8s manifests found in repo' });
     } finally {
-      execSync(`rm -rf ${tmpDir}`, { stdio: 'pipe' });
+      fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   } catch (err) {
     console.error('[infra-api] Error deploying from GitHub:', err.message);

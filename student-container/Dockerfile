@@ -103,6 +103,14 @@ RUN curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key | tee /u
 # Setup Jenkins home directory template in skel
 RUN mkdir -p /etc/skel/.jenkins
 
+# Install Node.js 22.x system-wide via NodeSource (default `node` for all users)
+# Modern frontend frameworks (Vite 7+, Astro 5+) require Node >= 20.19
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
+    apt-get install -y --no-install-recommends nodejs && \
+    npm install -g pnpm && \
+    npm cache clean --force && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
 # Create student user with docker group access
 RUN groupadd -f docker && \
     useradd -m -s /bin/bash -u 1000 student && \
@@ -113,22 +121,11 @@ RUN groupadd -f docker && \
 USER student
 WORKDIR /home/student
 
-# Install nvm, Node.js, and pnpm (single layer)
+# Install nvm for multi-version testing (system default remains Node 22 from NodeSource above)
 ENV NVM_DIR=/home/student/.nvm
-ENV NODE_VERSION=20.11.0
 
 RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash && \
-    . "$NVM_DIR/nvm.sh" && \
-    nvm install ${NODE_VERSION} && \
-    nvm alias default ${NODE_VERSION} && \
-    nvm use default && \
-    npm install -g pnpm && \
-    # Clean npm cache
-    npm cache clean --force && \
     rm -rf /home/student/.npm/_cacache
-
-ENV NODE_PATH=$NVM_DIR/versions/node/v$NODE_VERSION/lib/node_modules
-ENV PATH=$NVM_DIR/versions/node/v$NODE_VERSION/bin:$PATH
 
 # Install code-server
 RUN curl -fsSL https://code-server.dev/install.sh | sh && \
@@ -234,7 +231,8 @@ RUN curl -L -o /usr/local/bin/ilcc \
 
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+COPY validate-supervisor-dropins.py /usr/local/bin/validate-supervisor-dropins
+RUN chmod +x /entrypoint.sh /usr/local/bin/validate-supervisor-dropins
 
 # Expose ports: SSH, code-server, jupyter, supervisor
 EXPOSE 22 8443 8080 8888 9001

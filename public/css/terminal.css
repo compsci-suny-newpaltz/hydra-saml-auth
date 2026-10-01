@@ -41,6 +41,8 @@ body.terminal-bg {
   color: var(--text-green);
   white-space: pre;
   font-size: 14px;
+  overflow-x: auto;        /* the ASCII box is fixed-width: scroll it, never the page */
+  max-width: 100%;
 }
 
 .terminal-header .title {
@@ -55,19 +57,17 @@ body.terminal-bg {
 /* Grid layout */
 .terminal-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  /* wraps to as many columns as fit and fills the row — works for 2 or 3 panels */
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
   gap: 20px;
-}
-
-@media (max-width: 1200px) {
-  .terminal-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
 }
 
 @media (max-width: 800px) {
   .terminal-grid {
     grid-template-columns: 1fr;
+  }
+  .terminal-header, .services-header {
+    font-size: 9px;
   }
   body.terminal-bg {
     font-size: 11px;

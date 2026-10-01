@@ -30,7 +30,8 @@ That's it. Open http://localhost:6969/dashboard
 
 | User | Password | Role |
 |------|----------|------|
-| admin | password | faculty |
+| admin | password | admin (via ADMIN_USERS) |
+| faculty | password | faculty — not admin |
 | student | password | student |
 
 ## Make targets
@@ -49,6 +50,8 @@ make health         Curl health endpoints
 
 make test-student   Create a test student pod
 make rm-students    Remove all student pods
+make test           Unit tests (no cluster needed)
+make test-e2e       SSO role tests through the mock IdP (needs make up)
 make test-api       Run API endpoint tests
 ```
 

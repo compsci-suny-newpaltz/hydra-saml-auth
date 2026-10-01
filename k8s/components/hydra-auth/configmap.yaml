@@ -17,7 +17,7 @@ data:
   # JWT Settings
   JWT_TTL_SECONDS: "900"
   JWT_AUDIENCE: "npsites"
-  JWT_KEY_ID: "hydra-key-1"
+  JWT_KEY_ID: "hydra-key-2"   # rotated 2026-10-01 (old key was in a public image)
   JWT_PRIVATE_KEY_FILE: "/app/jwt-keys/private.pem"
   JWT_PUBLIC_KEY_FILE: "/app/jwt-keys/public.pem"
 
@@ -37,4 +37,6 @@ data:
 
   # Node Configuration
   CHIMERA_HOST: "chimera"
+  # Nodes hidden from students and status pages (comma-separated). Chimera is down since 2026-09-15.
+  DISABLED_NODES: "chimera"
   CERBERUS_HOST: "cerberus"

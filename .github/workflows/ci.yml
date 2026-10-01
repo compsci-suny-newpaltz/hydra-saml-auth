@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  hydra-auth:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - run: npm ci
+      - run: npm test            # middleware/roles, git input validation, webui identity binding
+
+  cs-lab-website:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: services/cs-lab-website/server } }
+    steps:
+      - uses: actions/checkout@v4
+        with: { submodules: true }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npm ci
+      - run: npm test            # SSO admin gates on every write route
+
+  # The SSO role tests (test/e2e, `make test-e2e`) need the k3d dev stack with
+  # the mock SAML IdP; run them locally after `make up` in dev/.

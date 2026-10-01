@@ -23,6 +23,13 @@ function isUnhealthyPod(pod) {
     return 'evicted';
   }
 
+  // Any other Failed phase — UnexpectedAdmissionError (GPU race), NodeAffinity, NodeLost, etc.
+  // These wedge forever without this branch: pod exists (so "missing" doesn't fire) but has no
+  // container statuses (so OOMKilled/CrashLoopBackOff doesn't fire).
+  if (phase === 'Failed') {
+    return `failed-${pod.status.reason || 'unknown'}`;
+  }
+
   // Check container statuses for OOMKilled or CrashLoopBackOff
   for (const cs of (pod.status.containerStatuses || [])) {
     if (cs.state?.waiting?.reason === 'CrashLoopBackOff') {
@@ -207,4 +214,57 @@ function stopPodWatcher() {
   }
 }
 
-module.exports = { reconcileContainers, startPodWatcher, stopPodWatcher };
+/**
+ * Compare actual pod resources to DB config.
+ * Returns null if they match, or { hasDrift: true, mismatches: [...] } if they don't.
+ * Safe — never throws if pod or config is incomplete.
+ */
+function detectResourceDrift(pod, config) {
+  if (!pod || !config) return null;
+
+  const limits = pod?.spec?.containers?.[0]?.resources?.limits || {};
+  const podMemRaw = limits.memory;        // e.g. "32Gi"
+  const podCpuRaw = limits.cpu;           // e.g. "4"
+  const podGpuRaw = limits['nvidia.com/gpu']; // e.g. "1"
+  const podNode   = pod?.spec?.nodeName;
+
+  // Convert pod memory to GiB
+  const parseMemGi = (s) => {
+    if (!s) return 0;
+    const m = String(s).match(/^(\d+(?:\.\d+)?)(Ki|Mi|Gi|Ti)?$/);
+    if (!m) return 0;
+    const n = parseFloat(m[1]);
+    const unit = m[2];
+    if (unit === 'Gi') return n;
+    if (unit === 'Mi') return n / 1024;
+    if (unit === 'Ti') return n * 1024;
+    if (unit === 'Ki') return n / (1024 * 1024);
+    return n / (1024 ** 3);
+  };
+  const podMemGi  = parseMemGi(podMemRaw);
+  const podCpuNum = parseFloat(podCpuRaw) || 0;
+  const podGpuNum = parseInt(podGpuRaw) || 0;
+
+  const expectedCpu  = Math.max(0.5, (config.cpus || 0) * 0.5);
+  const expectedMem  = config.memory_gb || 0;
+  const expectedGpu  = config.gpu_count || 0;
+  const expectedNode = config.current_node || 'hydra';
+
+  const mismatches = [];
+  if (Math.abs(podMemGi - expectedMem) > 0.5) {
+    mismatches.push({ field: 'memory_gb', pod: Number(podMemGi.toFixed(1)), config: expectedMem });
+  }
+  if (Math.abs(podCpuNum - expectedCpu) > 0.1) {
+    mismatches.push({ field: 'cpus', pod: podCpuNum, config: expectedCpu });
+  }
+  if (podGpuNum !== expectedGpu) {
+    mismatches.push({ field: 'gpu_count', pod: podGpuNum, config: expectedGpu });
+  }
+  if (podNode && expectedNode && podNode !== expectedNode) {
+    mismatches.push({ field: 'current_node', pod: podNode, config: expectedNode });
+  }
+
+  return mismatches.length ? { hasDrift: true, mismatches } : null;
+}
+
+module.exports = { reconcileContainers, startPodWatcher, stopPodWatcher, detectResourceDrift };

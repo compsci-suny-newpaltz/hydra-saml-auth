@@ -780,6 +780,15 @@ async function isWhitelisted(email) {
 }
 
 /**
+ * Get the whitelist row (with role) for an email, or null.
+ */
+async function getWhitelistEntry(email) {
+    const db = await getDb();
+    const row = await db.get('SELECT * FROM user_whitelist WHERE email = ?', [String(email || '').toLowerCase()]);
+    return row || null;
+}
+
+/**
  * Add user to whitelist
  */
 async function addToWhitelist(email, addedBy, role = 'admin', reason = null) {
@@ -855,7 +864,7 @@ async function getCustomRoutesFromDB(username) {
 /**
  * Add a custom route to DB
  */
-async function addCustomRoute(username, endpoint, port, startCommand = null, isPublic = true, stripPrefix = true) {
+async function addCustomRoute(username, endpoint, port, startCommand = null, isPublic = true, stripPrefix = false) {
     const db = await getDb();
     await db.run(
         `INSERT INTO custom_routes (username, endpoint, port, start_command, is_public, strip_prefix)
@@ -952,6 +961,7 @@ module.exports = {
     // Whitelist management
     getWhitelist,
     isWhitelisted,
+    getWhitelistEntry,
     addToWhitelist,
     removeFromWhitelist,
     updateWhitelistEntry,

@@ -1848,7 +1848,7 @@ router.post('/routes', async (req, res) => {
             }
 
             const isPublic = req.body.public !== false; // default to public
-            const stripPrefix = req.body.stripPrefix !== false; // default to true
+            const stripPrefix = req.body.stripPrefix === true; // default to false
             const startCommand = req.body.startCommand ? String(req.body.startCommand).trim() : null;
 
             // Validate start command
@@ -1987,6 +1987,9 @@ router.patch('/routes/:endpoint', async (req, res) => {
         }
 
         const endpoint = String(req.params.endpoint || '').trim().toLowerCase();
+        if (!/^[a-z0-9-]{1,40}$/.test(endpoint)) {
+            return res.status(400).json({ success: false, message: 'Invalid endpoint name (alphanumeric and hyphens only)' });
+        }
         const username = String(req.user.email).split('@')[0];
 
         if (!runtimeConfig.isKubernetes()) {
@@ -2069,6 +2072,9 @@ router.delete('/routes/:endpoint', async (req, res) => {
         }
 
         const endpoint = String(req.params.endpoint || '').trim().toLowerCase();
+        if (!/^[a-z0-9-]{1,40}$/.test(endpoint)) {
+            return res.status(400).json({ success: false, message: 'Invalid endpoint name (alphanumeric and hyphens only)' });
+        }
 
         if (RESERVED_ENDPOINTS.includes(endpoint)) {
             return res.status(400).json({ success: false, message: 'Cannot delete reserved endpoint' });
@@ -2712,5 +2718,56 @@ router.delete('/destroy', async (req, res) => {
         return res.status(500).json({ success: false, message: 'Failed to destroy container' });
     }
 });
+
+// SUPERVISOR-STATUS-START
+// GET /supervisor/status — return supervisor program status (running/stopped/etc) for the user's pod
+router.get('/supervisor/status', async (req, res) => {
+    try {
+        if (!req.isAuthenticated?.() || !req.user?.email) {
+            return res.status(401).json({ programs: [], unreachable: true });
+        }
+        const username = String(req.user.email).split('@')[0];
+        const runtimeConfig = require('../config/runtime');
+        const k8sClient = require('../services/k8s-client');
+        const namespace = runtimeConfig.k8s?.namespace || 'hydra-students';
+
+        let raw;
+        try {
+            raw = await k8sClient.execInPod(
+                `student-${username}`,
+                ['sh', '-c', 'sudo -n supervisorctl status 2>/dev/null || supervisorctl status'],
+                'student',
+                namespace
+            );
+        } catch (e) {
+            return res.json({ programs: [], unreachable: true });
+        }
+
+        const text = (typeof raw === 'string') ? raw : (raw?.stdout || raw?.output || '');
+        const programs = [];
+        for (const line of String(text).split('\n')) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+            // Format: "name STATE pid 1234, uptime 0:01:23" OR "name STOPPED Not started"
+            const m = trimmed.match(/^(\S+)\s+(\S+)(?:\s+(.*))?$/);
+            if (!m) continue;
+            const [, name, state, info = ''] = m;
+            const pidMatch = info.match(/pid\s+(\d+)/);
+            const uptimeMatch = info.match(/uptime\s+([\d:]+)/);
+            programs.push({
+                name,
+                state,
+                pid: pidMatch ? parseInt(pidMatch[1], 10) : null,
+                uptime: uptimeMatch ? uptimeMatch[1] : null,
+                info
+            });
+        }
+        return res.json({ programs, unreachable: false });
+    } catch (err) {
+        console.error('[containers] supervisor/status error:', err.message);
+        return res.json({ programs: [], unreachable: true });
+    }
+});
+// SUPERVISOR-STATUS-END
 
 module.exports = router;

@@ -12,6 +12,8 @@ const cookieParser = require('cookie-parser');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const fs = require('fs');
+const { resolveRoles } = require('./middleware/roles');
+const resourceConfig = require('./config/resources');
 
 const app = express();
 expressWs(app); // Enable WebSocket support
@@ -477,7 +479,7 @@ const ensureAuthenticated = (req, res, next) => {
       }
     });
 
-    app.get('/auth/verify', (req, res) => {
+    app.get('/auth/verify', async (req, res) => {
       const token = req.cookies?.np_access;
 
       if (!token) {
@@ -491,7 +493,13 @@ const ensureAuthenticated = (req, res, next) => {
         // The hydra-forward-auth Middleware's authResponseHeaders lists X-Hydra-*;
         // X-Forwarded-* are kept for any consumer that read them directly.
         const user = payload.email || payload.sub;
-        const roles = (payload.roles || []).join(',');
+        // SAML roles (affiliation etc.) plus the platform role from middleware/roles.js,
+        // so backends behind forward-auth can tell admin apart from faculty.
+        const roleSet = new Set(payload.roles || []);
+        const r = await resolveRoles(payload);
+        if (r.isAdmin) roleSet.add('admin');
+        if (r.isTA) roleSet.add('ta');
+        const roles = [...roleSet].join(',');
         res.set('X-Hydra-User', user);
         res.set('X-Hydra-Email', payload.email);
         res.set('X-Hydra-Roles', roles);
@@ -754,17 +762,10 @@ const ensureAuthenticated = (req, res, next) => {
           return;
         }
 
-        // Admin check
+        // Admin only (faculty is not admin) — this is a shell into infra pods
         const email = req.user.email.toLowerCase();
-        const isFaculty = (req.user.affiliation || '').toLowerCase() === 'faculty';
-        const isEnvWhitelisted = ADMIN_USERS.includes(email);
-        let isDbWhitelisted = false;
-        try {
-          const { isWhitelisted } = require('./services/db-init');
-          isDbWhitelisted = await isWhitelisted(email);
-        } catch (e) { /* ignore */ }
-
-        if (!isFaculty && !isEnvWhitelisted && !isDbWhitelisted) {
+        const roles = await resolveRoles(req.user);
+        if (!roles.isAdmin) {
           console.warn('[ws-infra] Non-admin access attempt:', email);
           ws.close();
           return;
@@ -877,24 +878,14 @@ const ensureAuthenticated = (req, res, next) => {
         displayName: req.user.display_name || req.user.name || req.user.email || '',
         oid: req.user.oid || req.user.id || ''
       };
-      // Admin = faculty affiliation OR in env whitelist OR in database whitelist
-      const isFaculty = (req.user.affiliation || '').toLowerCase() === 'faculty';
-      const isEnvWhitelisted = ADMIN_USERS.includes((req.user.email || '').toLowerCase());
-      // Check database whitelist
-      let isDbWhitelisted = false;
-      try {
-        const { isWhitelisted } = require('./services/db-init');
-        isDbWhitelisted = await isWhitelisted(req.user.email || '');
-      } catch (e) {
-        console.warn('[dashboard] Error checking db whitelist:', e.message);
-      }
-      const isAdmin = isFaculty || isEnvWhitelisted || isDbWhitelisted;
-      res.render('dashboard', { user: viewUser, baseUrl: BASE_URL, isAdmin });
+      // Roles: admin (ADMIN_USERS / whitelist admin) vs faculty vs ta vs student — see middleware/roles.js
+      const roles = await resolveRoles(req.user);
+      res.render('dashboard', { user: viewUser, baseUrl: BASE_URL, isAdmin: roles.isAdmin, isFaculty: roles.isFaculty, role: roles.role, disabledNodes: resourceConfig.disabledNodeNames() });
     });
 
     // Cluster status page (public, Bloomberg terminal style)
     app.get('/servers', (_req, res) => {
-      res.render('servers');
+      res.render('servers', { disabledNodes: resourceConfig.disabledNodeNames() });
     });
 
     app.get('/logout', (req, res, next) => {
@@ -975,11 +966,10 @@ const ensureAuthenticated = (req, res, next) => {
       console.log('[Init] Security monitor started');
 
       // SSE endpoint for container events (admin only)
-      app.get('/dashboard/api/events/containers', ensureAuthenticated, (req, res) => {
-        // Only admins can subscribe to container events (faculty OR whitelist)
-        const isFaculty = (req.user.affiliation || '').toLowerCase() === 'faculty';
-        const isWhitelisted = ADMIN_USERS.includes((req.user.email || '').toLowerCase());
-        if (!isFaculty && !isWhitelisted) {
+      app.get('/dashboard/api/events/containers', ensureAuthenticated, async (req, res) => {
+        // Only admins can subscribe to container events (faculty is not admin)
+        const roles = await resolveRoles(req.user);
+        if (!roles.isAdmin) {
           return res.status(403).json({ error: 'Admin access required' });
         }
 

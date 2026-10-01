@@ -2,7 +2,7 @@
 # One command: make
 # Prereqs: k3d, kubectl, docker (or podman)
 
-.PHONY: help up down status logs shell rebuild test-student rm-students \
+.PHONY: help up down status logs shell rebuild test test-e2e test-student rm-students \
 	reset nuke health setup-cluster deploy clean
 
 # ─── Config ──────────────────────────────────────────────────────────────────
@@ -29,6 +29,8 @@ help:
 	@echo "  make shell          Shell into hydra-auth pod"
 	@echo "  make health         Curl health endpoints"
 	@echo ""
+	@echo "  make test           Unit tests (hydra-saml-auth + cs-lab website) — no cluster needed"
+	@echo "  make test-e2e       SSO role tests through the mock IdP — needs 'make up'"
 	@echo "  make test-student   Create a test student pod"
 	@echo "  make rm-students    Remove all student pods"
 	@echo "  make nuke           Delete everything and start fresh"
@@ -226,6 +228,18 @@ nuke:
 
 # ─── Clean (alias for nuke) ─────────────────────────────────────────────────
 clean: nuke
+
+# ─── Tests ──────────────────────────────────────────────────────────────────
+# Unit: role middleware, git input validation, webui identity binding, website auth gates.
+test:
+	@cd .. && npm test
+	@cd ../services/cs-lab-website/server && npm test
+
+# End-to-end: logs in through the mock SAML IdP as student / faculty / admin and
+# checks what each role can reach (admin API, infra API, forward-auth headers).
+# Requires a running dev cluster (make up). Override with BASE_URL / IDP_URL.
+test-e2e:
+	@cd .. && BASE_URL=$${BASE_URL:-http://localhost:6969} IDP_URL=$${IDP_URL:-http://localhost:8080} npm run test:e2e
 
 # ─── Test API endpoints ─────────────────────────────────────────────────────
 test-api:

@@ -43,10 +43,9 @@ function getUsername(req) {
 /**
  * Helper: Check if user has admin privileges
  */
-function isAdmin(req) {
-    const adminList = (process.env.ADMIN_USERS || '').split(',').map(u => u.trim().toLowerCase());
-    const email = req.user?.email?.toLowerCase();
-    return adminList.includes(email);
+async function isAdmin(req) {
+    const { resolveRoles } = require('../middleware/roles');
+    return (await resolveRoles(req.user)).isAdmin;
 }
 
 /**
@@ -82,6 +81,7 @@ async function getNodeMetrics() {
     }
 
     for (const [nodeName, nodeConfig] of Object.entries(resourceConfig.nodes)) {
+        if (nodeConfig.disabled) continue;   // DISABLED_NODES: not offered at all
         const dbStatus = await getNodeStatus(nodeName);
 
         // Get real metrics if available
@@ -255,6 +255,7 @@ router.get('/presets', async (req, res) => {
         // Get available presets based on user's approvals
         const availablePresets = {};
         for (const [id, preset] of Object.entries(resourceConfig.presets)) {
+            if (!resourceConfig.isPresetAvailable(id)) continue;   // all of its nodes are disabled
             // Check if preset is available for the user
             const nodeRestrictions = preset.allowedNodes;
             let available = true;
@@ -486,8 +487,8 @@ router.post('/', async (req, res) => {
         } = req.body;
 
         // Validate target node
-        if (!target_node || !resourceConfig.nodes[target_node]) {
-            return res.status(400).json({ error: 'Invalid target node' });
+        if (!target_node || !resourceConfig.isNodeEnabled(target_node)) {
+            return res.status(400).json({ error: 'Invalid or currently unavailable target node' });
         }
 
         // Validate preset if provided
@@ -662,7 +663,7 @@ router.delete('/:id', async (req, res) => {
         }
 
         // Users can only cancel their own requests (admins can cancel any)
-        if (request.username !== username && !isAdmin(req)) {
+        if (request.username !== username && !(await isAdmin(req))) {
             return res.status(403).json({ error: 'Not authorized to cancel this request' });
         }
 

@@ -193,6 +193,7 @@ function renderCerberus(server) {
 
 function renderGpuCards(containerId, gpus) {
   const container = document.getElementById(containerId);
+  if (!container) return;
   if (!gpus || gpus.length === 0) {
     container.innerHTML = '<div class="error-message">No GPU data available</div>';
     return;
@@ -243,6 +244,7 @@ function getUtilClass(percent) {
 function updateServerStatus(server, status) {
   const panel = document.getElementById(`panel-${server}`);
   const statusEl = document.getElementById(`status-${server}`);
+  if (!panel || !statusEl) return;   // node hidden via DISABLED_NODES
 
   // Reset classes
   panel.className = 'server-panel';

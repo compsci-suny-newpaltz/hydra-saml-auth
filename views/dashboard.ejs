@@ -760,6 +760,17 @@
                 </button>
               </div>
             </div>
+            <!-- RESOURCE-DRIFT-WARNING-START -->
+            <div id="resource-drift-banner" class="hidden mt-3 p-3 bg-amber-50 border border-amber-200 rounded">
+              <p class="text-sm font-semibold text-amber-900 mb-1">
+                <i class="fas fa-exclamation-triangle"></i> Resource update pending
+              </p>
+              <p class="text-xs text-amber-800 mb-2">
+                Your container is running with old limits. Click <strong>Stop Container</strong>, wait for it to fully stop, then click <strong>Start Container</strong> to apply your updated configuration. Your files are preserved on the persistent volume.
+              </p>
+              <ul id="resource-drift-list" class="text-xs text-amber-800 list-disc list-inside space-y-0.5"></ul>
+            </div>
+            <!-- RESOURCE-DRIFT-WARNING-END -->
           </div>
           <div id="container-not-created" class="hidden">
             <p class="text-gray-600 text-sm mb-3">Your student container has not been created yet.</p>
@@ -1015,6 +1026,7 @@
                 </div>
                 <p class="text-xs text-gray-600"><span id="hydra-slots">--</span> available</p>
               </div>
+<% if (!(disabledNodes || []).includes('chimera')) { %>
               <!-- Chimera -->
               <div id="node-card-chimera" class="border rounded p-2 cursor-pointer hover:border-purple-400 transition-colors" onclick="selectNode('chimera')">
                 <div class="flex items-center justify-between mb-1">
@@ -1030,6 +1042,7 @@
                   <span><span id="chimera-gpu-util">--</span>% GPU</span>
                 </div>
               </div>
+<% } %>
               <!-- Cerberus -->
               <div id="node-card-cerberus" class="border rounded p-2 cursor-pointer hover:border-purple-400 transition-colors" onclick="selectNode('cerberus')">
                 <div class="flex items-center justify-between mb-1">
@@ -1050,6 +1063,23 @@
             <form id="resource-config-form" class="space-y-4">
               <!-- Target Node (hidden, controlled by cards) -->
               <input type="hidden" id="target-node" value="hydra">
+
+              <!-- Pod Restart Notice -->
+              <div class="bg-amber-50 border-l-4 border-amber-500 rounded p-3">
+                <p class="text-sm font-semibold text-amber-900 mb-1">
+                  <i class="fas fa-exclamation-triangle"></i> New limits apply only after a pod restart
+                </p>
+                <p class="text-xs text-amber-800">
+                  Kubernetes can't change CPU/RAM limits on a running pod. After your request is approved,
+                  click <strong>Stop Container</strong> then <strong>Start Container</strong> on the dashboard
+                  to apply the new resources.
+                </p>
+                <p class="text-xs text-amber-800 mt-1">
+                  <i class="fas fa-shield-alt text-emerald-700"></i>
+                  <strong>Your files are safe</strong> — your home directory (<code>/home/student</code>) is on a
+                  persistent volume and survives pod restarts. Only the resource limits change.
+                </p>
+              </div>
 
               <!-- Selected Node Display -->
               <div class="bg-purple-50 border border-purple-200 rounded p-3">
@@ -1098,9 +1128,11 @@
               <div id="gpu-preset-section" class="hidden">
                 <label class="block text-sm font-medium text-gray-700 mb-1">GPU Configuration</label>
                 <select id="resource-preset" class="w-full rounded border border-gray-300 px-3 py-2">
+<% if (!(disabledNodes || []).includes('chimera')) { %>
                   <option value="gpu_inference_1" data-node="chimera" data-gpus="1">Chimera — 1x RTX 3090 (24GB VRAM)</option>
                   <option value="gpu_inference_2" data-node="chimera" data-gpus="2">Chimera — 2x RTX 3090 (48GB VRAM)</option>
                   <option value="gpu_inference_3" data-node="chimera" data-gpus="3">Chimera — 3x RTX 3090 (72GB VRAM)</option>
+<% } %>
                   <option value="gpu_training_1" data-node="cerberus" data-gpus="1">Cerberus — 1x RTX 5090 (32GB VRAM)</option>
                   <option value="gpu_training_2" data-node="cerberus" data-gpus="2">Cerberus — 2x RTX 5090 (64GB VRAM)</option>
                 </select>
@@ -1162,7 +1194,8 @@
               <div id="auto-approve-info" class="bg-green-50 border border-green-200 rounded p-3">
                 <p class="text-sm text-green-800">
                   <i class="fas fa-check-circle"></i>
-                  <strong>Auto-approved:</strong> Applied immediately on next container restart.
+                  <strong>Auto-approved.</strong> Saved immediately. Stop and start your container
+                  on the dashboard to apply the new limits — your files are preserved.
                 </p>
               </div>
 
@@ -1312,7 +1345,14 @@
                     <i class="fas fa-sync"></i> Regenerate
                   </button>
                 </div>
-                <p class="text-xs text-gray-500 mt-1">Save the key to <code class="bg-gray-200 px-1">~/.ssh/</code> and set permissions with <code class="bg-gray-200 px-1">chmod 600</code></p>
+                <div class="mt-2 bg-yellow-50 border border-yellow-300 rounded p-2">
+                  <p class="text-xs font-semibold text-yellow-800 mb-1"><i class="fas fa-exclamation-triangle"></i> After downloading, run this in your terminal:</p>
+                  <div class="flex items-center gap-2">
+                    <code id="ssh-chmod-cmd" class="flex-1 text-xs bg-white border rounded px-2 py-1 font-mono">mv ~/Downloads/<%= user.email.split('@')[0] %>_hydra_key ~/.ssh/ && chmod 600 ~/.ssh/<%= user.email.split('@')[0] %>_hydra_key</code>
+                    <button onclick="navigator.clipboard.writeText(document.getElementById('ssh-chmod-cmd').textContent.trim());this.innerHTML='<i class=\'fas fa-check\'></i>';setTimeout(()=>this.innerHTML='<i class=\'fas fa-copy\'></i>',1500)"
+                      class="px-2 py-1 rounded bg-yellow-200 hover:bg-yellow-300 text-yellow-800 text-xs"><i class="fas fa-copy"></i></button>
+                  </div>
+                </div>
               </div>
 
               <!-- Setup Instructions -->
@@ -1372,6 +1412,9 @@
                   <th class="px-3 py-2 text-left">Port</th>
                   <th class="px-3 py-2 text-left">Type</th>
                   <th class="px-3 py-2 text-left">Access</th>
+                  <!-- SUPERVISOR-STATUS-START -->
+                  <th class="px-3 py-2 text-left">Process</th>
+                  <!-- SUPERVISOR-STATUS-END -->
                   <th class="px-3 py-2 text-left">URL</th>
                   <th class="px-3 py-2 text-left">Actions</th>
                 </tr>
@@ -1432,6 +1475,46 @@
 
           <div class="border-t pt-4">
             <h5 class="font-semibold mb-2">Add Custom Route</h5>
+
+            <!-- ROUTE-TEMPLATE-DROPDOWN-START -->
+            <div class="mb-3">
+              <label class="block text-xs font-medium mb-1" for="new-template">App Template</label>
+              <p class="text-xs text-gray-500 mb-1">Pick a template to autofill, or use Custom to enter your own.</p>
+              <select id="new-template"
+                class="w-full rounded border border-gray-300 px-3 py-2 text-sm">
+                <option value="custom" data-port="" data-cmd="" data-strip="">Custom (don't prefill)</option>
+                <option value="vite-dev"
+                  data-port="3000"
+                  data-cmd="cd ~/PROJECT &amp;&amp; docker compose up -d --build"
+                  data-strip="off">Vite (React/Vue) — dev server</option>
+                <option value="vite-static"
+                  data-port="3000"
+                  data-cmd="cd ~/PROJECT &amp;&amp; npx serve -s dist -l 3000"
+                  data-strip="on">Vite — built static (npx serve)</option>
+                <option value="nextjs"
+                  data-port="3000"
+                  data-cmd="cd ~/PROJECT &amp;&amp; npm run start"
+                  data-strip="off">Next.js</option>
+                <option value="express"
+                  data-port="3000"
+                  data-cmd="cd ~/PROJECT &amp;&amp; node index.js"
+                  data-strip="on">Express / Node</option>
+                <option value="fastapi"
+                  data-port="8000"
+                  data-cmd="cd ~/PROJECT &amp;&amp; uvicorn app:app --host 0.0.0.0 --port 8000"
+                  data-strip="on">FastAPI / Python</option>
+                <option value="flask"
+                  data-port="5000"
+                  data-cmd="cd ~/PROJECT &amp;&amp; python app.py"
+                  data-strip="on">Flask / Python</option>
+                <option value="static-html"
+                  data-port="8000"
+                  data-cmd="cd ~/PROJECT &amp;&amp; python3 -m http.server 8000"
+                  data-strip="on">Static HTML (busybox)</option>
+              </select>
+            </div>
+            <!-- ROUTE-TEMPLATE-DROPDOWN-END -->
+
             <div class="grid grid-cols-3 gap-2 items-end">
               <div>
                 <label class="block text-xs font-medium mb-1" for="new-endpoint">Endpoint</label>
@@ -1450,9 +1533,178 @@
                 </button>
               </div>
             </div>
-            <p class="text-xs text-gray-500 mt-1">Add a route, then click <strong>Edit</strong> to configure start command and URL prefix settings.</p>
+
+            <!-- ROUTE-TEMPLATE-DROPDOWN-START (start command + strip-prefix from template) -->
+            <div class="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2 items-end">
+              <div class="sm:col-span-2">
+                <label class="block text-xs font-medium mb-1" for="new-start-cmd">Start Command <span class="text-gray-400">(optional, auto-starts on container restart)</span></label>
+                <input type="text" id="new-start-cmd" placeholder="cd ~/myapp &amp;&amp; npm start"
+                  class="w-full rounded border border-gray-300 px-3 py-2 text-sm font-mono" />
+              </div>
+              <div>
+                <label class="inline-flex items-center gap-2 text-xs">
+                  <input type="checkbox" id="new-strip-prefix" class="rounded border-gray-300" />
+                  <span class="font-medium">Strip URL prefix</span>
+                </label>
+                <small class="block text-[11px] text-gray-500 mt-1 leading-snug">
+                  <strong>Off (recommended):</strong> your app sees the full URL <code class="bg-gray-100 px-1">/students/<%= user.email.split('@')[0] %>/{name}/...</code>. Required for Vite, Next.js, CRA, and any framework with a <code class="bg-gray-100 px-1">base</code>/<code class="bg-gray-100 px-1">basePath</code> config.
+                  <strong>On:</strong> your app sees only <code class="bg-gray-100 px-1">/...</code>. Use only for plain backends (Express, FastAPI) that don't care about URL prefixes.
+                </small>
+              </div>
+            </div>
+            <script>
+              (function () {
+                const sel = document.getElementById('new-template');
+                const portIn = document.getElementById('new-port');
+                const cmdIn = document.getElementById('new-start-cmd');
+                const stripIn = document.getElementById('new-strip-prefix');
+                if (!sel) return;
+                // default strip-prefix OFF for new routes
+                if (stripIn) stripIn.checked = false;
+                sel.addEventListener('change', function () {
+                  const opt = sel.options[sel.selectedIndex];
+                  const port = opt.getAttribute('data-port');
+                  const cmd = opt.getAttribute('data-cmd');
+                  const strip = opt.getAttribute('data-strip');
+                  if (port && portIn) portIn.value = port;
+                  if (cmd && cmdIn) cmdIn.value = cmd;
+                  if (strip === 'on' && stripIn) stripIn.checked = true;
+                  else if (strip === 'off' && stripIn) stripIn.checked = false;
+                });
+              })();
+            </script>
+            <!-- ROUTE-TEMPLATE-DROPDOWN-END -->
+
+            <p class="text-xs text-gray-500 mt-2">Add a route. If you provided a start command, it auto-starts on container restart. You can later click <strong>Edit</strong> to change start command or URL prefix settings.</p>
           </div>
           <div id="routing-message" class="mt-3"></div>
+
+          <!-- CODE-SNIPPETS-PANEL-START -->
+          <details class="mt-3 border rounded group">
+            <summary class="p-3 cursor-pointer hover:bg-gray-50 flex items-center justify-between text-sm font-medium text-gray-700">
+              <span><i class="fas fa-code text-purple-500"></i> Code Snippets — fetch / WebSocket / Vite config</span>
+              <i class="fas fa-chevron-down text-gray-400 group-open:rotate-180 transition-transform text-xs"></i>
+            </summary>
+            <div class="p-3 pt-0 space-y-2 text-xs text-gray-600">
+              <p class="text-gray-500">Copy-paste the right URL pattern for your client code so it works through the platform's URL prefix and TLS.</p>
+
+              <details class="border rounded group/snip">
+                <summary class="px-3 py-2 cursor-pointer hover:bg-gray-50 flex items-center justify-between font-mono text-xs">
+                  <span><i class="fas fa-arrow-right text-blue-500"></i> Fetch from a Vite frontend</span>
+                  <i class="fas fa-chevron-down text-gray-400 group-open/snip:rotate-180 transition-transform text-[10px]"></i>
+                </summary>
+                <div class="px-3 pb-3 relative">
+                  <pre class="bg-gray-900 text-gray-100 p-3 rounded text-[11px] overflow-x-auto"><code data-snippet="snip-fetch">// In any .jsx/.tsx file
+const res = await fetch(`${import.meta.env.BASE_URL}api/something`);
+const data = await res.json();</code></pre>
+                  <button type="button" data-copy-target="snip-fetch" class="absolute top-1 right-4 px-2 py-1 text-[10px] rounded bg-gray-700 text-white hover:bg-gray-600">Copy</button>
+                </div>
+              </details>
+
+              <details class="border rounded group/snip">
+                <summary class="px-3 py-2 cursor-pointer hover:bg-gray-50 flex items-center justify-between font-mono text-xs">
+                  <span><i class="fas fa-bolt text-yellow-500"></i> WebSocket from a Vite frontend</span>
+                  <i class="fas fa-chevron-down text-gray-400 group-open/snip:rotate-180 transition-transform text-[10px]"></i>
+                </summary>
+                <div class="px-3 pb-3 relative">
+                  <pre class="bg-gray-900 text-gray-100 p-3 rounded text-[11px] overflow-x-auto"><code data-snippet="snip-ws">const wsProto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+const ws = new WebSocket(
+  `${wsProto}://${window.location.host}${import.meta.env.BASE_URL}path`
+);</code></pre>
+                  <button type="button" data-copy-target="snip-ws" class="absolute top-1 right-4 px-2 py-1 text-[10px] rounded bg-gray-700 text-white hover:bg-gray-600">Copy</button>
+                </div>
+              </details>
+
+              <details class="border rounded group/snip">
+                <summary class="px-3 py-2 cursor-pointer hover:bg-gray-50 flex items-center justify-between font-mono text-xs">
+                  <span><i class="fab fa-react text-cyan-500"></i> React Router with the right basename</span>
+                  <i class="fas fa-chevron-down text-gray-400 group-open/snip:rotate-180 transition-transform text-[10px]"></i>
+                </summary>
+                <div class="px-3 pb-3 relative">
+                  <pre class="bg-gray-900 text-gray-100 p-3 rounded text-[11px] overflow-x-auto"><code data-snippet="snip-router">import { BrowserRouter, Routes, Route } from 'react-router-dom';
+
+export default function App() {
+  return (
+    &lt;BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, '')}&gt;
+      &lt;Routes&gt;
+        &lt;Route path="/" element={&lt;Home /&gt;} /&gt;
+      &lt;/Routes&gt;
+    &lt;/BrowserRouter&gt;
+  );
+}</code></pre>
+                  <button type="button" data-copy-target="snip-router" class="absolute top-1 right-4 px-2 py-1 text-[10px] rounded bg-gray-700 text-white hover:bg-gray-600">Copy</button>
+                </div>
+              </details>
+
+              <details class="border rounded group/snip">
+                <summary class="px-3 py-2 cursor-pointer hover:bg-gray-50 flex items-center justify-between font-mono text-xs">
+                  <span><i class="fas fa-cog text-gray-500"></i> Vite config (with API proxy)</span>
+                  <i class="fas fa-chevron-down text-gray-400 group-open/snip:rotate-180 transition-transform text-[10px]"></i>
+                </summary>
+                <div class="px-3 pb-3 relative">
+                  <pre class="bg-gray-900 text-gray-100 p-3 rounded text-[11px] overflow-x-auto"><code data-snippet="snip-vite">import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+export default defineConfig({
+  plugins: [react()],
+  base: '/students/<%= user.email.split('@')[0] %>/ROUTENAME/',
+  server: {
+    host: true,
+    port: 3000,
+    allowedHosts: ['hydra.newpaltz.edu'],
+    proxy: {
+      '/students/<%= user.email.split('@')[0] %>/ROUTENAME/api': {
+        target: 'http://server:3000',
+        changeOrigin: true,
+        ws: true,
+        rewrite: (p) =&gt; p.replace(/^\/students\/<%= user.email.split('@')[0] %>\/ROUTENAME/, ''),
+      },
+    },
+  },
+})</code></pre>
+                  <button type="button" data-copy-target="snip-vite" class="absolute top-1 right-4 px-2 py-1 text-[10px] rounded bg-gray-700 text-white hover:bg-gray-600">Copy</button>
+                </div>
+              </details>
+
+              <details class="border rounded group/snip">
+                <summary class="px-3 py-2 cursor-pointer hover:bg-gray-50 flex items-center justify-between font-mono text-xs">
+                  <span><i class="fab fa-python text-yellow-600"></i> FastAPI: serve API + static React build in one process</span>
+                  <i class="fas fa-chevron-down text-gray-400 group-open/snip:rotate-180 transition-transform text-[10px]"></i>
+                </summary>
+                <div class="px-3 pb-3 relative">
+                  <pre class="bg-gray-900 text-gray-100 p-3 rounded text-[11px] overflow-x-auto"><code data-snippet="snip-fastapi">from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+
+app = FastAPI()
+
+@app.get("/api/hello")
+async def hello():
+    return {"hello": "world"}
+
+# Mount AFTER all your @app.get / @app.post / @app.websocket routes
+app.mount("/", StaticFiles(directory="../client/dist", html=True), name="static")</code></pre>
+                  <button type="button" data-copy-target="snip-fastapi" class="absolute top-1 right-4 px-2 py-1 text-[10px] rounded bg-gray-700 text-white hover:bg-gray-600">Copy</button>
+                </div>
+              </details>
+            </div>
+          </details>
+          <script>
+            (function() {
+              document.addEventListener('click', function(e) {
+                const btn = e.target.closest('[data-copy-target]');
+                if (!btn) return;
+                const target = document.querySelector(`[data-snippet="${btn.dataset.copyTarget}"]`);
+                if (!target) return;
+                navigator.clipboard.writeText(target.textContent).then(() => {
+                  const orig = btn.textContent;
+                  btn.textContent = 'Copied!';
+                  setTimeout(() => btn.textContent = orig, 1200);
+                });
+              });
+            })();
+          </script>
+          <!-- CODE-SNIPPETS-PANEL-END -->
+
           <details class="mt-3 border rounded group">
             <summary class="p-3 cursor-pointer hover:bg-gray-50 flex items-center justify-between text-sm font-medium text-gray-700">
               <span><i class="fas fa-book text-blue-500"></i> How to Host a Web App</span>
@@ -1567,6 +1819,7 @@ Assets load from /                 Assets load from /students/.../myapp/_nuxt/
               </div>
             </div>
 
+<% if (!(disabledNodes || []).includes('chimera')) { %>
             <!-- Chimera Status -->
             <div class="border rounded-lg p-4 bg-gradient-to-b from-white to-gray-50">
               <div class="flex items-center justify-between mb-1">
@@ -1599,6 +1852,7 @@ Assets load from /                 Assets load from /students/.../myapp/_nuxt/
               </div>
             </div>
 
+<% } %>
             <!-- Cerberus Status -->
             <div class="border rounded-lg p-4 bg-gradient-to-b from-white to-gray-50">
               <div class="flex items-center justify-between mb-1">
@@ -1721,6 +1975,47 @@ Assets load from /                 Assets load from /students/.../myapp/_nuxt/
                 Click "Initialize Container" to create your personal development environment. Once running, click "Open VS Code" to access a full IDE in your browser with your files, terminal, and extensions pre-configured. You can also use "Open Jupyter" for notebook-based development, or connect via SSH at <code class="bg-gray-100 px-1 rounded">ssh yournetid@hydra.newpaltz.edu -p 2222</code>.
               </div>
             </details>
+            <details class="group">
+              <summary class="flex justify-between items-center p-4 cursor-pointer hover:bg-gray-50">
+                <span class="font-medium">I changed my CPU/RAM but it didn't apply — why?</span>
+                <i class="fas fa-chevron-down text-gray-400 group-open:rotate-180 transition-transform"></i>
+              </summary>
+              <div class="px-4 pb-4 text-sm text-gray-600">
+                <p class="mb-2"><strong>Kubernetes can't change resource limits on a running pod.</strong> Your new
+                  request is saved, but the running container still has the old CPU/RAM limits until it restarts.</p>
+                <p class="mb-2"><strong>To apply new limits:</strong> click <strong>Stop Container</strong>, wait
+                  for it to fully stop, then click <strong>Start Container</strong>. The new pod will come up with
+                  your updated resources.</p>
+                <p class="mb-2"><i class="fas fa-shield-alt text-emerald-700"></i>
+                  <strong>Your files are safe.</strong> Your home directory <code class="bg-gray-100 px-1 rounded">/home/student</code>
+                  lives on a persistent volume that's reattached to the new pod — code, installed packages in your
+                  home dir, SSH keys, and supervisor configs all survive. System-wide installs (e.g.
+                  <code class="bg-gray-100 px-1 rounded">apt install</code> as root) and processes do not.</p>
+                <p>Symptom check: run <code class="bg-gray-100 px-1 rounded">cat /sys/fs/cgroup/memory.max</code>
+                  inside your container — if it shows the old number after a config change, you need to stop+start.</p>
+              </div>
+            </details>
+            <!-- FAQ-DIND-VOLUMES-START -->
+            <details class="group">
+              <summary class="flex justify-between items-center p-4 cursor-pointer hover:bg-gray-50">
+                <span class="font-medium">My docker-compose.yml has <code class="bg-gray-100 px-1 rounded text-xs">volumes: ./src:/app</code> and my containers crash with "Cannot find /app/package.json"</span>
+                <i class="fas fa-chevron-down text-gray-400 group-open:rotate-180 transition-transform"></i>
+              </summary>
+              <div class="px-4 pb-4 text-sm text-gray-600">
+                <p class="mb-2">The DinD sidecar that runs your Docker daemon has its own filesystem — it can't see your student container's <code class="bg-gray-100 px-1 rounded">/home/student</code> directory. When <code class="bg-gray-100 px-1 rounded">docker-compose</code> tries to bind-mount <code class="bg-gray-100 px-1 rounded">./src</code>, the daemon doesn't find anything and creates an empty mount, hiding the files your Dockerfile already <code class="bg-gray-100 px-1 rounded">COPY</code>'d in.</p>
+                <p class="mb-2"><strong>Fix:</strong> delete the <code class="bg-gray-100 px-1 rounded">volumes:</code> blocks. Your Dockerfiles already copy source at build time with <code class="bg-gray-100 px-1 rounded">COPY . .</code>, so you don't need bind mounts.</p>
+                <p class="mb-2"><strong>Trade-off:</strong> you have to <code class="bg-gray-100 px-1 rounded">docker compose up --build</code> to pick up source changes (no hot reload). For dev with hot reload, run your dev server natively (no Docker) — Node, Python, etc. are all installed in your container.</p>
+                <p>If you genuinely need a shared volume between containers (e.g., shared data, not source), use a Docker-managed named volume:</p>
+                <pre class="bg-gray-100 p-2 rounded text-xs overflow-x-auto mt-2"><code>services:
+  server:
+    build: ./server
+    volumes:
+      - app-data:/app/data
+volumes:
+  app-data:</code></pre>
+              </div>
+            </details>
+            <!-- FAQ-DIND-VOLUMES-END -->
             <details class="group">
               <summary class="flex justify-between items-center p-4 cursor-pointer hover:bg-gray-50">
                 <span class="font-medium">What tools are available in my container?</span>
@@ -2264,6 +2559,24 @@ Assets load from /                 Assets load from /students/.../myapp/_nuxt/
         }
       });
 
+      // SUPERVISOR-STATUS-START
+      // Poll supervisor program status (which routes are RUNNING vs STOPPED/FATAL) every 15s
+      window._supervisorPrograms = null;
+      let supervisorStatusInterval = null;
+      async function loadSupervisorStatus() {
+        try {
+          const r = await fetch('/dashboard/api/containers/supervisor/status');
+          if (!r.ok) return;
+          const data = await r.json();
+          window._supervisorPrograms = Array.isArray(data.programs) ? data.programs : [];
+          if (typeof loadRoutes === 'function') loadRoutes();
+        } catch (_) { /* ignore */ }
+      }
+      // Kick off when the dashboard first loads, then refresh
+      setTimeout(loadSupervisorStatus, 1500);
+      supervisorStatusInterval = setInterval(loadSupervisorStatus, 15000);
+      // SUPERVISOR-STATUS-END
+
       // Container Management Functions
       let lastKnownResources = null; // Store actual K8s state for resource modal
 
@@ -2348,6 +2661,24 @@ Assets load from /                 Assets load from /students/.../myapp/_nuxt/
             } else {
               moveHydraBanner.classList.add('hidden');
             }
+
+            // RESOURCE-DRIFT-WARNING-START
+            const driftBanner = document.getElementById('resource-drift-banner');
+            const driftList = document.getElementById('resource-drift-list');
+            if (driftBanner && driftList) {
+              const drift = data.resourceDrift;
+              if (drift && drift.hasDrift && Array.isArray(drift.mismatches) && drift.mismatches.length > 0) {
+                const labelMap = { memory_gb: 'RAM (GB)', cpus: 'CPU cores', gpu_count: 'GPUs', current_node: 'Node' };
+                driftList.innerHTML = drift.mismatches.map(m => {
+                  const label = labelMap[m.field] || m.field;
+                  return `<li><strong>${label}</strong>: pod has <code class="bg-amber-100 px-1 rounded">${m.pod}</code> · approved <code class="bg-amber-100 px-1 rounded">${m.config}</code></li>`;
+                }).join('');
+                driftBanner.classList.remove('hidden');
+              } else {
+                driftBanner.classList.add('hidden');
+              }
+            }
+            // RESOURCE-DRIFT-WARNING-END
           }
 
           if (!data.exists) {
@@ -3189,6 +3520,7 @@ Assets load from /                 Assets load from /students/.../myapp/_nuxt/
         // Update visual selection on cards
         ['hydra', 'chimera', 'cerberus'].forEach(n => {
           const card = document.getElementById('node-card-' + n);
+          if (!card) return;   // node hidden via DISABLED_NODES
           if (n === selectedNode) {
             card.classList.add('border-purple-500', 'border-2', 'bg-purple-50');
           } else {
@@ -3626,11 +3958,28 @@ Assets load from /                 Assets load from /students/.../myapp/_nuxt/
                 </button>`;
             }
 
+            // SUPERVISOR-STATUS-START
+            const procPill = (() => {
+              if (isDefault) return '<span class="text-xs text-gray-400">-</span>';
+              const programs = window._supervisorPrograms || null;
+              if (programs === null) return '<span class="px-2 py-0.5 text-xs rounded bg-gray-100 text-gray-500" data-supervisor-pill="${route.endpoint}">…</span>'.replace('${route.endpoint}', route.endpoint);
+              const prog = programs.find(p => p.name === route.endpoint);
+              if (!prog) return `<span class="px-2 py-0.5 text-xs rounded bg-blue-50 text-blue-600 border border-blue-200" title="No supervisor.d entry">⏸ Not configured</span>`;
+              const s = prog.state;
+              if (s === 'RUNNING') return `<span class="px-2 py-0.5 text-xs rounded bg-green-100 text-green-700 border border-green-200" title="pid ${prog.pid} · uptime ${prog.uptime || '?'}">✅ Running</span>`;
+              if (s === 'STOPPED' || s === 'EXITED') return `<span class="px-2 py-0.5 text-xs rounded bg-yellow-100 text-yellow-700 border border-yellow-200" title="${prog.info}">⚠️ ${s.charAt(0) + s.slice(1).toLowerCase()}</span>`;
+              if (s === 'FATAL' || s === 'BACKOFF') return `<span class="px-2 py-0.5 text-xs rounded bg-red-100 text-red-700 border border-red-200" title="${prog.info}">❌ Crashed</span>`;
+              if (s === 'STARTING' || s === 'RESTARTING') return `<span class="px-2 py-0.5 text-xs rounded bg-blue-100 text-blue-700 border border-blue-200" title="${prog.info}">⏳ ${s.charAt(0) + s.slice(1).toLowerCase()}</span>`;
+              return `<span class="px-2 py-0.5 text-xs rounded bg-gray-100 text-gray-700">${s}</span>`;
+            })();
+            // SUPERVISOR-STATUS-END
+
             row.innerHTML = `
               <td class="px-3 py-2 font-mono">${route.endpoint}</td>
               <td class="px-3 py-2">${route.port}</td>
               <td class="px-3 py-2">${typeBadge}</td>
               <td class="px-3 py-2">${accessCol}</td>
+              <td class="px-3 py-2">${procPill}</td>
               <td class="px-3 py-2">
                 <div class="flex items-center gap-1">
                   <a href="${route.url}" target="_blank" class="text-blue-600 underline text-xs truncate max-w-[260px]" title="${route.url}">

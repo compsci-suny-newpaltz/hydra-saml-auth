@@ -45,7 +45,8 @@ pipeline {
         stage('Unit Tests') {
             steps {
                 sh '''
-                    npm test -- --coverage || echo "Tests completed"
+                    npm test
+                    (cd services/cs-lab-website/server && npm ci --prefer-offline && npm test)
                 '''
             }
             post {

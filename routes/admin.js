@@ -17,45 +17,17 @@ const {
     getSecuritySummary,
     acknowledgeSecurityEvent,
     getWhitelist,
-    isWhitelisted,
     addToWhitelist,
     removeFromWhitelist,
     updateWhitelistEntry
 } = require('../services/db-init');
 
-// Admin users list from environment (supplemented by database whitelist)
+// Env admin list is still shown in GET /whitelist; the gate itself lives in middleware/roles.js
 const ADMIN_USERS = (process.env.ADMIN_USERS || '').split(',').map(u => u.trim().toLowerCase()).filter(Boolean);
+const { requireAdmin } = require('../middleware/roles');
 
-/**
- * Middleware: Check if user is an admin (faculty OR env whitelist OR db whitelist)
- */
-async function requireAdmin(req, res, next) {
-    if (!req.isAuthenticated?.() || !req.user?.email) {
-        return res.status(401).json({ error: 'Authentication required' });
-    }
-
-    const email = req.user.email.toLowerCase();
-    const isFaculty = (req.user.affiliation || '').toLowerCase() === 'faculty';
-    const isEnvWhitelisted = ADMIN_USERS.includes(email);
-
-    // Check database whitelist
-    let isDbWhitelisted = false;
-    try {
-        isDbWhitelisted = await isWhitelisted(email);
-    } catch (e) {
-        console.warn('[admin] Error checking whitelist:', e.message);
-    }
-
-    if (!isFaculty && !isEnvWhitelisted && !isDbWhitelisted) {
-        console.warn(`[admin] Unauthorized access attempt by ${email}`);
-        return res.status(403).json({ error: 'Admin access required' });
-    }
-
-    next();
-}
-
-// Apply admin check to all routes
-router.use(requireAdmin);
+// Admin only (ADMIN_USERS env or whitelist role 'admin'). Faculty is not admin.
+router.use(requireAdmin());
 
 /**
  * GET /requests
@@ -381,11 +353,12 @@ router.put('/quotas/:username', async (req, res) => {
 router.get('/nodes', async (req, res) => {
     try {
         const nodes = {};
-        for (const nodeName of ['hydra', 'chimera', 'cerberus']) {
+        for (const nodeName of Object.keys(resourceConfig.nodes)) {
             const status = await getNodeStatus(nodeName);
             const config = resourceConfig.nodes[nodeName];
             nodes[nodeName] = {
                 ...config,
+                disabled: !!config.disabled,   // DISABLED_NODES (hidden from students)
                 status: status || {
                     is_available: true,
                     current_containers: 0,
@@ -749,9 +722,9 @@ router.post('/whitelist', async (req, res) => {
             return res.status(400).json({ error: 'Email is required' });
         }
 
-        // Validate email format
-        if (!email.includes('@')) {
-            return res.status(400).json({ error: 'Invalid email format' });
+        // Validate email format — campus accounts only (this grants admin/faculty/ta on the platform)
+        if (!/^[a-z0-9._-]+@newpaltz\.edu$/i.test(String(email).trim())) {
+            return res.status(400).json({ error: 'Email must be a @newpaltz.edu account' });
         }
 
         const validRoles = ['admin', 'faculty', 'ta'];

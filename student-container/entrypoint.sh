@@ -73,15 +73,17 @@ if [ ! -d "/home/student/.nvm" ] && [ -d "/etc/skel/.nvm" ]; then
     echo "Node.js $(cat /home/student/.nvm/alias/default) installed"
 fi
 
-# Copy supervisor.d README/examples if not present (for fresh or old volumes)
+# Copy supervisor.d templates if not present (fresh or old volumes), and always
+# refresh README.md from the image so students see current docs (it is not user data)
 if [ ! -d "/home/student/supervisor.d" ] && [ -d "/etc/skel/supervisor.d" ]; then
     echo "Copying supervisor.d templates to home directory..."
     cp -r /etc/skel/supervisor.d /home/student/supervisor.d
     chown -R student:student /home/student/supervisor.d
-elif [ -d "/home/student/supervisor.d" ] && [ ! -f "/home/student/supervisor.d/README.md" ] && [ -f "/etc/skel/supervisor.d/README.md" ]; then
-    # Directory exists but README missing — copy just the README
-    cp /etc/skel/supervisor.d/README.md /home/student/supervisor.d/README.md
-    chown student:student /home/student/supervisor.d/README.md
+elif [ -d "/home/student/supervisor.d" ] && [ -f "/etc/skel/supervisor.d/README.md" ]; then
+    if ! cmp -s /etc/skel/supervisor.d/README.md /home/student/supervisor.d/README.md; then
+        cp /etc/skel/supervisor.d/README.md /home/student/supervisor.d/README.md
+        chown student:student /home/student/supervisor.d/README.md
+    fi
 fi
 
 # Create Jupyter approval marker if env var is set
@@ -108,6 +110,19 @@ elif [ -d /var/run/docker ]; then
         sleep 1
     done) &
 fi
+
+# Heal any root-owned leftovers from prior pod sessions or supervisor-as-root operations
+for d in .docker .cache .config .npm .nvm .vscode-server; do
+  if [ -d "/home/student/$d" ]; then
+    chown -R student:docker "/home/student/$d" 2>/dev/null || true
+  fi
+done
+
+# Quarantine any ~/supervisor.d/*.conf that supervisord could not parse.
+# supervisord is PID 1: one bad drop-in (e.g. user=postgres after the account
+# vanished on restart) would otherwise abort it and take sshd/code-server down.
+# Never fatal — the container always starts.
+/usr/local/bin/validate-supervisor-dropins || echo "WARN: drop-in validation failed to run; starting supervisord anyway"
 
 # Handle graceful shutdown
 trap 'supervisorctl shutdown && exit 0' SIGTERM SIGINT

@@ -8,3 +8,14 @@ dev/jwt-keys
 *.log
 .DS_Store
 Thumbs.db
+
+# secrets / runtime state — mounted at runtime (hydra-jwt-keys secret, hostPath data/ and sshpiper/config), never baked in
+*.pem
+*.key
+data/
+sshpiper/config/
+*.db
+*.db-wal
+*.db-shm
+k8s/backup-*/
+test/

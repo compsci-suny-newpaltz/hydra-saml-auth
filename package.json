@@ -7,7 +7,9 @@
     "start": "node index.js",
     "dev": "nodemon index.js",
     "extract-cert": "node scripts/extract-cert.js",
-    "openwebui:server": "node openwebui-api.js"
+    "openwebui:server": "node openwebui-api.js",
+    "test": "node --test test/*.test.js",
+    "test:e2e": "node --test test/e2e/*.test.js"
   },
   "dependencies": {
     "@kubernetes/client-node": "^0.21.0",
