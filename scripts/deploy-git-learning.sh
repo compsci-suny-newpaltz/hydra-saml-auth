@@ -70,6 +70,13 @@ ${KUBECTL} -n ${NS} set image deploy/${DEPLOY} ${DEPLOY}=${IMAGE}:${TAG}
 ${KUBECTL} -n ${NS} rollout status deploy/${DEPLOY} --timeout=180s
 
 # ---- 5. smoke ------------------------------------------------------------
+# Traefik may still hand requests to the draining pod for a few seconds.
+echo "==> Waiting for the new pod to answer through Traefik"
+for i in $(seq 1 30); do
+  curl -sf --max-time 5 "${PUBLIC}/healthz" >/dev/null 2>&1 && \
+  [ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "${PUBLIC}/module/git-intro")" = 200 ] && break
+  sleep 2
+done
 echo "==> Smoke"
 fail=0
 chk() { if eval "$2"; then echo "  ok   $1"; else echo "  FAIL $1"; fail=1; fi; }
