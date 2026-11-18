@@ -19,9 +19,10 @@ spec:
         kubernetes.io/hostname: hydra
       containers:
         - name: git-learning
-          image: gg-git-learning-app:latest
+          # Built locally by scripts/deploy-git-learning.sh and imported into
+          # RKE2 containerd; the script pins a versioned tag on the deployment.
+          image: docker.io/library/gg-git-learning-app:latest
           imagePullPolicy: Never
-          command: ["pm2-runtime", "backend/server.js"]
           ports:
             - containerPort: 38765
               name: http
@@ -37,15 +38,22 @@ spec:
             limits:
               memory: "256Mi"
               cpu: "300m"
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           livenessProbe:
             httpGet:
-              path: /git
+              path: /git/healthz
               port: 38765
             initialDelaySeconds: 10
             periodSeconds: 30
           readinessProbe:
             httpGet:
-              path: /git
+              path: /git/healthz
               port: 38765
             initialDelaySeconds: 5
             periodSeconds: 10
